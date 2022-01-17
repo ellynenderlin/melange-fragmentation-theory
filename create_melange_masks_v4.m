@@ -1,4 +1,3 @@
-n
 function create_melange_masks_v4(root_path,glacier_abbrev,output_path)
 %------------------------------------
 % Description: Intersect the melange masks used to crop digital elevation
@@ -703,7 +702,7 @@ for p = 1:length(melange_mats)
             melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
         end
         clear term_in termdist termx termy term_start term_end;
-        figure; set(gcf,'position',[50 450 1600 600]);
+        figure; set(gcf,'position',[50 50 1600 600]);
         imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
         colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
         set(gca,'xlim',[max(min(melpoly_x),min(Z.x)) min(max(melpoly_x),max(Z.x))],'ylim',[max(min(melpoly_y),min(Z.y)) min(max(melpoly_y),max(Z.y))]);
@@ -733,7 +732,7 @@ for p = 1:length(melange_mats)
         clear Z melpoly* outline_* out_* *in Z*grid;
         
     else
-        figure; set(gcf,'position',[50 450 1600 600]);
+        figure; set(gcf,'position',[50 50 1600 600]);
         imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
         colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
         set(gca,'xlim',[max(min(Z.fjord.DEM_maskX),min(Z.x)) min(max(Z.fjord.DEM_maskX),max(Z.x))],'ylim',[max(min(Z.fjord.DEM_maskY),min(Z.y)) min(max(Z.fjord.DEM_maskY),max(Z.y))]);
@@ -747,9 +746,6 @@ for p = 1:length(melange_mats)
     
     close all; drawnow; clear newtif;
 end
-
-
-
 
 disp('Done converting geotiffs to mat-files');
 
