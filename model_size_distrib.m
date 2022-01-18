@@ -40,7 +40,7 @@ nthresh = 1e-8; % set small size bin cutoff (n1 must be greater than this value)
 season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
 0.600	0.439	0.671; 0.761	0.647	0.812; 0.906	0.831	0.910;
 0.851	0.941	0.827; 0.651	0.859	0.627; 0.353	0.682	0.380; 
-0.106	0.471	0.216; 0.000	0.267	0.106; 0.50 0.50 0.50]; %close gcf;
+0.106	0.471	0.216; 0.000	0.267	0.106; 0.50 0.50 0.50]; close gcf;
 
 %% 1) plot size distributions to examine
 
@@ -69,7 +69,7 @@ end
 % for p = 1:nfiles
 %     if p == 2;
 %         % load the data
-%         name = fnames(p,:); fname = fnames(p,:);
+%         name = fnames(p,:);
 %         load_data = ['load ',name]; eval(load_data);
 %         disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
 %         v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)');
@@ -98,7 +98,7 @@ end
 %         a = 2; % hold alpha at 2
 %         
 %         % grab c1 and c4 guesses using EBC_fragmentation curve
-%         [alpha,c1_guess,c2_x,c3_x,c4_guess,data_lims,error] = EBC_fragmentation_curve(fname, v1, n1, dv1, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
+%         [alpha,c1_guess,c2_x,c3_x,c4_guess,data_lims,error] = EBC_fragmentation_curve(name, v1, n1, dv1, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
 %         
 %         c0 = [c1_guess, c2_guess, a, c3_guess, c4_guess]; % initial guess vector
 %         c0 = abs(c0); % make sure initial guess is at least positive in all coeficients   
@@ -112,8 +112,8 @@ end
 %         n_mod = EBC_model(c,v1); % grab model
 %         
 %         % add to plot
-%         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fname(8:9)),:)); hold on;
-%         loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(fname(8:9)),:)); hold on;
+%         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
+%         loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
 %         xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
 %         title('Iceberg size distribution'); grid on;
 %     end
@@ -165,7 +165,7 @@ for p = 1:nfiles
 
         subplot(1,2,1); % plot result
         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
-        loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(fname(8:9)),:)); hold on;
+        loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
         xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
         title('Iceberg size distribution'); grid on;
         
@@ -191,7 +191,7 @@ for p = 1:nfiles
         loglog(resn_idx, abs(resn)./(abs(n(resn_idx)).^normalize_exp), 'kx'); 
         legend('positive', 'negative'); set(gca,'FontSize',16);
         title('Residuals'); grid on;
-        sgtitle(fname(1:11)); % plot title
+        sgtitle(name(1:11)); % plot title
         
         submarine_melt_influence = 1; % initially assume influence of sub. melt
         % if there are at least 2 negative residuals in the first 8 points,
@@ -249,7 +249,7 @@ for p = 1:nfiles
                 xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
                 title('submarine melt considered');
                 legend('data','submarine melt','E-BC frag. model');
-                sgtitle(fname(1:11)); % plot title
+                sgtitle(name(1:11)); % plot title
             end
         else
             c5 = NaN; c6 = NaN;

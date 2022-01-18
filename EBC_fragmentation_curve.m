@@ -26,7 +26,7 @@ function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(fname, v1
 % SYNTAX: FILL IN
 
 %initialize
-addpath('/Users/jukesliu/Documents/CALVING-ICEBERGS/general/') % add general functions to path
+% addpath('/Users/icebergs/general-code/') % add general functions to path
 clf; 
 if tracktime == 1; tic; end % track time
 season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;

@@ -15,7 +15,7 @@ function [c1, c2] = sub_melt_curve(v, n, dv, norm_type)
 % OUTPUTS: FILL IN
 % SYNTAX: FILL IN
 
-addpath('/Users/jukesliu/Documents/CALVING-ICEBERGS/general/') % add general functions to path
+% addpath('/Users/icebergs/general-code/') % add general functions to path
 clf; % clear figure
 season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
 0.600	0.439	0.671; 0.761	0.647	0.812; 0.906	0.831	0.910;

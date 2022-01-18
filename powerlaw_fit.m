@@ -17,7 +17,7 @@ function [error,c1,c2] = powerlaw_fit(v, n, norm_type, lbounds, ubounds)
 % OUTPUTS: FILL IN
 % SYNTAX: FILL IN
 
-addpath('/Users/jukesliu/Documents/CALVING-ICEBERGS/general/') % add general functions to path
+% addpath('/Users/icebergs/general-code/') % add general functions to path
 
 % manually perform inversion to find initial guesses:
 m = length(v);
