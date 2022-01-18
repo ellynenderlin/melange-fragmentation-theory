@@ -261,10 +261,10 @@ for p = 1:nfiles
             mkdir([basepath,'/',glacier_abbrev,'/models/']) % make models folder if it doesn't exist
             disp('Models folder created.');
         end
-        saveas(gcf,[basepath,glacier_abbrev,'/models/',name(1:11),'_model.png']) % save into models folder
+        saveas(gcf,[basepath,glacier_abbrev,'/models/',fname(1:11),'_model.png']) % save into models folder
         
         % save the parameters
-        params(p,:) = [str2num(name(4:11)), c1, c2, alpha, c3, c4, c5, c6];
+        params(p,:) = [str2num(fname(4:11)), c1, c2, alpha, c3, c4, c5, c6];
         
         % clear variables
         clearvars -except nfiles fnames season_cmap nthresh basepath root_path glacier_abbrev output_path use_dummy taperthresh dplawthresh params norm_type normalize_exp
