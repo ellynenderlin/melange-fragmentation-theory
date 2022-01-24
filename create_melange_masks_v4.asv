@@ -600,27 +600,20 @@ for p = 1:length(melange_mats)
             clear xi yi;
         end
         %find terminus positions inside the outline
-        set(gca,'clim',[0 80]);
-        if ~isempty(out_intercept)
-            term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
-            termdist = sqrt((outline_x(out_intercept(1))-termx).^2 + (outline_y(out_intercept(1))-termy).^2);
-            term_start = find(termdist == min(termdist)); term_end = find(termdist == max(termdist));
-            if term_start > term_end
-                melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:-1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
-                melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:-1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
-            else
-                melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
-                melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
-            end
-            
-            plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on; drawnow;
-            disp('melange polygon cropped with terminus trace = cyan dashed line');
+        term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
+        termdist = sqrt((outline_x(out_intercept(1))-termx).^2 + (outline_y(out_intercept(1))-termy).^2);
+        term_start = find(termdist == min(termdist)); term_end = find(termdist == max(termdist)); 
+        if term_start > term_end
+            melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:-1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
+            melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:-1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
         else
-            disp('old terminus trace did not intersect melange mask in 2 places');
-            plot(outline_x,outline_y,'--c','linewidth',2); hold on; drawnow;
+            melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
+            melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
         end
+        set(gca,'clim',[0 80]); 
+        plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on; drawnow;
         clear term_in termdist termx termy term_start term_end out_* outline_* meledge*;
-        
+        disp('melange polygon cropped with terminus trace = cyan dashed line');
         
         %retrace the terminus if it looks wonky
         prompt = 'Does the melange mask cropped with the terminus trace look good (y/n)? If terminus not visible, does the line go straight across the fjord?'; term_str = input(prompt,'s');

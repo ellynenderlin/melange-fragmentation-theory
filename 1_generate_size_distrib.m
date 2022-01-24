@@ -11,7 +11,7 @@ addpath('/Users/icebergs/general-code/');
 addpath('/Users/icebergs/general-code/cmocean/'); % add general functions to path)
 
 % set paths and glacier to analyze manually:
-glacier_abbrev = 'DJ' ; % SET GLACIER ID HERE
+glacier_abbrev = 'KO' ; % SET GLACIER ID HERE
 basepath='/Users/icebergs/iceberg-fragmentation/';
 addpath([basepath,'DEMsizes_matlab-python']);
 root_path = basepath; output_path = basepath;
@@ -29,3 +29,5 @@ extract_automated_iceberg_DEM_distributions_v4(root_path,glacier_abbrev,output_p
 
 %% c) Automatically fit fragmentation curves to the size distributions
 model_size_distrib(root_path,glacier_abbrev)
+
+disp('Move on to ''2_manually_adjust_fits.ipynb'' Jupyter Notebook to correct wonky fragmentation fits');
