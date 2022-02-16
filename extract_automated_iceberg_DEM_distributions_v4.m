@@ -188,8 +188,7 @@ for p = 1:length(mats)
             title([DEMmat_dates(p,1:4),'/',DEMmat_dates(p,5:6),'/',DEMmat_dates(p,7:8)],'fontsize',16); grid on; drawnow;
             
 %             %save figures
-            saveas(figDEM,[glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.png'],'png'); 
-%             saveas(figratio,[glacier_abbrev,'-',DEMmat_dates(p,:),'_iceberg-aspectratios.png'],'png'); 
+%             saveas(figDEM,[glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.png'],'png'); 
             
             %uncomment next two lines if you want to delete the HUGE iceberg distribution files for the manual delineations
 %             recycle('on'); %send to recycling, not permanently delete

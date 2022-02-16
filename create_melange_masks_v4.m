@@ -601,30 +601,32 @@ for p = 1:length(melange_mats)
         end
         %find terminus positions inside the outline
         set(gca,'clim',[0 80]);
-        if ~isempty(out_intercept)
+        if length(out_intercept) > 1
             term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
             termdist = sqrt((outline_x(out_intercept(1))-termx).^2 + (outline_y(out_intercept(1))-termy).^2);
-            term_start = find(termdist == min(termdist)); term_end = find(termdist == max(termdist));
-            if term_start > term_end
-                melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:-1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
-                melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:-1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
+            term_start = find(termdist == min(termdist)); %term_end = find(termdist == max(termdist));
+            if term_start ~=1
+                melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:-1:1); out_interceptx(end); outline_x(out_intercept(2)+1:end)];
+                melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:-1:1); out_intercepty(end); outline_y(out_intercept(2)+1:end)];
             else
-                melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
-                melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
+                melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:end); out_interceptx(end); outline_x(out_intercept(2)+1:end)];
+                melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:end); out_intercepty(end); outline_y(out_intercept(2)+1:end)];
             end
             
             plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on; drawnow;
             disp('melange polygon cropped with terminus trace = cyan dashed line');
+            term_flag = 0;
         else
             disp('old terminus trace did not intersect melange mask in 2 places');
             plot(outline_x,outline_y,'--c','linewidth',2); hold on; drawnow;
+            term_flag = 1;
         end
         clear term_in termdist termx termy term_start term_end out_* outline_* meledge*;
         
         
         %retrace the terminus if it looks wonky
         prompt = 'Does the melange mask cropped with the terminus trace look good (y/n)? If terminus not visible, does the line go straight across the fjord?'; term_str = input(prompt,'s');
-        if contains(term_str,'n')==1
+        if contains(term_str,'n')==1 || term_flag == 1 %retrace if manually or automatically flagged as bad
             %trace the terminus, making sure to intersect the edges of the melange mask
             disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
             disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
@@ -647,7 +649,7 @@ for p = 1:length(melange_mats)
         end
         clear prompt term_str;
     end
-    clear Z melpoly* outline_* out_* in Z*grid;
+    clear Z melpoly* outline_* out_* in Z*grid term_flag;
     close all; drawnow;
     
     clear newtif;
@@ -730,7 +732,7 @@ for p = 1:length(melange_mats)
             clear xi yi;
         end
         %if only one intercept redraw the terminus
-        if length(out_intercept) ~= 2
+        if length(out_intercept) < 2
             disp('Incorrect number of intersections between the terminus delineation w/ the fjord outline!');
             figure; set(gcf,'position',[50 50 1600 600]);
             imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
@@ -757,13 +759,13 @@ for p = 1:length(melange_mats)
         %find terminus positions inside the outline
         term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
         termdist = sqrt((outline_x(out_intercept(1))-termx).^2 + (outline_y(out_intercept(1))-termy).^2);
-        term_start = find(termdist == min(termdist)); term_end = find(termdist == max(termdist)); 
-        if term_start > term_end
-            melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:-1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
-            melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:-1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
+        term_start = find(termdist == min(termdist)); %term_end = find(termdist == max(termdist));
+        if term_start ~=1
+            melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:-1:1); out_interceptx(end); outline_x(out_intercept(2)+1:end)];
+            melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:-1:1); out_intercepty(end); outline_y(out_intercept(2)+1:end)];
         else
-            melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:term_end); out_interceptx(2); outline_x(out_intercept(2)+1:end)];
-            melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(2); outline_y(out_intercept(2)+1:end)];
+            melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:end); out_interceptx(end); outline_x(out_intercept(2)+1:end)];
+            melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:end); out_intercepty(end); outline_y(out_intercept(2)+1:end)];
         end
         clear term_in termdist termx termy term_start term_end;
         figure; set(gcf,'position',[50 50 1600 600]);
