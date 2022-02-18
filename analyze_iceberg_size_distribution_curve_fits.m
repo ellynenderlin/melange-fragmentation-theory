@@ -4,10 +4,10 @@
 
 %% initialize (run every time)
 clearvars; close all;
-addpath('/Users/ellynenderlin/mfiles/general/cmocean/');
+addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
 
 %root directory for all glacier folders
-root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/fragmentation-curves/';
+root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/';
 
 %automated fit file info
 auto_folder = 'models';
@@ -33,7 +33,7 @@ region_flag = ['NW'; 'CE'; 'SE'; 'SE'; 'CW'; 'NW'; 'CW'; 'SE'; 'SE'; 'NW'; 'CE';
 cd_to_root = ['cd ',root_dir]; eval(cd_to_root);
 sites = dir; sitenames = [];
 for i = 1:length(sites)
-    if ~contains(sites(i).name,'.')
+    if ~contains(sites(i).name,'.') && length(sites(i).name) == 2
         sitenames = [sitenames; sites(i).name];
     end
 end
