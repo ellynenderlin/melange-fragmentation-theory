@@ -7,6 +7,7 @@ function create_melange_masks_v4(root_path,glacier_abbrev,output_path)
 
 % addpath('/Users/ellynenderlin/mfiles/general/') % change this to where your general folder is
 
+%% make a mask
 %if you already have a melange mask, load it, otherwise make one (requires
 %a Landsat panchromatic image reprojected to Greenland Polar Stereo
 %coordinates and renamed with *B8PS.TIF ending)
@@ -75,6 +76,7 @@ else
     end
     
     % take user input
+    disp('Click on two vertices that define a bounding box to zoom in on the glacier');
     a = ginput(2);
     set(gca,'xlim',sort(a(:,1)),'ylim',sort(a(:,2))); drawnow;
   
@@ -362,14 +364,14 @@ end
 %% custom modify the melange mask for each DEM (remove glacier & DEM blunders)
 load_masks = ['load(''',glacier_abbrev,'-melange-masks.mat''',')']; eval(load_masks);
 %uncomment lines directly below if you are just running this section
-% melangemat_dates = ''; melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
-% for i = 1:length(melange_mats)
-%     melangemat_dates(i,:) = melange_mats(i).name(4:11);
-% end
-% tifs = dir('*_dem.tif');
-% for i = 1:length(tifs)
-%     DEMtif_dates(i,:) = tifs(i).name(6:13);
-% end
+ %melangemat_dates = ''; melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
+%for i = 1:length(melange_mats)
+    %melangemat_dates(i,:) = melange_mats(i).name(4:11);
+%end
+%tifs = dir('*_dem.tif');
+%for i = 1:length(tifs)
+    %DEMtif_dates(i,:) = tifs(i).name(6:13);
+%end
 
 %set-up the dated melange mask structure
 if ~isfield(melmask,'dated')

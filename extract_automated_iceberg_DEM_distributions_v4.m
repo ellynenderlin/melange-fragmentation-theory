@@ -81,8 +81,12 @@ for p = 1:length(mats)
     %         outputberg_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_iceberg-data.mat'];
     outputberg_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];
     %identify the original & filled DEMs
-    for k = 1:size(filledDEM_dates,1)
-        filledflag(k) = contains(string(DEMmat_dates(p,:)),filledDEM_dates(k,:));
+    if ~isempty(filled_DEMs)
+        for k = 1:size(filledDEM_dates,1)
+            filledflag(k) = contains(string(DEMmat_dates(p,:)),filledDEM_dates(k,:));
+        end
+    else
+        filledflag = zeros(size(DEMmat_dates,1),1);
     end
     
     %loop through DEMs WITHOUT manual aspect ratios & extract elevation
