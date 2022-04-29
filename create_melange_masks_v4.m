@@ -711,7 +711,8 @@ for p = 1:length(melange_mats)
     load_DEM = ['load ',DEM_name]; eval(load_DEM);
     
     %identify if it is a newly-delineated terminus (if so, apply masks)
-    if isempty(melmask.dated(p).x)
+    maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
+    if isempty(melmask.dated(maskref).x)
         %crop the melange mask using the terminus trace
         [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
         [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
@@ -792,8 +793,8 @@ for p = 1:length(melange_mats)
         %save the mask for each time step
         cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
         saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
-        melmask.dated(p).datestring = melangemat_dates(p,:);
-        melmask.dated(p).x = melpoly_x; melmask.dated(p).y = melpoly_y;
+        melmask.dated(maskref).datestring = melangemat_dates(p,:);
+        melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
         save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
         disp(['Saved ',DEM_name]);
