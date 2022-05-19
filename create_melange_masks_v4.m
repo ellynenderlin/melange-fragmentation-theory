@@ -740,7 +740,7 @@ for p = 1:length(melange_mats)
     load_DEM = ['load ',DEM_name]; eval(load_DEM);
     
     %plot the masked DEM
-    figure; set(gcf,'position',[50 50 1600 600]);
+    figure; set(gcf,'position',[50 50 1600 50]);
     imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
     colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
     set(gca,'xlim',[max(min(Z.fjord.DEM_maskX),min(Z.x)) min(max(Z.fjord.DEM_maskX),max(Z.x))],'ylim',[max(min(Z.fjord.DEM_maskY),min(Z.y)) min(max(Z.fjord.DEM_maskY),max(Z.y))]);
@@ -748,10 +748,11 @@ for p = 1:length(melange_mats)
     maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
     if ~isempty(melmask.dated(maskref).x)
         plot(melmask.dated(maskref).x,melmask.dated(maskref).y,'--c','linewidth',2); hold on;
+    else
+        disp('No mask was plotted because the melange mask needs to be redone');
     end
     title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
     drawnow;
-    disp('If no mask was plotted, the melange mask needs to be redone');
     
     %check if you want to forcibly re-create the mask
     answer = questdlg('Do you need to recreate the melange mask?',...
