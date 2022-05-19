@@ -519,10 +519,7 @@ for p = 1:length(melange_mats)
             if contains(melmask.dated(1).datestring,'start')
                 melmask.dated(1).datestring = melangemat_dates(p,:); melmask.dated(1).x = []; melmask.dated(1).y = [];
             else
-                maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
-                if isempty(maskref)
-                    maskref = length(melmask.dated)+1;
-                end
+                maskref = length(melmask.dated)+1;
                 melmask.dated(maskref).datestring = melangemat_dates(p,:); melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
             end
             cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
@@ -732,7 +729,7 @@ else %otherwise DEMs are in root directory
 end
 
 %loop through & mask and plot if new or just plot if old
-for p = 1:length(melange_mats)
+for p = 6; %1:length(melange_mats)
     disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
     disp(melangemat_dates(p,:));
     cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
@@ -745,7 +742,6 @@ for p = 1:length(melange_mats)
     colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
     set(gca,'xlim',[max(min(Z.fjord.DEM_maskX),min(Z.x)) min(max(Z.fjord.DEM_maskX),max(Z.x))],'ylim',[max(min(Z.fjord.DEM_maskY),min(Z.y)) min(max(Z.fjord.DEM_maskY),max(Z.y))]);
     set(gcf,'position',[50 450 1600 600]);
-    maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
     if ~isempty(melmask.dated(maskref).x)
         plot(melmask.dated(maskref).x,melmask.dated(maskref).y,'--c','linewidth',2); hold on;
     end
@@ -765,6 +761,7 @@ for p = 1:length(melange_mats)
     clear answer; close(gcf);
     
     %identify if it is a newly-delineated terminus (if so, apply masks)
+    maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
     if isempty(melmask.dated(maskref).x) || redo_flag == 1
         %crop the melange mask using the terminus trace
         [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
