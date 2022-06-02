@@ -707,7 +707,7 @@ end
 
 
 %% apply the fjord mask w/ moving terminus boundary
-disp('Applying mask to each DEM... this takes a LONG LONG time (>1 hr/DEM)');
+disp('Applying mask to each DEM as necessary... this takes a LONG LONG time (>1 hr/DEM)');
 %identify the melange DEMs (some DEMs mave have been removed in the last step due to poor coverage)
 clear melangemat_dates; 
 melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); 
@@ -729,6 +729,13 @@ else %otherwise DEMs are in root directory
     for i = 1:length(tifs)
         DEMtif_dates(i,:) = tifs(i).name(6:13);
     end
+end
+
+%located filled DEMs (created during next step & will be deleted if you
+%decide the old mask was wrong)
+filled_DEMs = dir([glacier_abbrev,'*melange-DEMfilled.mat']);
+for i = 1:length(filled_DEMs)
+    filledDEM_dates(i,:) = filled_DEMs(i).name(4:11);
 end
 
 %loop through & mask and plot if new or just plot if old
@@ -753,6 +760,8 @@ for p = 1:length(melange_mats)
     end
     title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
     drawnow;
+    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+    saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
     
     %check if you want to forcibly re-create the mask
     answer = questdlg('Do you need to recreate the melange mask?',...
@@ -767,6 +776,19 @@ for p = 1:length(melange_mats)
     
     %identify if it is a newly-delineated terminus (if so, apply masks)
     if isempty(melmask.dated(maskref).x) || redo_flag == 1
+        %delete filled DEM created with wrong mask (if is exists)
+        if ~isempty(filled_DEMs)
+            %find the corresponding filled DEM
+            for k = 1:size(filledDEM_dates,1)
+                filledflag(k) = contains(DEM_name,filledDEM_dates(k,:));
+            end
+            %delete the corresponding filled DEM
+            if sum(filledflag > 0)
+                delete([filled_DEMs(filledflag==1).name]);
+            end
+            clear filledflag;
+        end
+        
         %crop the melange mask using the terminus trace
         [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
         [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
@@ -854,10 +876,6 @@ for p = 1:length(melange_mats)
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
         disp(['Saved ',DEM_name]);
         clear Z melpoly* outline_* out_* *in Z*grid;
-        
-    else
-        cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-        saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
     end
     
     close all; drawnow; clear newtif;

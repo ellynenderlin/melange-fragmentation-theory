@@ -22,10 +22,9 @@ eval(cd_to_glacier);
 disp('Create custom melange masks... the last step (masking) should ideally run overnight');
 create_melange_masks_v4(root_path,glacier_abbrev,output_path) 
 
-%create_melange_masks_MD(root_path,glacier_abbrev,output_path) 
-
 %% b) Extract the automated iceberg distributions from the DEM
 extract_automated_iceberg_DEM_distributions_v4(root_path,glacier_abbrev,output_path)
+close all;
 
 %% c) Automatically fit fragmentation curves to the size distributions
 model_size_distrib(root_path,glacier_abbrev)

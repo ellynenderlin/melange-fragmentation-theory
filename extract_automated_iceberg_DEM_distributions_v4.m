@@ -77,8 +77,6 @@ for p = 1:length(mats)
     %specify output location and file names
     cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
     DEM_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.mat']; save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; %raw & intermediate elevation data
-    %         filledDEM_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat']; %filled, orthorectified DEM
-    %         outputberg_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_iceberg-data.mat'];
     outputberg_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];
     %identify the original & filled DEMs
     if ~isempty(filled_DEMs)
@@ -96,14 +94,14 @@ for p = 1:length(mats)
         %load the gap-filled DEM if already generated or the raw DEM if new
         if sum(filledflag)>0
             disp('loading gap-filled DEM');
-            cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-            load_DEM = ['load ',filled_DEMs(filledflag==1).name]; eval(load_DEM); %load the gap-filled DEM
+            cd([output_path,'/',glacier_abbrev,'/']);
+            load(filled_DEMs(filledflag==1).name); %load the gap-filled DEM
             clear filledflag;
         end
         %check that filled DEM contains all the necessary data
         if exist('M') ~=1
             disp('loading raw DEM');
-            cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
+            cd([root_path,'/',glacier_abbrev]);
             load_DEM = ['load ',DEM_name]; eval(load_DEM); %load the masked orthometric melange elevations in Z structure
             disp('DEM loaded');
             
@@ -141,7 +139,7 @@ for p = 1:length(mats)
         %old processing pipeline, add it to the filled DEM then delete
         for j = 1:length(iceberg_dates)
             if contains(string(DEMmat_dates(p,:)),iceberg_dates(j,:))
-                load_old_file = ['load ',iceberg_mats(j).name]; eval(load_old_file);
+                load(iceberg_mats(j).name);
                 save_filledDEM = ['save(''',outputberg_name,''',''M'',''m'',''-v7.3'')']; eval(save_filledDEM);
                 %move to an old file folder instead of deleting
                 if exist('old-icebergs') == 0
@@ -190,9 +188,6 @@ for p = 1:length(mats)
             set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
             xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
             title([DEMmat_dates(p,1:4),'/',DEMmat_dates(p,5:6),'/',DEMmat_dates(p,7:8)],'fontsize',16); grid on; drawnow;
-            
-%             %save figures
-%             saveas(figDEM,[glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.png'],'png'); 
             
             %uncomment next two lines if you want to delete the HUGE iceberg distribution files for the manual delineations
 %             recycle('on'); %send to recycling, not permanently delete
