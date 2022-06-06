@@ -16,7 +16,7 @@ function model_size_distrib(basepath,glacier_abbrev)
 root_path = basepath; output_path = basepath;
 cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; 
 eval(cd_to_glacier);
-disp(['Analyzing ',glacier_abbrev]);
+disp(['Analyzing ',glacier_abbrev,'...']);
 
 %% 0) grab the data
 iceberg_dates = '';

@@ -750,7 +750,7 @@ for p = 1:length(melange_mats)
     figure; set(gcf,'position',[50 50 1600 50]);
     imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
     colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
-    set(gca,'xlim',[max(min(Z.fjord.DEM_maskX),min(Z.x)) min(max(Z.fjord.DEM_maskX),max(Z.x))],'ylim',[max(min(Z.fjord.DEM_maskY),min(Z.y)) min(max(Z.fjord.DEM_maskY),max(Z.y))]);
+    set(gca,'xlim',[min(Z.x) max(Z.x)],'ylim',[min(Z.y) max(Z.y)]);
     set(gcf,'position',[50 450 1600 600]);
     maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
     if ~isempty(melmask.dated(maskref).x)
