@@ -137,7 +137,7 @@ for p = 1:length(mats)
         
         %if there is an "iceberg-data" matfile, which is leftover from an
         %old processing pipeline, add it to the filled DEM then delete
-        for j = 1:length(iceberg_dates)
+        for j = 1:size(iceberg_dates,1)
             if contains(string(DEMmat_dates(p,:)),iceberg_dates(j,:))
                 load(iceberg_mats(j).name);
                 save_filledDEM = ['save(''',outputberg_name,''',''M'',''m'',''-v7.3'')']; eval(save_filledDEM);
@@ -207,7 +207,7 @@ for p = 1:length(mats)
         disp('Iceberg data already extracted');
     end
 end
-disp("Done.");
+disp("Done creating hole-less melange DEMs");
 %% UPDATE FILES AND PLOT ICEBERG SIZE DISTRIBUTIONS
 cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
 DEM_mats = dir([glacier_abbrev,'*_melange-DEMfilled.mat']); DEM_dates = ''; %DEMs
@@ -218,7 +218,7 @@ close all; drawnow;
 
 %convert elevation distributions into iceberg size distributions   
 %note: this could be merged with the loop above to increase efficiency
-disp('Creating a time series of iceberg size distributions...');
+disp('Extracting iceberg size distributions...');
 for p = 1:length(DEM_mats)
     cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
     

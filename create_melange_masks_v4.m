@@ -370,7 +370,7 @@ end
 
 
 %% custom modify the melange mask for each DEM (remove glacier & DEM blunders)
-load_masks = ['load(''',glacier_abbrev,'-melange-masks.mat''',')']; eval(load_masks);
+load([glacier_abbrev,'-melange-masks.mat']);
 %uncomment lines directly below if you are just running this section
  %melangemat_dates = ''; melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
 %for i = 1:length(melange_mats)
@@ -401,7 +401,7 @@ for p = 1:length(melange_mats)
     
     %if it is a new DEM, create a custom melange mask that removes blunders, open water, and the glacier
     if sum(newtif) > 0
-        %load the DEM
+        %load the DE
         disp(['DEM #',num2str(p),' of ',num2str(size(melangemat_dates,1))]);
         disp(melangemat_dates(p,:));
         cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
@@ -834,7 +834,6 @@ for p = 1:length(melange_mats)
                 end
                 clear xi yi;
             end
-            close(gcf);
         end
         %find terminus positions inside the outline
         term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
@@ -868,7 +867,7 @@ for p = 1:length(melange_mats)
         set(gca,'clim',[0 70]); grid on;
         
         %save the mask for each time step
-        cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+        eval(cd_to_output);
         saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
