@@ -7,7 +7,7 @@
 %for Matlab downloaded
 %(https://www.mathworks.com/matlabcentral/fileexchange/57773-cmocean-perceptually-uniform-colormaps)
 %or you can swap the call to cmocean when creating "cmap" with one of
-%Matbla's built-in colormaps.
+%Matlab's built-in colormaps.
 
 %Section 1: Uses a Landsat image and the melange-masks matlab file in each
 %site directory to create an overview figure for each study site.
@@ -21,16 +21,17 @@
 clearvars; close all;
 
 %specify directories for required files
-root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/'; %over-arching directory (include trailing /)
-DEM_dir = root_dir; %code will navigate to this directory and then into a site name directory to look for DEMs
+root_dir = '/Users/icebergs/iceberg-fragmentation/'; %over-arching directory (include trailing /)
+DEM_dir = [root_dir,'AGU2021/']; %code will navigate to this directory and then into a site name directory to look for DEMs
 
 %add cmocean toolbox to your Matlab path
-addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/');
-addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
+addpath('/Users/icebergs/general-code/');
+addpath('/Users/icebergs/general-code/cmocean/');
 
 %set plot variables
 years = [2011:1:2021];
-cmap = cmocean('haline',length(years));
+cmap = cmocean('haline',length(years)); %color map for the terminus delineations
+% cmap = colormap(gray(length(year))); %alternative gray-scale colormap for terminus delineations
 site_names = ['HM';'KO';'AG';'IG';'UN';'US';'IB';'UM';'RI';'JI';'KB';'HH';'MG';'KL';'MD';'DJ';'ZI']; %used to identify site-specific directories
 reg_flags = [3;3;3;3;3;3;2;2;2;2;1;1;1;1;4;4;5]; %specifies the region for each site listed in site_names (1=SE,2=SW,3=NW,4=CE,5=NE)
 reg_colors = [215,25,28; 253,174,97; 255,255,191; 171,217,233; 44,123,182]/255; %same colorblind-friendly color scheme as analyze_iceberg_size_distribution_curve_fits.m

@@ -4,10 +4,10 @@
 
 %% Section 0: Initialize (run every time)
 clearvars; close all;
-addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
+addpath('/Users/icebergs/iceberg-fragmentation/general-code/cmocean/');
 
 %specify directories for required files ([root_dir,'/',site_names(i)])
-root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/'; %include trailing / in file name
+root_dir = '/Users/icebergs/iceberg-fragmentation/'; %include trailing / in file name
 
 %automated fit file info
 auto_folder = 'models';
@@ -128,7 +128,7 @@ for i = 1:length(sitenames)
     F(i).c1 = fit_table(:,2); %branching fragmentation constant
     F(i).c2 = fit_table(:,3); %branching fragmentation 'cut-off'
     F(i).c3 = fit_table(:,5); %tabular fragmentation constant
-    F(i).c4 = fit_table(:,6); %tabular calvin 'cut-off'
+    F(i).c4 = fit_table(:,6); %tabular calving 'cut-off'
     F(i).c5 = fit_table(:,7); %submarine melt constant
     F(i).beta = fit_table(:,8); %submarine melt exponent
     

@@ -18,15 +18,14 @@ cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
 melmask_file = dir([glacier_abbrev,'*-melange-masks.mat']);
 if ~isempty(melmask_file)
     disp('Loading the melange masks...');
-    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-    load_mask = ['load ',glacier_abbrev,'-melange-masks.mat']; eval(load_mask);
+    eval(cd_to_output);
+    load([glacier_abbrev,'-melange-masks.mat']);
 else
     disp('Create a generic fjord mask that extends over the glacier a few kilometers using a Landsat image');
     
     %load the panchromatic Landsat scene & create a glacier/fjord mask
-    cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
-    L8dir = dir('LC08*');
-    cd_to_L8data = ['cd ',L8dir(1).name]; eval(cd_to_L8data);
+    cd([root_path,'/',glacier_abbrev]);
+    L8dir = dir('LC08*'); cd(L8dir(1).name);
     L8bands = dir('L*.TIF');
     for i = 1:length(L8bands)
         if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
@@ -84,7 +83,7 @@ else
     disp('Trace fjord walls to create a fjord mask, including several km of glacier');
     [~,fjord_maskx,fjord_masky] = roipoly;
     close(gcf); drawnow;
-    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+    eval(cd_to_output);
     melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
     save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
 end
@@ -132,7 +131,7 @@ for p = 1:length(DEMmat_dates)
     %load the .tif if the .mat DEM doesn't exist
     if isempty(strmatch(DEMmat_dates(p,:),melangemat_dates))
         %load the matfile
-        load_DEM = ['load ',mats(p).name]; eval(load_DEM);
+        load(mats(p).name);
         %account for possible alternative structure names
         if exist('Z'); Y=Z; clear Z; %from iceberg DEMs
         elseif exist('DEM'); Y=DEM; clear DEM; Y = rmfield(Y,{'xflow','yflow','zflow'}); %from crevasse DEMs
@@ -182,7 +181,7 @@ for p = 1:length(DEMmat_dates)
         
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
-        cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+        eval(cd_to_output);
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
         disp(['Saved DEM geotiff from ',DEMmat_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
@@ -196,7 +195,7 @@ end
 for p = 1:length(tifs)
     disp(['reformating DEM tif #',num2str(p),' of ',num2str(length(tifs))]);
     disp(DEMtif_dates(p,:));
-    cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
+    cd([root_path,'/',glacier_abbrev]);
     DEM_name = [glacier_abbrev,'-',DEMtif_dates(p,:),'_melange-DEM.mat'];
     
     %load the .tif if the .mat DEM doesn't exist
@@ -261,7 +260,7 @@ for p = 1:length(tifs)
         
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
-        cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+        eval(cd_to_output);
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
         disp(['Saved DEM geotiff from ',DEMtif_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
@@ -285,93 +284,88 @@ answer = questdlg('Was the melange mask just created for the first time & has no
     'Mask Edit','1) Yes!','2) No!','1) Yes!');
 switch answer
     case '1) Yes!'
-        edit_flag = 1;
+        disp('Now modify the fjord mask using the DEMs');
+        cd([root_path,'/',glacier_abbrev]);
+        melmask_file = dir('*-melange-masks.mat');
+        
+        %load the panchromatic Landsat scene & create a glacier/fjord mask
+        L8dir = dir('LC08*'); cd(L8dir(1).name);
+        L8bands = dir('L*.TIF');
+        for i = 1:length(L8bands)
+            if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
+                [I,S] = readgeoraster(L8bands(i).name);
+                im.x = S.XWorldLimits(1):S.SampleSpacingInWorldX:S.XWorldLimits(2);
+                im.y = S.YWorldLimits(2):-S.SampleSpacingInWorldY:S.YWorldLimits(1);
+                im.z = double(I);
+                clear I S;
+            end
+        end
+        cd ..
+        
+        melange_xlims = [min(melmask.uncropped.x)-2000 max(melmask.uncropped.x)+2000]; melange_ylims = [min(melmask.uncropped.y)-2000 max(melmask.uncropped.y)+2000];
+        %crop image to limits
+        if sign(im.x(1)-im.x(end)) == -1
+            xmin = find(im.x<=min(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
+            xmax = find(im.x>=max(melange_xlims),1,'first'); if isempty(xmax); xmax=length(im.x); end
+        else
+            xmin = find(im.x>=max(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
+            xmax = find(im.x<=min(melange_xlims),1,'first'); if isempty(xmax); xmax=length(im.x); end
+        end
+        if sign(im.y(1)-im.y(end)) == -1
+            ymin = find(im.y<=min(melange_ylims),1,'last');
+            ymax = find(im.y>=max(melange_ylims),1,'first');
+        else
+            ymin = find(im.y>=max(melange_ylims),1,'last');  if isempty(ymin); ymin=1; end
+            ymax = find(im.y<=min(melange_ylims),1,'first'); if isempty(ymax); ymax=length(im.y); end
+        end
+        imx = single(im.x(xmin:xmax)); imy = single(im.y(ymin:ymax));
+        % imz = single(im.z(ymin:ymax,xmin:xmax));
+        [Xgrid,Ygrid] = meshgrid(imx,imy); %convert the vector coordinates into matrices
+        
+        %loop through the DEMs & create a DEM mosaic
+        disp('looping through the DEMs & loading elevations to a 3D matrix');
+        for p = 1:length(melange_mats)
+            disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
+            %     disp(melangemat_dates(p,:));
+            cd([root_path,'/',glacier_abbrev]);
+            DEM_name = melange_mats(p).name;
+            load(DEM_name);
+            
+            %interpolate to the cropped Landsat image
+            [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
+            DEMz(:,:,p) = interp2(ZXgrid,ZYgrid,double(Z.z.ortho),Xgrid,Ygrid); %interpolate elevations to the Landsat 8 coordinates
+            clear Z*;
+        end
+        
+        %plot the time-averaged DEM & redraw the melange mask
+        figure1 = figure; set(gcf,'position',[50 50 1600 600]);
+        imagesc(imx,imy,nanmean(DEMz,3)); axis xy equal; hold on;
+        %     elev_cmap = cmocean('thermal',1001); elev_cmap(1,:) = [1 1 1];
+        colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
+        plot(melmask.uncropped.x,melmask.uncropped.y,'-m','linewidth',1); hold on;
+        drawnow;
+        disp('Redraw the fjord mask so it is custom to the DEMs');
+        [~,fjord_maskx,fjord_masky] = roipoly;
+        close(gcf); drawnow;
+        
+        %save the edited melange mask
+        cd([output_path,'/',glacier_abbrev,'/']);
+        melmask = rmfield(melmask,'uncropped');
+        melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
+        save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
+        disp('Edited mask saved');
     case '2) No!'
-        edit_flag = 0;
+        disp('Carrying on with already-edited melange mask');
 end
 clear answer;
-if edit_flag==1
-    disp('Now modify the fjord mask using the DEMs');
-    cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
-    melmask_file = dir('*-melange-masks.mat');
-    
-    %load the panchromatic Landsat scene & create a glacier/fjord mask
-    L8dir = dir('LC08*');
-    cd_to_L8data = ['cd ',L8dir(1).name]; eval(cd_to_L8data);
-    L8bands = dir('L*.TIF');
-    for i = 1:length(L8bands)
-        if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
-            [I,S] = readgeoraster(L8bands(i).name); 
-            im.x = S.XWorldLimits(1):S.SampleSpacingInWorldX:S.XWorldLimits(2);
-            im.y = S.YWorldLimits(2):-S.SampleSpacingInWorldY:S.YWorldLimits(1);
-            im.z = double(I);
-            clear I S;
-        end
-    end
-    cd ..
-    
-    melange_xlims = [min(melmask.uncropped.x)-2000 max(melmask.uncropped.x)+2000]; melange_ylims = [min(melmask.uncropped.y)-2000 max(melmask.uncropped.y)+2000];
-    
-    if sign(im.x(1)-im.x(end)) == -1
-        xmin = find(im.x<=min(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
-        xmax = find(im.x>=max(melange_xlims),1,'first'); if isempty(xmax); xmax=length(im.x); end
-    else
-        xmin = find(im.x>=max(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
-        xmax = find(im.x<=min(melange_xlims),1,'first'); if isempty(xmax); xmax=length(im.x); end
-    end
-    if sign(im.y(1)-im.y(end)) == -1
-        ymin = find(im.y<=min(melange_ylims),1,'last');
-        ymax = find(im.y>=max(melange_ylims),1,'first');
-    else
-        ymin = find(im.y>=max(melange_ylims),1,'last');  if isempty(ymin); ymin=1; end
-        ymax = find(im.y<=min(melange_ylims),1,'first'); if isempty(ymax); ymax=length(im.y); end
-    end
-    imx = single(im.x(xmin:xmax)); imy = single(im.y(ymin:ymax));
-    % imz = single(im.z(ymin:ymax,xmin:xmax));
-    [Xgrid,Ygrid] = meshgrid(imx,imy); %convert the vector coordinates into matrices
-    
-    %loop through the DEMs & create a DEM mosaic
-    disp('looping through the DEMs & loading elevations to a 3D matrix');
-    for p = 1:length(melange_mats)
-        disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
-        %     disp(melangemat_dates(p,:));
-        cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
-        DEM_name = melange_mats(p).name;
-        load_DEM = ['load ',DEM_name]; eval(load_DEM);
-        
-        %interpolate to the cropped Landsat image
-        [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
-        DEMz(:,:,p) = interp2(ZXgrid,ZYgrid,double(Z.z.ortho),Xgrid,Ygrid); %interpolate elevations to the Landsat 8 coordinates
-        clear Z*;
-    end
-    
-    %plot the time-averaged DEM & redraw the melange mask
-    figure1 = figure; set(gcf,'position',[50 50 1600 600]);
-    imagesc(imx,imy,nanmean(DEMz,3)); axis xy equal; hold on;
-%     elev_cmap = cmocean('thermal',1001); elev_cmap(1,:) = [1 1 1];
-    colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
-    plot(melmask.uncropped.x,melmask.uncropped.y,'-m','linewidth',1); hold on;
-    drawnow;
-    disp('Redraw the fjord mask so it is custom to the DEMs');
-    [~,fjord_maskx,fjord_masky] = roipoly;
-    close(gcf); drawnow;
-    
-    %save the edited melange mask
-    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-    melmask = rmfield(melmask,'uncropped');
-    melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
-    save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
-    disp('Edited mask saved');
-    
-else
-    disp('Carrying on with already-edited melange mask');
-    
-end
 
 
 %% custom modify the melange mask for each DEM (remove glacier & DEM blunders)
+if ~exist('melmask')
 load([glacier_abbrev,'-melange-masks.mat']);
-%uncomment lines directly below if you are just running this section
+end
+
+%uncomment lines directly below if you are just running this section for debugging purposes
  %melangemat_dates = ''; melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
 %for i = 1:length(melange_mats)
     %melangemat_dates(i,:) = melange_mats(i).name(4:11);
@@ -392,6 +386,63 @@ disp('IMPORTANT: When masking, you may need to click the hand icon on the figure
 
 %trace the termini & mask-out blunders in all the DEMs
 for p = 1:length(melange_mats)
+    %load the DEM
+    disp(['DEM #',num2str(p),' of ',num2str(size(melangemat_dates,1))]);
+    disp(melangemat_dates(p,:));
+    cd([root_path,'/',glacier_abbrev]);
+    DEM_name = melange_mats(p).name; load(DEM_name);
+    
+    %plot the DEM
+    figure1 = figure; set(gcf,'position',[50 50 1600 600]);
+    imagesc(Z.x,Z.y,Z.z.ortho); axis xy equal; hold on;
+    colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
+    plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+    drawnow;
+    
+    %identify the starting uncropped melange mask vertex to use when
+    %generating cropped melange masks (should be in the water!)
+    if p == 1
+        [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
+        [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
+        meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
+        start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
+        set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
+            'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
+        plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
+        
+        %check that the starting vertex for the melange mask is in the ocean
+        answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
+            'Mask Start Vertex','Ocean','Glacier','Ocean');
+        switch answer
+            case 'Ocean'
+                disp('Melange mask start vertex is correct, carry on!');
+            case 'Glacier'
+                start_dist = sqrt((meledge_x-meledge_x(start_vert(1))).^2 + (meledge_y-meledge_y(start_vert(1))).^2);
+                clear start_vert;
+                start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
+                plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
+        end
+        
+        %sort melange mask vertices so that they start at the defined starting vertex in the ocean
+        if start_vert(1) > 1
+            outline_x = [meledge_x(start_vert(1):end); meledge_x(1:start_vert(1))];
+            outline_y = [meledge_y(start_vert(1):end); meledge_y(1:start_vert(1))];
+        else
+            outline_x = meledge_x; outline_y = meledge_y;
+        end
+        clear meledge*; close(figure1); drawnow;
+        
+        %recreate figure without marks for the melange mask start vertex
+        figure1 = figure; set(gcf,'position',[50 50 1600 600]);
+        imagesc(Z.x,Z.y,Z.z.ortho); axis xy equal; hold on;
+        colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
+        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+        drawnow;
+    end
+    
+    
+    %determine if using a new DEM (if there is a geotiff with the same date
+    %in the same directory... GEM geotiffs are automatically moved in the next step)
     newtif = zeros(length(tifs),1);
     for i = 1:length(tifs)
         if ~isempty(strfind(tifs(i).name,melange_mats(p).name(4:11)))
@@ -401,165 +452,155 @@ for p = 1:length(melange_mats)
     
     %if it is a new DEM, create a custom melange mask that removes blunders, open water, and the glacier
     if sum(newtif) > 0
-        %load the DE
-        disp(['DEM #',num2str(p),' of ',num2str(size(melangemat_dates,1))]);
-        disp(melangemat_dates(p,:));
-        cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
-        DEM_name = melange_mats(p).name; load_DEM = ['load ',DEM_name]; eval(load_DEM);
-        
-        %plot the DEM
         clear spurious* anom* blunders;
-        figure1 = figure; set(gcf,'position',[50 50 1600 600]);
-        imagesc(Z.x,Z.y,Z.z.ortho); axis xy equal; hold on;
-        colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
-        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+        
+        %zoom in on the DEM
         set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
         drawnow;
         
         %check that the DEM covers a few kilometers of the melange, otherwise
         %delete the melange DEM so it isn't called again in the processing pipeline
-        prompt = 'Does the DEM span the fjord & extend a few km from the terminus  (y/n)?'; cover_str = input(prompt,'s');
-        if strmatch(cover_str,'y')==1
-            %remind the user what to do
-            disp('Iteratively generate masks to:');
-            disp('   1) eliminate areas with obvious elevation blunders &')
-            disp('   2) crop the melange area so it doesn''t extend over flat, open water');
-            
-            %iterative blunder removal
-            q=1;
-            while q
-                if q == 1
-                    prompt = 'Create blunder masks (y/n)?'; str = input(prompt,'s');
-                    spurious_vals = zeros(size(Z.z.ortho));
+        answer = questdlg('Does the DEM span the fjord & extend a few km from the terminus?',...
+            'DEM coverage','1) Yes!','2) No!','1) Yes!');
+        switch answer
+            case '1) Yes!'
+                %remind the user what to do
+                disp('Iteratively generate masks to:');
+                disp('   1) eliminate areas with obvious elevation blunders &')
+                disp('   2) crop the melange area so it doesn''t extend over flat, open water');
+                
+                %iterative blunder removal
+                q=1;
+                while q
+                    if q == 1
+                        blunder_question = questdlg('Create blunder masks?',...
+                            'Blunder ID','1) Yes!','2) No!','1) Yes!');
+                        spurious_vals = zeros(size(Z.z.ortho));
+                    else
+                        blunder_question = questdlg('Are additional masks necessary?',...
+                            'Blunder ID','1) Yes!','2) No!','1) Yes!');
+                    end
+                    %execute blunder removal based on question response
+                    switch blunder_question
+                        case '1) Yes!'
+                            figure(figure1);
+                            disp('Click on UL & LR corners of a box bounding the anomalous elevations to zoom in'); % Upper left, lower right.
+                            [a] = ginput(2);
+                            set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                            drawnow;
+                            disp('Draw mask');
+                            anom_zmask = roipoly;
+                            anom_zmask = double(~anom_zmask);
+                            Z.z.ortho = anom_zmask.*Z.z.ortho; Z.z.ortho(Z.z.ortho==0) = NaN;
+                            imagesc(Z.x,Z.y,Z.z.ortho); hold on; axis xy equal;
+                            colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
+                            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+                            drawnow;
+                            blunders = ~anom_zmask;
+                            spurious_vals = spurious_vals + blunders;
+                            q = q+1;
+                            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                            drawnow;
+                        case '2) No!'
+                            spurious_vals(spurious_vals>0) = 1;
+                            clear blunders;
+                            break
+                    end
+                    clear blunder_question;
+                end
+                Z.melange.blunder_mask = single(spurious_vals);
+                
+                %mask out the open ocean (& more blunders if discovered with the narrower elevation limits)
+                q=1;
+                while q
+                    figure(figure1); colormap(gca,elev_cmap); set(gca,'clim',[0 9]); colorbar; drawnow;
+                    if q == 1
+                        mask_question = questdlg('Create ocean masks?',...
+                            'Open Ocean Masking','1) Yes!','2) No!','1) Yes!');
+                        spurious_vals = zeros(size(Z.z.ortho));
+                    else
+                        mask_question = questdlg('Are additional masks necessary?',...
+                            'Open Ocean Masking','1) Yes!','2) No!','1) Yes!');
+                    end
+                    %execute ocean masking based on question response
+                    switch mask_question
+                        case '1) Yes!'
+                            figure(figure1);
+                            disp('Click on UL & LR corners of a box bounding the open ocean to zoom in');
+                            [a] = ginput(2);
+                            set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                            drawnow;
+                            disp('Draw mask');
+                            anom_zmask = roipoly;
+                            anom_zmask = double(~anom_zmask);
+                            Z.z.ortho = anom_zmask.*Z.z.ortho; Z.z.ortho(Z.z.ortho==0) = NaN;
+                            imagesc(Z.x,Z.y,Z.z.ortho); hold on; axis xy equal;
+                            colormap(gca,elev_cmap); set(gca,'clim',[0 9]); cbar = colorbar;
+                            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+                            drawnow;
+                            blunders = ~anom_zmask;
+                            spurious_vals = spurious_vals + blunders;
+                            q = q+1;
+                            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                            drawnow;
+                        case '2) No!'
+                            spurious_vals(spurious_vals>0) = 1;
+                            clear blunders;
+                            break
+                    end
+                    clear mask_question;
+                end
+                Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
+                Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
+                
+                %readjust elevation color scaling
+                colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
+                set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                
+                %trace the terminus, making sure to intersect the edges of the melange mask
+                disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
+                disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
+                [term_x,term_y,~] = improfile;
+                [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
+                
+                %save the mask for each time step
+                cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+                if contains(melmask.dated(1).datestring,'start')
+                    melmask.dated(1).datestring = melangemat_dates(p,:); melmask.dated(1).x = []; melmask.dated(1).y = [];
                 else
-                    prompt = 'Are additional masks necessary (y/n)?'; str = input(prompt,'s');
+                    maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
+                    if isempty(maskref)
+                        maskref = length(melmask.dated)+1;
+                    end
+                    melmask.dated(maskref).datestring = melangemat_dates(p,:); melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
                 end
-                if strmatch(str,'y')==1
-                    figure(figure1);
-                    disp('Click on UL & LR corners of a box bounding the anomalous elevations to zoom in'); % Upper left, lower right. 
-                    [a] = ginput(2);
-                    set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-                    drawnow;
-                    disp('Draw mask');
-                    anom_zmask = roipoly;
-                    anom_zmask = double(~anom_zmask);
-                    Z.z.ortho = anom_zmask.*Z.z.ortho; Z.z.ortho(Z.z.ortho==0) = NaN;
-                    imagesc(Z.x,Z.y,Z.z.ortho); hold on; axis xy equal;
-                    colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar; 
-                    plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on; 
-                    drawnow;
-                    blunders = ~anom_zmask;
-                    spurious_vals = spurious_vals + blunders;
-                    q = q+1;
-                    set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
-                    drawnow;
-                else
-                    spurious_vals(spurious_vals>0) = 1;
-                    clear blunders;
-                    break
-                end
-            end
-            Z.melange.blunder_mask = single(spurious_vals);
-            
-            %mask out the open ocean (& more blunders if discovered with the narrower elevation limits)
-            q=1;
-            while q
-                figure(figure1); colormap(gca,elev_cmap); set(gca,'clim',[0 9]); colorbar; drawnow;
-                if q == 1
-                    prompt = 'Create ocean masks (y/n)?'; str = input(prompt,'s');
-                    spurious_vals = zeros(size(Z.z.ortho));
-                else
-                    prompt = 'Are additional masks necessary (y/n)?'; str = input(prompt,'s');
-                end
-                if strmatch(str,'y')==1
-                    figure(figure1);
-                    disp('Click on UL & LR corners of a box bounding the open ocean to zoom in');
-                    [a] = ginput(2);
-                    set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-                    drawnow;
-                    disp('Draw mask');
-                    anom_zmask = roipoly;
-                    anom_zmask = double(~anom_zmask);
-                    Z.z.ortho = anom_zmask.*Z.z.ortho; Z.z.ortho(Z.z.ortho==0) = NaN;
-                    imagesc(Z.x,Z.y,Z.z.ortho); hold on; axis xy equal;
-                    colormap(gca,elev_cmap); set(gca,'clim',[0 9]); cbar = colorbar; 
-                    plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-                    drawnow;
-                    blunders = ~anom_zmask;
-                    spurious_vals = spurious_vals + blunders;
-                    q = q+1;
-                    set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
-                    drawnow;
-                else
-                    spurious_vals(spurious_vals>0) = 1;
-                    clear blunders;
-                    break
-                end
-            end
-            Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
-            Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
-            close(figure1); drawnow;
-            
-            %display the orthometric elevations for the melange
-            figure; set(gcf,'position',[50 50 1600 600]);
-            imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal; hold on;
-            colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar; 
-            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-            hold on;
-            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
-            
-            %trace the terminus, making sure to intersect the edges of the melange mask
-            disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
-            disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
-            [term_x,term_y,~] = improfile;
-            [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
-            
-            %save the mask for each time step
-            cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-            if contains(melmask.dated(1).datestring,'start')
-                melmask.dated(1).datestring = melangemat_dates(p,:); melmask.dated(1).x = []; melmask.dated(1).y = [];
-            else
-                maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
-                if isempty(maskref)
-                    maskref = length(melmask.dated)+1;
-                end
-                melmask.dated(maskref).datestring = melangemat_dates(p,:); melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
-            end
-            cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-            save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
-            save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
-        else
-            delete_file = ['delete ',DEM_name]; eval(delete_file);
+                cd([output_path,'/',glacier_abbrev,'/']);
+                save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
+                save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+            case '2) No!'
+                delete_file = ['delete ',DEM_name]; eval(delete_file);
         end
+        clear answer;
         
     else %if the terminus was previously traced, check it to make sure it looks OK
-        %load the DEM
-        disp(['DEM #',num2str(p),' of ',num2str(size(melangemat_dates,1))]);
-        disp(melangemat_dates(p,:));
-        cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
-        DEM_name = melange_mats(p).name; load_DEM = ['load ',DEM_name]; eval(load_DEM);
-        
-        %display the orthometric elevations for the melange
-        figure1 = figure; set(gcf,'position',[50 50 1600 600]);
-        imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal; hold on;
-        colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
-        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-        hold on;
+        %zoom in on the DEM
         set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+        drawnow;
         
-        %check that the open ocean and blunders are properly masked
-        figure(figure1); set(gca,'clim',[0 9]); cbar = colorbar;
-        prompt = 'Can you see obvious blunders or open ocean that should be masked (y/n)?'; str = input(prompt,'s');
-        if contains(str,'y')==1
-            q=1;
-            while q
-                figure(figure1); colormap(gca,elev_cmap); set(gca,'clim',[0 9]); colorbar; drawnow;
-                if q == 1
-                    spurious_vals = zeros(size(Z.z.ortho));
-                else
-                    prompt = 'Are additional masks necessary (y/n)?'; str = input(prompt,'s');
-                end
-                if strmatch(str,'y')==1
+        %iterative blunder removal
+        q=1;
+        while q
+            if q == 1
+                blunder_question = questdlg('Create blunder masks?',...
+                    'Blunder ID','1) Yes!','2) No!','1) Yes!');
+                spurious_vals = zeros(size(Z.z.ortho));
+            else
+                blunder_question = questdlg('Are additional masks necessary?',...
+                    'Blunder ID','1) Yes!','2) No!','1) Yes!');
+            end
+            %execute blunder removal based on question response
+            switch blunder_question
+                case '1) Yes!'
                     figure(figure1);
                     disp('Click on UL & LR corners of a box bounding the area to remove to zoom in');
                     [a] = ginput(2);
@@ -570,6 +611,48 @@ for p = 1:length(melange_mats)
                     anom_zmask = double(~anom_zmask);
                     Z.z.ortho = anom_zmask.*Z.z.ortho; Z.z.ortho(Z.z.ortho==0) = NaN;
                     imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); hold on; axis xy equal;
+                    colormap(gca,elev_cmap); set(gca,'clim',[0 40]); cbar = colorbar;
+                    plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+                    drawnow;
+                    blunders = ~anom_zmask;
+                    spurious_vals = spurious_vals + blunders;
+                    q = q+1;
+                    set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                    drawnow;
+                case '2) No!'
+                    spurious_vals(spurious_vals>0) = 1;
+                    clear blunders;
+                    break
+            end
+        end
+        Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
+        Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
+        
+        %mask out the open ocean (& more blunders if discovered with the narrower elevation limits)
+        q=1;
+        while q
+            figure(figure1); colormap(gca,elev_cmap); set(gca,'clim',[0 9]); colorbar; drawnow;
+            if q == 1
+                mask_question = questdlg('Create ocean masks?',...
+                    'Open Ocean Masking','1) Yes!','2) No!','1) Yes!');
+                spurious_vals = zeros(size(Z.z.ortho));
+            else
+                mask_question = questdlg('Are additional masks necessary?',...
+                    'Open Ocean Masking','1) Yes!','2) No!','1) Yes!');
+            end
+            %execute ocean masking based on question response
+            switch mask_question
+                case '1) Yes!'
+                    figure(figure1);
+                    disp('Click on UL & LR corners of a box bounding the open ocean to zoom in');
+                    [a] = ginput(2);
+                    set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                    drawnow;
+                    disp('Draw mask');
+                    anom_zmask = roipoly;
+                    anom_zmask = double(~anom_zmask);
+                    Z.z.ortho = anom_zmask.*Z.z.ortho; Z.z.ortho(Z.z.ortho==0) = NaN;
+                    imagesc(Z.x,Z.y,Z.z.ortho); hold on; axis xy equal;
                     colormap(gca,elev_cmap); set(gca,'clim',[0 9]); cbar = colorbar;
                     plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
                     drawnow;
@@ -578,32 +661,21 @@ for p = 1:length(melange_mats)
                     q = q+1;
                     set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
                     drawnow;
-                else
+                case '2) No!'
                     spurious_vals(spurious_vals>0) = 1;
                     clear blunders;
                     break
-                end
             end
-            Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
-            Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
-            %save the mask for each time step
-            cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-            save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+            clear mask_question;
         end
+        Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
+        Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
+        
+        %resave the blunder mask
+        cd([output_path,'/',glacier_abbrev,'/']);
+        save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
         
         %crop the melange mask using the terminus trace
-        [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
-        [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
-        meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GriS center to each melange outline vertex
-        start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
-        if start_vert(1) > 1
-            outline_x = [meledge_x(start_vert(1):end); meledge_x(1:start_vert(1))];
-            outline_y = [meledge_y(start_vert(1):end); meledge_y(1:start_vert(1))];
-        else
-            outline_x = meledge_x; outline_y = meledge_y;
-        end
-        clear meledge* start_vert;
-        %find intercepts
         out_intercept = []; out_interceptx = []; out_intercepty = [];
         for i = 1:length(outline_x)-1
             [xi,yi] = polyxpoly(outline_x(i:i+1),outline_y(i:i+1),Z.term.x,Z.term.y); %find the intersections of the terminus trace with the melange outline
@@ -626,6 +698,7 @@ for p = 1:length(melange_mats)
                 melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(end); outline_y(out_intercept(2)+1:end)];
             end
             
+            %plot the cropped melange mask
             plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on; drawnow;
             disp('melange polygon cropped with terminus trace = cyan dashed line');
             term_flag = 0;
@@ -634,16 +707,23 @@ for p = 1:length(melange_mats)
             plot(outline_x,outline_y,'--c','linewidth',2); hold on; drawnow;
             term_flag = 1;
         end
-        clear term_in termdist termx termy term_start term_end out_* outline_* meledge*;
-        
+        clear term_in termdist termx termy term_start term_end out_* meledge*;
         
         %retrace the terminus if it looks wonky
-        prompt = 'Does the melange mask cropped with the terminus trace look good (y/n)? If terminus not visible, does the line go straight across the fjord?'; term_str = input(prompt,'s');
-        if contains(term_str,'n')==1 || term_flag == 1 %retrace if manually or automatically flagged as bad
+        disp('Terminus trace should intersect both sides of the mask and, if terminus not visible, go straight across the fjord');
+        trace_question = questdlg('Does the melange mask cropped with the terminus trace look good?',...
+            'Terminus Trace Check','1) Yes!','2) No!','1) Yes!');
+        switch trace_question
+            case '1) Yes!'
+                retrace_flag = 0;
+            case '2) No!'
+                retrace_flag = 1;
+        end
+        if retrace_flag == 1 || term_flag == 1 %retrace if manually or automatically flagged as bad
             %trace the terminus, making sure to intersect the edges of the melange mask
             disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
             disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
-            Z.term.x = []; Z.term.y = []; 
+            Z.term.x = []; Z.term.y = [];
             %identify the melange mask index you should use to save the data
             maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
             if isempty(maskref)
@@ -657,9 +737,9 @@ for p = 1:length(melange_mats)
             melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
             [term_x,term_y,~] = improfile;
             [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
-
+            
             %save the mask for each time step
-            cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+            cd([output_path,'/',glacier_abbrev,'/']);
             save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
             save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
             disp('new terminus trace saved');
@@ -677,11 +757,12 @@ for p = 1:length(melange_mats)
         end
         clear prompt term_str;
     end
-    clear Z melpoly* outline_* out_* in Z*grid term_flag;
+    clear Z melpoly* out_* in Z*grid term_flag trace_*;
     close all; drawnow;
     
     clear newtif;
 end
+clear outline_*;
 disp('All anomalous elevations masked & termini delineated');
 
 
@@ -742,12 +823,11 @@ end
 for p = 1:length(melange_mats)
     disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
     disp(melangemat_dates(p,:));
-    cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
-    DEM_name = melange_mats(p).name;
-    load_DEM = ['load ',DEM_name]; eval(load_DEM);
+    cd([root_path,'/',glacier_abbrev]);
+    DEM_name = melange_mats(p).name; load(DEM_name);
     
     %plot the masked DEM
-    figure; set(gcf,'position',[50 50 1600 50]);
+    figure1 = figure; set(gcf,'position',[50 50 1600 50]);
     imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
     colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
     set(gca,'xlim',[min(Z.x) max(Z.x)],'ylim',[min(Z.y) max(Z.y)]);
@@ -760,11 +840,59 @@ for p = 1:length(melange_mats)
     end
     title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
     drawnow;
-    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-    saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
+    
+    %identify the starting uncropped melange mask vertex to use when
+    %generating cropped melange masks (should be in the water!)
+    if p == 1 && ~exist('start_vert')
+            [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
+            [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
+            meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
+            start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
+            set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
+                'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
+            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+            plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
+            
+            %check that the starting vertex for the melange mask is in the ocean
+            answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
+                'Mask Start Vertex','Ocean','Glacier','Ocean');
+            switch answer
+                case 'Ocean'
+                    disp('Melange mask start vertex is correct, carry on!');
+                case 'Glacier'
+                    start_dist = sqrt((meledge_x-meledge_x(start_vert(1))).^2 + (meledge_y-meledge_y(start_vert(1))).^2);
+                    clear start_vert;
+                    start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
+                    plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
+            end
+        
+        %sort melange mask vertices so that they start at the defined starting vertex in the ocean
+        if start_vert(1) > 1
+            outline_x = [meledge_x(start_vert(1):end); meledge_x(1:start_vert(1))];
+            outline_y = [meledge_y(start_vert(1):end); meledge_y(1:start_vert(1))];
+        else
+            outline_x = meledge_x; outline_y = meledge_y;
+        end
+        clear meledge*; close(figure1); drawnow;
+        
+        %recreate figure without marks for the melange mask start vertex
+        figure1 = figure; set(gcf,'position',[50 50 1600 50]);
+        imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
+        colormap(gca,elev_cmap); set(gca,'clim',[0 200]); cbar = colorbar; hold on;
+        set(gca,'xlim',[min(Z.x) max(Z.x)],'ylim',[min(Z.y) max(Z.y)]);
+        set(gcf,'position',[50 450 1600 600]);
+        maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
+        if ~isempty(melmask.dated(maskref).x)
+            plot(melmask.dated(maskref).x,melmask.dated(maskref).y,'--c','linewidth',2); hold on;
+        else
+            disp('No mask was plotted because the melange mask needs to be redone');
+        end
+        title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
+        drawnow;
+    end
     
     %check if you want to forcibly re-create the mask
-    answer = questdlg('Do you need to recreate the melange mask?',...
+    answer = questdlg('Do you need to recreate the melange mask (redrawn terminus or glacier masked)?',...
         'Mask Redo','1) Yes!','2) No!','1) Yes!');
     switch answer
         case '1) Yes!'
@@ -790,18 +918,6 @@ for p = 1:length(melange_mats)
         end
         
         %crop the melange mask using the terminus trace
-        [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
-        [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
-        meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GriS center to each melange outline vertex
-        start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
-        if start_vert(1) > 1
-            outline_x = [meledge_x(start_vert(1):end); meledge_x(1:start_vert(1))];
-            outline_y = [meledge_y(start_vert(1):end); meledge_y(1:start_vert(1))];
-        else
-            outline_x = meledge_x; outline_y = meledge_y;
-        end
-        clear meledge* start_vert;
-        %find intercepts
         out_intercept = []; out_interceptx = []; out_intercepty = [];
         for i = 1:length(outline_x)-1
             [xi,yi] = polyxpoly(outline_x(i:i+1),outline_y(i:i+1),Z.term.x,Z.term.y); %find the intersections of the terminus trace with the melange outline
@@ -868,15 +984,14 @@ for p = 1:length(melange_mats)
         
         %save the mask for each time step
         eval(cd_to_output);
-        saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
         save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
         disp(['Saved ',DEM_name]);
-        clear Z melpoly* outline_* out_* *in Z*grid;
+        clear Z melpoly* out_* *in Z*grid;
     end
-    
+    saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
     close all; drawnow; clear newtif;
 end
 
