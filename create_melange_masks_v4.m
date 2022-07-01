@@ -762,7 +762,7 @@ for p = 1:length(melange_mats)
     
     clear newtif;
 end
-clear outline_*;
+% clear outline_*;
 disp('All anomalous elevations masked & termini delineated');
 
 
@@ -844,27 +844,27 @@ for p = 1:length(melange_mats)
     %identify the starting uncropped melange mask vertex to use when
     %generating cropped melange masks (should be in the water!)
     if p == 1 && ~exist('start_vert')
-            [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
-            [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
-            meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
-            start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
-            set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
-                'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
-            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-            plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
-            
-            %check that the starting vertex for the melange mask is in the ocean
-            answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
-                'Mask Start Vertex','Ocean','Glacier','Ocean');
-            switch answer
-                case 'Ocean'
-                    disp('Melange mask start vertex is correct, carry on!');
-                case 'Glacier'
-                    start_dist = sqrt((meledge_x-meledge_x(start_vert(1))).^2 + (meledge_y-meledge_y(start_vert(1))).^2);
-                    clear start_vert;
-                    start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
-                    plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
-            end
+        [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
+        [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
+        meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
+        start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
+        set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
+            'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
+        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+        plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
+        
+        %check that the starting vertex for the melange mask is in the ocean
+        answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
+            'Mask Start Vertex','Ocean','Glacier','Ocean');
+        switch answer
+            case 'Ocean'
+                disp('Melange mask start vertex is correct, carry on!');
+            case 'Glacier'
+                start_dist = sqrt((meledge_x-meledge_x(start_vert(1))).^2 + (meledge_y-meledge_y(start_vert(1))).^2);
+                clear start_vert;
+                start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
+                plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
+        end
         
         %sort melange mask vertices so that they start at the defined starting vertex in the ocean
         if start_vert(1) > 1
@@ -932,7 +932,7 @@ for p = 1:length(melange_mats)
             figure; set(gcf,'position',[50 50 1600 600]);
             imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
             colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar; hold on;
-             plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
             set(gca,'xlim',[max(min(melange_xlims),min(Z.x)) min(max(melange_xlims),max(Z.x))],'ylim',[max(min(melange_ylims),min(Z.y)) min(max(melange_ylims),max(Z.y))]);
             drawnow;
             disp('retrace the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
