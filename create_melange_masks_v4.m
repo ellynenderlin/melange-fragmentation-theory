@@ -762,7 +762,7 @@ for p = 1:length(melange_mats)
     
     clear newtif;
 end
-clear outline_*;
+%clear outline_*;
 disp('All anomalous elevations masked & termini delineated');
 
 
@@ -988,10 +988,10 @@ for p = 1:length(melange_mats)
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
         save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+        saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         disp(['Saved ',DEM_name]);
         clear Z melpoly* out_* *in Z*grid;
     end
-    saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
     close all; drawnow; clear newtif;
 end
 

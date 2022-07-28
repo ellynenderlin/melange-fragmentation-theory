@@ -29,9 +29,10 @@ addpath('/Users/icebergs/general-code/');
 addpath('/Users/icebergs/general-code/cmocean/');
 
 %set plot variables
-years = [2011:1:2021];
-cmap = cmocean('haline',length(years)); %color map for the terminus delineations
+years = (2011:1:2021); %Note to self: Changed to parenthesis. 
+cmap = cmocean('haline',length(years)); %color map for the terminus delineations -- Note: Changed from Haline to Parula. 
 % cmap = colormap(gray(length(year))); %alternative gray-scale colormap for terminus delineations
+
 site_names = ['HM';'KO';'AG';'IG';'UN';'US';'IB';'UM';'RI';'JI';'KB';'HH';'MG';'KL';'MD';'DJ';'ZI']; %used to identify site-specific directories
 reg_flags = [3;3;3;3;3;3;2;2;2;2;1;1;1;1;4;4;5]; %specifies the region for each site listed in site_names (1=SE,2=SW,3=NW,4=CE,5=NE)
 reg_colors = [215,25,28; 253,174,97; 255,255,191; 171,217,233; 44,123,182]/255; %same colorblind-friendly color scheme as analyze_iceberg_size_distribution_curve_fits.m
@@ -64,28 +65,38 @@ for i = 1:length(site_names)
     %load and plot the fjord polygon
     load([site_names(i,:),'-melange-masks.mat']); %load the melange mask file
     %plot dummy lines for colorbar to ensure all years are included
+    
     for j = 1:length(cmap)
-       pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); hold on; 
+       zeros pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); %Note to self: Added zeros before pl(j)
+       hold on; 
+       
     end
+    
     %plot actual data
     for j = 1:length(melmask.dated)
-       plot(melmask.dated(j).x,melmask.dated(j).y,'-','color',cmap(str2num(melmask.dated(j).datestring(1:4))-2011+1,:),'linewidth',1.5); hold on; 
+       plot(melmask.dated(j).x,melmask.dated(j).y,'-','color',cmap(str2double(melmask.dated(j).datestring(1:4))-2011+1,:),'linewidth',1.5); hold on; 
     end
+    %Note to self: Changed str2num to str2double 
+    
     %plot the large mask for the melange and the glacier
     plot(melmask.uncropped.x,melmask.uncropped.y,'-','color','w','linewidth',2.5); hold on; %thick white line
     plot(melmask.uncropped.x,melmask.uncropped.y,'-','color',reg_colors(reg_flags(i),:),'linewidth',2); hold on; %thinner line colored to region
+    
     set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],...
         'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],...
         'fontsize',20); grid on; %zoom to the extend of the bigger mask
+    
     xticks = get(gca,'xtick'); yticks = get(gca,'ytick'); %get the default axis tick locations
     set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000); %change the tick labels from meters to kilometers
     xlabel('Easting (km)','fontsize',20); ylabel('Northing (km)','fontsize',20); %add axis labels
+    
     %add a legend showing the colors for the terminus delineations (colors used to distinguish observation years)
     if reg_flags(i) <=2
         leg = legend(pl,num2str(years'),'location','west','orientation','vertical');
     else
         leg = legend(pl,num2str(years'),'location','east','orientation','vertical');
     end
+    
     drawnow;
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.eps'],'epsc'); 
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.png'],'png'); %save the image
@@ -123,7 +134,7 @@ for i = 1:length(site_names)
     for j = 1:geoid_spacing:size(ZXgrid,1)
         for k = 1:geoid_spacing:size(ZXgrid,2)
             [Zlon(ceil(j/geoid_spacing),ceil(k/geoid_spacing)),Zlat(ceil(j/geoid_spacing),ceil(k/geoid_spacing))] = ps2wgs(ZXgrid(j,k),ZYgrid(j,k));
-            G(ceil(j/geoid_spacing),ceil(k/geoid_spacing)) = geoidheight(Zlat(ceil(j/geoid_spacing),ceil(k/geoid_spacing)),Zlon(ceil(j/geoid_spacing),ceil(k/geoid_spacing)));
+            zeros G(ceil(j/geoid_spacing),ceil(k/geoid_spacing)) = geoidheight(Zlat(ceil(j/geoid_spacing),ceil(k/geoid_spacing)),Zlon(ceil(j/geoid_spacing),ceil(k/geoid_spacing)));
         end
     end
     %interpolate the sparse geoid height values to the DEM grid
@@ -165,12 +176,13 @@ for i = 1:length(site_names)
     
     %plot dummy lines for colorbar to ensure all years are included
     for j = 1:length(cmap)
-        pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); hold on;
+        zeros pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); hold on; %Note to self: put zeros in front of pl(j)
     end
     %plot actual data
     for j = 1:length(melmask.dated)
-        plot(melmask.dated(j).x,melmask.dated(j).y,'-','color',cmap(str2num(melmask.dated(j).datestring(1:4))-2011+1,:),'linewidth',1.5); hold on;
+        plot(melmask.dated(j).x,melmask.dated(j).y,'-','color',cmap(str2double(melmask.dated(j).datestring(1:4))-2011+1,:),'linewidth',1.5); hold on; %Note to self: Changed str2num to str2double
     end
+    
     %plot the large mask for the melange and the glacier
     plot(melmask.uncropped.x,melmask.uncropped.y,'-','color','w','linewidth',2.5); hold on;
     plot(melmask.uncropped.x,melmask.uncropped.y,'-','color',reg_colors(reg_flags(i),:),'linewidth',2); hold on;
@@ -186,6 +198,7 @@ for i = 1:length(site_names)
     else
         leg = legend(pl,num2str(years'),'location','east','orientation','vertical');
     end
+    
     axpos = get(gca,'position'); set(gca,'position',[axpos(1) 0.11 axpos(3) 0.75]); axpos = get(gca,'position');  %set the position of the map in the figure window
     legpos = get(leg,'position'); %get the default position of the legend
     set(leg,'position',[(axpos(1)+axpos(3)/2)-(legpos(3)/2) (axpos(2)+axpos(4))+0.02 legpos(3) legpos(4)]); %shift the legend position
