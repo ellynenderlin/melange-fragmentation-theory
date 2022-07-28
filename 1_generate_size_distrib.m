@@ -11,7 +11,7 @@ addpath('/Users/icebergs/general-code/');
 addpath('/Users/icebergs/general-code/cmocean/'); % add general functions to path)
 
 % set paths and glacier to analyze manually:
-glacier_abbrev = 'MD'; % SET GLACIER ID HERE
+glacier_abbrev = 'HM'; % SET GLACIER ID HERE
 basepath='/Users/icebergs/iceberg-fragmentation/';
 addpath([basepath,'DEMsizes_matlab-python']);
 root_path = basepath; output_path = basepath;
