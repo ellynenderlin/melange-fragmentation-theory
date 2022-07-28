@@ -22,7 +22,7 @@ if ~isempty(melmask_file)
     load([glacier_abbrev,'-melange-masks.mat']);
 else
     disp('Create a generic fjord mask that extends over the glacier a few kilometers using a Landsat image');
-    
+
     %load the panchromatic Landsat scene & create a glacier/fjord mask
     cd([root_path,'/',glacier_abbrev]);
     L8dir = dir('LC08*'); cd(L8dir(1).name);
@@ -30,9 +30,9 @@ else
     for i = 1:length(L8bands)
         if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
             if contains(version,'R2021')
-                [I,S] = readgeoraster(L8bands(i).name); 
+                [I,S] = readgeoraster(L8bands(i).name);
             else
-                [I,S] = readgeoraster(L8bands(i).name); 
+                [I,S] = readgeoraster(L8bands(i).name);
             end
             info = geotiffinfo(L8bands(i).name);
             im.x = S.XWorldLimits(1):S.SampleSpacingInWorldX:S.XWorldLimits(2);
@@ -63,7 +63,7 @@ else
         if isempty(strmatch(DEMtif_dates(p,:),melangemat_dates))
             %load the geotiff
             if contains(version,'R2021')
-                [I,S] = readgeoraster(tifs(p).name); 
+                [I,S] = readgeoraster(tifs(p).name);
             else
                 [I,S] = readgeoraster(tifs(p).name);
             end
@@ -73,12 +73,12 @@ else
             plot(xs, ys,'Color','yellow'); drawnow;
         end
     end
-    
+
     % take user input
     disp('Click on two vertices that define a bounding box to zoom in on the glacier');
     a = ginput(2);
     set(gca,'xlim',sort(a(:,1)),'ylim',sort(a(:,2))); drawnow;
-  
+
     %create the melange mask and save it
     disp('Trace fjord walls to create a fjord mask, including several km of glacier');
     [~,fjord_maskx,fjord_masky] = roipoly;
@@ -94,12 +94,12 @@ disp('...moving on');
 disp('Convert geotiffs to mat-files as necessary');
 melangemat_dates = ''; DEMmat_dates = ''; DEMtif_dates = '';
 %existing melange DEMs
-melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); 
+melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']);
 for i = 1:length(melange_mats)
     melangemat_dates(i,:) = melange_mats(i).name(4:11);
 end
 %full DEM matfiles from old analyses, not just melange DEM
-mats = dir(['*_dem.mat']); 
+mats = dir(['*_dem.mat']);
 for i = 1:length(mats)
     if strcmp(glacier_abbrev,mats(i).name(1:2))
         DEMmat_dates(i,:) = mats(i).name(4:11); %data saved to Y structure
@@ -127,7 +127,7 @@ for p = 1:length(DEMmat_dates)
     disp(DEMmat_dates(p,:));
     cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
     DEM_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.mat'];
-    
+
     %load the .tif if the .mat DEM doesn't exist
     if isempty(strmatch(DEMmat_dates(p,:),melangemat_dates))
         %load the matfile
@@ -136,12 +136,12 @@ for p = 1:length(DEMmat_dates)
         if exist('Z'); Y=Z; clear Z; %from iceberg DEMs
         elseif exist('DEM'); Y=DEM; clear DEM; Y = rmfield(Y,{'xflow','yflow','zflow'}); %from crevasse DEMs
         end
-        
+
         %plot a figure
         figure; set(gcf,'position',[50 50 1600 600]);
         subplot(1,2,1);
         imagesc(Y.x,Y.y,Y.z); axis xy equal; colormap(gca,elev_cmap); hold on;
-        
+
         %crop the DEM
         if sign(Y.x(1)-Y.x(end)) == -1
             xmin = find(Y.x<=min(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
@@ -163,7 +163,7 @@ for p = 1:length(DEMmat_dates)
         subplot(1,2,2);
         imagesc(Z.x,Z.y,Z.z.raw); axis xy equal; colormap(gca,elev_cmap); hold on;
         clear Y;
-        
+
         %calculate geoid heights to convert from ellipsoidal heights to orthometric elevations
         disp('calculating the geoid heights for the DEM...')
         warning off;
@@ -178,7 +178,7 @@ for p = 1:length(DEMmat_dates)
         disp('converting from ellipsoidal heights to orthometric elevations...');
         Z.z.ortho = Z.z.raw - Z.z.geoid; Z.z = rmfield(Z.z,'raw');
         clear Zlat Zlon G;
-        
+
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
         eval(cd_to_output);
@@ -186,7 +186,7 @@ for p = 1:length(DEMmat_dates)
         disp(['Saved DEM geotiff from ',DEMmat_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
         close all; drawnow;
-    else 
+    else
         disp('... already converted to correct format');
     end
 end
@@ -197,7 +197,7 @@ for p = 1:length(tifs)
     disp(DEMtif_dates(p,:));
     cd([root_path,'/',glacier_abbrev]);
     DEM_name = [glacier_abbrev,'-',DEMtif_dates(p,:),'_melange-DEM.mat'];
-    
+
     %load the .tif if the .mat DEM doesn't exist
     if isempty(strmatch(DEMtif_dates(p,:),melangemat_dates))
         %load the geotiff
@@ -215,12 +215,12 @@ for p = 1:length(tifs)
         end
         Y.z = double(I); Y.z(Y.z==-9999) = NaN;
         clear I S;
-        
+
         %plot a figure
         figure; set(gcf,'position',[50 50 1600 600]);
         subplot(1,2,1);
         imagesc(Y.x,Y.y,Y.z); axis xy equal; colormap(gca,elev_cmap); hold on;
-        
+
         %crop the DEM
         if sign(Y.x(1)-Y.x(end)) == -1
             xmin = find(Y.x<=min(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
@@ -242,7 +242,7 @@ for p = 1:length(tifs)
         subplot(1,2,2);
         imagesc(Z.x,Z.y,Z.z.raw); axis xy equal; colormap(gca,elev_cmap); hold on;
         clear Y;
-        
+
         %calculate geoid heights to convert from ellipsoidal heights to orthometric elevations
         disp('calculating the geoid heights for the DEM...')
         warning off;
@@ -257,7 +257,7 @@ for p = 1:length(tifs)
         disp('converting from ellipsoidal heights to orthometric elevations...');
         Z.z.ortho = Z.z.raw - Z.z.geoid; Z.z = rmfield(Z.z,'raw');
         clear Zlat Zlon G;
-        
+
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
         eval(cd_to_output);
@@ -265,7 +265,7 @@ for p = 1:length(tifs)
         disp(['Saved DEM geotiff from ',DEMtif_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
         close all; drawnow;
-    else 
+    else
         disp('... already converted to correct format');
     end
 end
@@ -287,7 +287,7 @@ switch answer
         disp('Now modify the fjord mask using the DEMs');
         cd([root_path,'/',glacier_abbrev]);
         melmask_file = dir('*-melange-masks.mat');
-        
+
         %load the panchromatic Landsat scene & create a glacier/fjord mask
         L8dir = dir('LC08*'); cd(L8dir(1).name);
         L8bands = dir('L*.TIF');
@@ -301,7 +301,7 @@ switch answer
             end
         end
         cd ..
-        
+
         melange_xlims = [min(melmask.uncropped.x)-2000 max(melmask.uncropped.x)+2000]; melange_ylims = [min(melmask.uncropped.y)-2000 max(melmask.uncropped.y)+2000];
         %crop image to limits
         if sign(im.x(1)-im.x(end)) == -1
@@ -321,7 +321,7 @@ switch answer
         imx = single(im.x(xmin:xmax)); imy = single(im.y(ymin:ymax));
         % imz = single(im.z(ymin:ymax,xmin:xmax));
         [Xgrid,Ygrid] = meshgrid(imx,imy); %convert the vector coordinates into matrices
-        
+
         %loop through the DEMs & create a DEM mosaic
         disp('looping through the DEMs & loading elevations to a 3D matrix');
         for p = 1:length(melange_mats)
@@ -330,13 +330,13 @@ switch answer
             cd([root_path,'/',glacier_abbrev]);
             DEM_name = melange_mats(p).name;
             load(DEM_name);
-            
+
             %interpolate to the cropped Landsat image
             [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
             DEMz(:,:,p) = interp2(ZXgrid,ZYgrid,double(Z.z.ortho),Xgrid,Ygrid); %interpolate elevations to the Landsat 8 coordinates
             clear Z*;
         end
-        
+
         %plot the time-averaged DEM & redraw the melange mask
         figure1 = figure; set(gcf,'position',[50 50 1600 600]);
         imagesc(imx,imy,nanmean(DEMz,3)); axis xy equal; hold on;
@@ -347,7 +347,7 @@ switch answer
         disp('Redraw the fjord mask so it is custom to the DEMs');
         [~,fjord_maskx,fjord_masky] = roipoly;
         close(gcf); drawnow;
-        
+
         %save the edited melange mask
         cd([output_path,'/',glacier_abbrev,'/']);
         melmask = rmfield(melmask,'uncropped');
@@ -391,14 +391,14 @@ for p = 1:length(melange_mats)
     disp(melangemat_dates(p,:));
     cd([root_path,'/',glacier_abbrev]);
     DEM_name = melange_mats(p).name; load(DEM_name);
-    
+
     %plot the DEM
     figure1 = figure; set(gcf,'position',[50 50 1600 600]);
     imagesc(Z.x,Z.y,Z.z.ortho); axis xy equal; hold on;
     colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
     plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
     drawnow;
-    
+
     %identify the starting uncropped melange mask vertex to use when
     %generating cropped melange masks (should be in the water!)
     if p == 1
@@ -409,7 +409,7 @@ for p = 1:length(melange_mats)
         set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
             'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
         plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
-        
+
         %check that the starting vertex for the melange mask is in the ocean
         answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
             'Mask Start Vertex','Ocean','Glacier','Ocean');
@@ -422,7 +422,7 @@ for p = 1:length(melange_mats)
                 start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
                 plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
         end
-        
+
         %sort melange mask vertices so that they start at the defined starting vertex in the ocean
         if start_vert(1) > 1
             outline_x = [meledge_x(start_vert(1):end); meledge_x(1:start_vert(1))];
@@ -431,7 +431,7 @@ for p = 1:length(melange_mats)
             outline_x = meledge_x; outline_y = meledge_y;
         end
         clear meledge*; close(figure1); drawnow;
-        
+
         %recreate figure without marks for the melange mask start vertex
         figure1 = figure; set(gcf,'position',[50 50 1600 600]);
         imagesc(Z.x,Z.y,Z.z.ortho); axis xy equal; hold on;
@@ -439,8 +439,8 @@ for p = 1:length(melange_mats)
         plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
         drawnow;
     end
-    
-    
+
+
     %determine if using a new DEM (if there is a geotiff with the same date
     %in the same directory... GEM geotiffs are automatically moved in the next step)
     newtif = zeros(length(tifs),1);
@@ -449,15 +449,15 @@ for p = 1:length(melange_mats)
             newtif(i) = 1;
         end
     end
-    
+
     %if it is a new DEM, create a custom melange mask that removes blunders, open water, and the glacier
     if sum(newtif) > 0
         clear spurious* anom* blunders;
-        
+
         %zoom in on the DEM
         set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
         drawnow;
-        
+
         %check that the DEM covers a few kilometers of the melange, otherwise
         %delete the melange DEM so it isn't called again in the processing pipeline
         answer = questdlg('Does the DEM span the fjord & extend a few km from the terminus?',...
@@ -468,7 +468,7 @@ for p = 1:length(melange_mats)
                 disp('Iteratively generate masks to:');
                 disp('   1) eliminate areas with obvious elevation blunders &')
                 disp('   2) crop the melange area so it doesn''t extend over flat, open water');
-                
+
                 %iterative blunder removal
                 q=1;
                 while q
@@ -509,7 +509,7 @@ for p = 1:length(melange_mats)
                     clear blunder_question;
                 end
                 Z.melange.blunder_mask = single(spurious_vals);
-                
+
                 %mask out the open ocean (& more blunders if discovered with the narrower elevation limits)
                 q=1;
                 while q
@@ -552,17 +552,17 @@ for p = 1:length(melange_mats)
                 end
                 Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
                 Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
-                
+
                 %readjust elevation color scaling
                 colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
                 set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
-                
+
                 %trace the terminus, making sure to intersect the edges of the melange mask
                 disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
                 disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
                 [term_x,term_y,~] = improfile;
                 [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
-                
+
                 %save the mask for each time step
                 cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
                 if contains(melmask.dated(1).datestring,'start')
@@ -581,12 +581,12 @@ for p = 1:length(melange_mats)
                 delete_file = ['delete ',DEM_name]; eval(delete_file);
         end
         clear answer;
-        
+
     else %if the terminus was previously traced, check it to make sure it looks OK
         %zoom in on the DEM
         set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
         drawnow;
-        
+
         %iterative blunder removal
         q=1;
         while q
@@ -627,7 +627,7 @@ for p = 1:length(melange_mats)
         end
         Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
         Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
-        
+
         %mask out the open ocean (& more blunders if discovered with the narrower elevation limits)
         q=1;
         while q
@@ -670,11 +670,11 @@ for p = 1:length(melange_mats)
         end
         Z.melange.blunder_mask = Z.melange.blunder_mask + single(spurious_vals);
         Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
-        
+
         %resave the blunder mask
         cd([output_path,'/',glacier_abbrev,'/']);
         save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
-        
+
         %crop the melange mask using the terminus trace
         out_intercept = []; out_interceptx = []; out_intercepty = [];
         for i = 1:length(outline_x)-1
@@ -697,7 +697,7 @@ for p = 1:length(melange_mats)
                 melpoly_x = [outline_x(1:out_intercept(1)); out_interceptx(1); termx(term_start:1:term_end); out_interceptx(end); outline_x(out_intercept(2)+1:end)];
                 melpoly_y = [outline_y(1:out_intercept(1)); out_intercepty(1); termy(term_start:1:term_end); out_intercepty(end); outline_y(out_intercept(2)+1:end)];
             end
-            
+
             %plot the cropped melange mask
             plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on; drawnow;
             disp('melange polygon cropped with terminus trace = cyan dashed line');
@@ -708,7 +708,7 @@ for p = 1:length(melange_mats)
             term_flag = 1;
         end
         clear term_in termdist termx termy term_start term_end out_* meledge*;
-        
+
         %retrace the terminus if it looks wonky
         disp('Terminus trace should intersect both sides of the mask and, if terminus not visible, go straight across the fjord');
         trace_question = questdlg('Does the melange mask cropped with the terminus trace look good?',...
@@ -737,7 +737,7 @@ for p = 1:length(melange_mats)
             melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
             [term_x,term_y,~] = improfile;
             [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
-            
+
             %save the mask for each time step
             cd([output_path,'/',glacier_abbrev,'/']);
             save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
@@ -759,10 +759,10 @@ for p = 1:length(melange_mats)
     end
     clear Z melpoly* out_* in Z*grid term_flag trace_*;
     close all; drawnow;
-    
+
     clear newtif;
 end
-%clear outline_*;
+% clear outline_*;
 disp('All anomalous elevations masked & termini delineated');
 
 
@@ -790,8 +790,8 @@ end
 %% apply the fjord mask w/ moving terminus boundary
 disp('Applying mask to each DEM as necessary... this takes a LONG LONG time (>1 hr/DEM)');
 %identify the melange DEMs (some DEMs mave have been removed in the last step due to poor coverage)
-clear melangemat_dates; 
-melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']); 
+clear melangemat_dates;
+melange_mats = dir([glacier_abbrev,'*_melange-DEM.mat']);
 for i = 1:length(melange_mats)
     melangemat_dates(i,:) = melange_mats(i).name(4:11);
 end
@@ -825,7 +825,7 @@ for p = 1:length(melange_mats)
     disp(melangemat_dates(p,:));
     cd([root_path,'/',glacier_abbrev]);
     DEM_name = melange_mats(p).name; load(DEM_name);
-    
+
     %plot the masked DEM
     figure1 = figure; set(gcf,'position',[50 50 1600 50]);
     imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
@@ -840,32 +840,32 @@ for p = 1:length(melange_mats)
     end
     title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
     drawnow;
-    
+
     %identify the starting uncropped melange mask vertex to use when
     %generating cropped melange masks (should be in the water!)
     if p == 1 && ~exist('start_vert')
-            [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
-            [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
-            meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
-            start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
-            set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
-                'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
-            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-            plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
-            
-            %check that the starting vertex for the melange mask is in the ocean
-            answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
-                'Mask Start Vertex','Ocean','Glacier','Ocean');
-            switch answer
-                case 'Ocean'
-                    disp('Melange mask start vertex is correct, carry on!');
-                case 'Glacier'
-                    start_dist = sqrt((meledge_x-meledge_x(start_vert(1))).^2 + (meledge_y-meledge_y(start_vert(1))).^2);
-                    clear start_vert;
-                    start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
-                    plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
-            end
-        
+        [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
+        [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
+        meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
+        start_vert = find(meledge_dist==max(meledge_dist)); %find the farthest vertex & use that as the start of the outline
+        set(gca,'xlim',[min([min(Z.x),min(melmask.uncropped.x)]) max([max(Z.x),max(melmask.uncropped.x)])],...
+            'ylim',[min([min(Z.y),min(melmask.uncropped.y)]) max([max(Z.y),max(melmask.uncropped.y)])]);
+        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+        plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'mx','linewidth',3); drawnow;
+
+        %check that the starting vertex for the melange mask is in the ocean
+        answer = questdlg('Where is the starting vertex for the melange mask (pink X)?',...
+            'Mask Start Vertex','Ocean','Glacier','Ocean');
+        switch answer
+            case 'Ocean'
+                disp('Melange mask start vertex is correct, carry on!');
+            case 'Glacier'
+                start_dist = sqrt((meledge_x-meledge_x(start_vert(1))).^2 + (meledge_y-meledge_y(start_vert(1))).^2);
+                clear start_vert;
+                start_vert = find(start_dist==max(start_dist)); %find the farthest vertex from the incorrect default starting vertex
+                plot(meledge_x(start_vert(1)),meledge_y(start_vert(1)),'c+','linewidth',3); drawnow;
+        end
+
         %sort melange mask vertices so that they start at the defined starting vertex in the ocean
         if start_vert(1) > 1
             outline_x = [meledge_x(start_vert(1):end); meledge_x(1:start_vert(1))];
@@ -874,7 +874,7 @@ for p = 1:length(melange_mats)
             outline_x = meledge_x; outline_y = meledge_y;
         end
         clear meledge*; close(figure1); drawnow;
-        
+
         %recreate figure without marks for the melange mask start vertex
         figure1 = figure; set(gcf,'position',[50 50 1600 50]);
         imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
@@ -890,7 +890,7 @@ for p = 1:length(melange_mats)
         title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
         drawnow;
     end
-    
+
     %check if you want to forcibly re-create the mask
     answer = questdlg('Do you need to recreate the melange mask (redrawn terminus or glacier masked)?',...
         'Mask Redo','1) Yes!','2) No!','1) Yes!');
@@ -901,7 +901,7 @@ for p = 1:length(melange_mats)
             redo_flag = 0;
     end
     clear answer; close(gcf);
-    
+
     %identify if it is a newly-delineated terminus (if so, apply masks)
     if isempty(melmask.dated(maskref).x) || redo_flag == 1
         %delete filled DEM created with wrong mask (if is exists)
@@ -916,7 +916,7 @@ for p = 1:length(melange_mats)
             end
             clear filledflag;
         end
-        
+
         %crop the melange mask using the terminus trace
         out_intercept = []; out_interceptx = []; out_intercepty = [];
         for i = 1:length(outline_x)-1
@@ -932,7 +932,7 @@ for p = 1:length(melange_mats)
             figure; set(gcf,'position',[50 50 1600 600]);
             imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
             colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar; hold on;
-             plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
             set(gca,'xlim',[max(min(melange_xlims),min(Z.x)) min(max(melange_xlims),max(Z.x))],'ylim',[max(min(melange_ylims),min(Z.y)) min(max(melange_ylims),max(Z.y))]);
             drawnow;
             disp('retrace the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
@@ -940,7 +940,7 @@ for p = 1:length(melange_mats)
             [term_x,term_y,~] = improfile;
             [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
             close(gcf); drawnow;
-            
+
             %find the intercepts with the fjord mask
             out_intercept = []; out_interceptx = []; out_intercepty = [];
             for i = 1:length(outline_x)-1
@@ -970,7 +970,7 @@ for p = 1:length(melange_mats)
         plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on;
         title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
         drawnow;
-        
+
         %create melange mask
         disp('Creating a BW mask from the melange mask shapefile');
         [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
@@ -981,7 +981,7 @@ for p = 1:length(melange_mats)
         Z.fjord.DEM_mask = round(Z.fjord.DEM_mask); Z.fjord.DEM_mask = logical(Z.fjord.DEM_mask);
         set(gca,'xlim',sort([Z.x(find(sum(Z.fjord.DEM_mask,1)>=1,1,'first')) Z.x(find(sum(Z.fjord.DEM_mask,1)>=1,1,'last'))]),'ylim',sort([Z.y(find(sum(Z.fjord.DEM_mask,2)>=1,1,'first')) Z.y(find(sum(Z.fjord.DEM_mask,2)>=1,1,'last'))]));
         set(gca,'clim',[0 70]); grid on;
-        
+
         %save the mask for each time step
         eval(cd_to_output);
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
