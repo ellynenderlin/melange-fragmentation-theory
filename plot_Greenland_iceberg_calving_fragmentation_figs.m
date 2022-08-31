@@ -67,7 +67,7 @@ for i = 1:length(site_names)
     %plot dummy lines for colorbar to ensure all years are included
     
     for j = 1:length(cmap)
-       zeros pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); %Note to self: Added zeros before pl(j)
+       pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); 
        hold on; 
        
     end

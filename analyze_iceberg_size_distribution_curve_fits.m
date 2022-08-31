@@ -4,7 +4,7 @@
 
 %% Section 0: Initialize (run every time)
 clearvars; close all;
-addpath('/Users/icebergs/iceberg-fragmentation/general-code/cmocean/');
+addpath('/Users/icebergs/iceberg-fragmentation/DEMsizes_matlab-python');
 
 %specify directories for required files ([root_dir,'/',site_names(i)])
 root_dir = '/Users/icebergs/iceberg-fragmentation/'; %include trailing / in file name
@@ -31,8 +31,8 @@ region_cmap = [171,217,233; 253,174,97; 44,123,182; 255,255,191; 215,25,28]/255;
 %% Section 1: Loop through the files for each site & pull the best fit information
 
 % %identify the site folders
-% cd(root_dir);
-% sites = dir; sitenames = [];
+%cd(root_dir);
+%sites = dir; sitenames = [];
 % for i = 1:length(sites)
 %     if ~contains(sites(i).name,'.') && length(sites(i).name) == 2
 %         sitenames = [sitenames; sites(i).name];
@@ -41,9 +41,9 @@ region_cmap = [171,217,233; 253,174,97; 44,123,182; 255,255,191; 215,25,28]/255;
 
 %loop through the folders & extract info
 disp('Extracting fits...');
-for i = 1:length(sitenames)
-    cd([root_dir,sitenames(i,:)]);
-    F(i).site = sitenames(i,:); F(i).region = region_flag(i,:); %save the site name and region to the data structure
+for i = 1:length(site_names)
+    cd([root_dir,site_names(i,:)]);
+    F(i).site = site_names(i,:); F(i).region = region_flag(i,:); %save the site name and region to the data structure
     
     %load the average iceberg surface area for each bin
     if i == 1
