@@ -391,7 +391,7 @@ for p = 1:length(melange_mats)
     disp(melangemat_dates(p,:));
     cd([root_path,'/',glacier_abbrev]);
     DEM_name = melange_mats(p).name; 
-    load (DEM_name);
+    load(DEM_name);
     
     %Rainey + Alexandra: Trying this out - Aug 12th 2022
     % make sure DEM coordinates are type double
@@ -404,16 +404,13 @@ for p = 1:length(melange_mats)
      %if ~isa(Z.z.ortho, 'double')
         %Z.z.ortho = double(Z.z.ortho);
      %end
-    
-    %if DEM_name == '20190418' %Put date here
-        %load(DEM_name);
         
         %plot the DEM
         figure1 = figure; set(gcf,'position',[50 50 1600 600]);
         imagesc(double(Z.x), double(Z.y), double(Z.z.ortho)); axis xy equal; hold on;
         colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
         plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-        title(DEM_name);
+        title(DEM_name(1:11));
         drawnow;
         
         %identify the starting uncropped melange mask vertex to use when
@@ -581,19 +578,26 @@ for p = 1:length(melange_mats)
                     [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
                     
                     %save the mask for each time step
-                    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+                    cd([output_path,'/',glacier_abbrev,'/']);
                     if contains(melmask.dated(1).datestring,'start')
                         melmask.dated(1).datestring = melangemat_dates(p,:); melmask.dated(1).x = []; melmask.dated(1).y = [];
                     else
                         maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
+                        %throw an error if any melange mask dates are
+                        %duplicated in the mask structure
+                        if length(maskref) > 1
+                            error('Duplicate dates in the mask structure')
+                        end
+                        %if there is no existing date in the structure, add
+                        %the date & dummy coordinate matrices to the end
                         if isempty(maskref)
                             maskref = length(melmask.dated)+1;
                         end
                         melmask.dated(maskref).datestring = melangemat_dates(p,:); melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
                     end
                     cd([output_path,'/',glacier_abbrev,'/']);
-                    save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
-                    save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+                    save([glacier_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+                    save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
                 case '2) No!'
                     delete_file = ['delete ',DEM_name]; eval(delete_file);
             end
@@ -697,7 +701,7 @@ for p = 1:length(melange_mats)
                     
                     %resave the blunder mask
                     cd([output_path,'/',glacier_abbrev,'/']);
-                    save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+                    save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
                     
                     %crop the melange mask using the terminus trace
                     out_intercept = []; out_interceptx = []; out_intercepty = [];
@@ -766,8 +770,8 @@ for p = 1:length(melange_mats)
                         
                         %save the mask for each time step
                         cd([output_path,'/',glacier_abbrev,'/']);
-                        save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
-                        save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+                        save([glacier_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+                        save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
                         disp('new terminus trace saved');
                     else
                         %identify the melange mask index you should use to save the data
@@ -792,8 +796,7 @@ for p = 1:length(melange_mats)
         end
         
         clear newtif;
-    end
-%end
+end
 % clear outline_*;
 disp('All anomalous elevations masked & termini delineated');
 
@@ -865,10 +868,14 @@ for p = 1:length(melange_mats)
     set(gca,'xlim',[min(Z.x) max(Z.x)],'ylim',[min(Z.y) max(Z.y)]);
     set(gcf,'position',[50 450 1600 600]);
     maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
-    if ~isempty(melmask.dated(maskref).x)
-        plot(melmask.dated(maskref).x,melmask.dated(maskref).y,'--c','linewidth',2); hold on;
+    if length(maskref) > 1
+        error('Duplicate dates in the mask structure')
     else
-        disp('No mask was plotted because the melange mask needs to be redone');
+        if ~isempty(melmask.dated(maskref).x)
+            plot(melmask.dated(maskref).x,melmask.dated(maskref).y,'--c','linewidth',2); hold on;
+        else
+            disp('No mask was plotted because the melange mask needs to be redone');
+        end
     end
     title(melangemat_dates(p,:),'fontsize',14); xlabel('Easting (m)','fontsize',12); ylabel('Northing (m)','fontsize',12); cbar.Label.String = 'elevation (m)';
     drawnow;
