@@ -4,7 +4,7 @@
 
 %% Section 0: Initialize (run every time)
 clearvars; close all;
-addpath('/Users/icebergs/iceberg-fragmentation/DEMsizes_matlab-python');
+addpath('/Users/icebergs/iceberg-fragmentation/AGU2021');
 
 %specify directories for required files ([root_dir,'/',site_names(i)])
 root_dir = '/Users/icebergs/iceberg-fragmentation/'; %include trailing / in file name
@@ -30,14 +30,14 @@ region_cmap = [171,217,233; 253,174,97; 44,123,182; 255,255,191; 215,25,28]/255;
 
 %% Section 1: Loop through the files for each site & pull the best fit information
 
-% %identify the site folders
+ %identify the site folders
 %cd(root_dir);
-%sites = dir; sitenames = [];
-% for i = 1:length(sites)
-%     if ~contains(sites(i).name,'.') && length(sites(i).name) == 2
-%         sitenames = [sitenames; sites(i).name];
-%     end
-% end
+%sites = dir; site_names = [];
+ %for i = 1:length(sites)
+  %   if ~contains(sites(i).name,'.') && length(sites(i).name) == 2
+   %      site_names = [site_names; sites(i).name];
+    % end
+    %end
 
 %loop through the folders & extract info
 disp('Extracting fits...');
@@ -55,51 +55,36 @@ for i = 1:length(site_names)
     F(i).Abin_mean = surfA'; F(i).Abin_width = surfA_binwidth'; %save surface are info to the data structure
     
     %extract automated fits
-    cd([root_dir,sitenames(i,:),'/',auto_folder]);
+    cd([root_dir,site_names(i,:),'/',auto_folder]);
     auto_files = dir(['*',auto_filepart,'*']); %find the files with the specified name
     %there should only be one file (old ones should now be automatically
-    %deleted), but this code will sort the file creation dates under the
-    %assumption that the most recent file contains the most info
-    for j = 1:length(auto_files)
-        %identify the month the file was created
-        for k = 1:length(month_array)
-            if contains(auto_files(j).name(18:20),string(month_array(k,:)))
-                file_creation_mo(j) = k;
-            end
-        end
-        
-        %identify the day of the year the file was created
-        file_creation_doy(j) = str2num(auto_files(j).name(15:16)) + cum_days(file_creation_mo(j));
-    end
-    [sort_date,sort_ref] = sort(file_creation_doy); %sorted dates of creation
-    
+    %deleted)
     %create a matrix of the fit data, replacing the oldest data with everything more recent
-    for j = 1:length(auto_files)
-%         T = readtable(auto_files(sort_ref(j)).name); fit_data = table2array(T); 
-        fit_data = readmatrix(auto_files(sort_ref(j)).name);
-        fit_data(fit_data(:,1)==0,:) = [];
-        
-        %create a master matrix
-        if j == 1; fit_table = fit_data; end
-        
-        %identify rows of data that need to be replaced with newer estimates
-        if j > 1
-            for k = 1:size(fit_data,1)
-                row_ref = find(fit_table(:,1) - fit_data(k,1) == 0);
-                if isempty(row_ref)
-                    fit_table = [fit_table; fit_data(k,:)];
-                else
-                    fit_table(row_ref,:) = fit_data(k,:);
-                end
-                clear row_ref;
-            end
-        end
-        
-        clear T fit_data;
-    end
+    %         T = readtable(auto_files(sort_ref(j)).name); fit_data = table2array(T);
+    fit_data = readmatrix(auto_files(1).name);
+    fit_data(fit_data(:,1)==0,:) = [];
+    
+    %create a master matrix
+%     if j == 1
+        fit_table = fit_data; 
+%     end
+    
+    %identify rows of data that need to be replaced with newer estimates
+%     if j > 1
+%         for k = 1:size(fit_data,1)
+%             row_ref = find(fit_table(:,1) - fit_data(k,1) == 0);
+%             if isempty(row_ref)
+%                 fit_table = [fit_table; fit_data(k,:)];
+%             else
+%                 fit_table(row_ref,:) = fit_data(k,:);
+%             end
+%             clear row_ref;
+%         end
+%     end
+%     clear T fit_data;
     
     %replace automated fits with manual fits where needed
-    cd([root_dir,sitenames(i,:),'/',man_folder]);
+    cd([root_dir,site_names(i,:),'/',man_folder]);
     man_files = dir(['*',man_filepart,'.csv']); %find all the manually-adjusted data files
     for j = 1:length(man_files)
 %         T = readtable(man_files(j).name); fit_data = table2array(T); 
@@ -108,13 +93,17 @@ for i = 1:length(site_names)
         
         %replace the corresponding automated fit data
         row_ref = find(fit_table(:,1) - str2num(fit_datestring) == 0); %find the automated fit that needs to be replaced by matching dates
-        if size(fit_data,2) == 6 %replace fit that does not include submarine melting
-            fit_table(row_ref,2:6) = fit_data(1,2:6); 
-            fit_table(row_ref,7:8) = NaN; %fill in columns 7:8 with NaNs so all dates have the same number of columns
-        else %replace fit that includes submarine melting (columns 7:8 have data)
-            fit_table(row_ref,2:8) = fit_data(1,2:8);
+        if ~isempty(row_ref)
+            if size(fit_data,2) == 6 %replace fit that does not include submarine melting
+                fit_table(row_ref,2:6) = fit_data(1,2:6);
+                fit_table(row_ref,7:8) = NaN; %fill in columns 7:8 with NaNs so all dates have the same number of columns
+            else %replace fit that includes submarine melting (columns 7:8 have data)
+                fit_table(row_ref,2:8) = fit_data(1,2:8);
+            end
+            %clear row_ref T fit_data fit_datestring;
+        else
+            error('Date not in the automated fit file. Need to rerun automated fit portion of code then manually check fits.');
         end
-        clear row_ref T fit_data fit_datestring;
     end
     
     %convert all dates to decimal date format
@@ -169,6 +158,32 @@ start_yr = years(1); end_yr = years(end);
 % season_cmap = cmocean('dense',4);
 
 %find the intersection of the two fragmentation theory curves & plot
+
+
+
+
+
+%Create new variable for 4x4 plots, insert here: (NSEW orientation) Be sure
+%to include 2nd direction, just getting it formatted for now: 
+
+%North_fig = figure; (North_fig, 'position', []);
+%South_fig = figure; (South_fig, 'position', []);
+%East_fig = figure; (East_fig, 'position', []);
+%West_fig = figure; (West_fig, 'position', []);
+%hold on; 
+
+%for i = 1:length(F) Totally used old code here. Defs feel like an idiot -
+%probably not a good plan to reuse code like that.
+
+    %for j = 1:size(F(i).c1,1)
+        %calculate the expected iceberg counts for each size bin using the "branching fracture" portion of the fragmentation equation
+        %branching(j,:) = F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j)); 
+        %calculate the expected iceberg counts for each size bin using the "isolated fracture" portion of the fragmentation equation...
+        %produces tabular icebergs
+        %tabular(j,:) = F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j));
+
+
+
 annual_fig = figure; set(annual_fig,'position',[50 50 800 1200]); 
 season_fig = figure; set(season_fig,'position',[650 50 800 1200]); 
 for i = 1:length(F)

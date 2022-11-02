@@ -30,7 +30,7 @@ addpath('/Users/icebergs/general-code/cmocean/');
 
 %set plot variables
 years = (2011:1:2021); %Note to self: Changed to parenthesis. 
-cmap = cmocean('haline',length(years)); %color map for the terminus delineations -- Note: Changed from Haline to Parula. 
+cmap = cmocean('solar',length(years)); %color map for the terminus delineations -- Note: Changed from Haline to Parula. 
 % cmap = colormap(gray(length(year))); %alternative gray-scale colormap for terminus delineations
 
 site_names = ['HM';'KO';'AG';'IG';'UN';'US';'IB';'UM';'RI';'JI';'KB';'HH';'MG';'KL';'MD';'DJ';'ZI']; %used to identify site-specific directories
@@ -44,7 +44,10 @@ Wmax = 1000; %maximum likely iceberg width (based on qualitative inspection of i
 Hmax = 800; %threshold thickness in meters that you do not expect icebergs to exceed (grounding line thickness is a good proxy)
 cmax = 16; %melange elevation map upper limit in meters
 
+
+
 cd(root_dir);
+disp(site_names); %displays site names before running. 
 
 %% Section 1: plot each Landsat images with an overlay of the fjord polygon
 disp('Plotting overview figure for each melange size distribution study site');
@@ -90,20 +93,30 @@ for i = 1:length(site_names)
     set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000); %change the tick labels from meters to kilometers
     xlabel('Easting (km)','fontsize',20); ylabel('Northing (km)','fontsize',20); %add axis labels
     
+   
+
+    
     %add a legend showing the colors for the terminus delineations (colors used to distinguish observation years)
     if reg_flags(i) <=2
         leg = legend(pl,num2str(years'),'location','west','orientation','vertical');
     else
         leg = legend(pl,num2str(years'),'location','east','orientation','vertical');
     end
-    
+
+    %title(DEM_name(1:17));
+    %Title of each figure
+title('Insert here later - find out how to make it date specific','fontsize',10);
+
+
     drawnow;
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.eps'],'epsc'); 
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.png'],'png'); %save the image
     
-    disp('moving on...'); close all; drawnow;
+    hold on;
+    
+    disp('moving on...'); drawnow; %Took out close all so I could see them side by side, add later if needed. -A
 end
-disp('Finished creating site maps');
+disp('Move onto step 2!');
 
 
 %% Section 2: plot example DEMs
@@ -134,7 +147,7 @@ for i = 1:length(site_names)
     for j = 1:geoid_spacing:size(ZXgrid,1)
         for k = 1:geoid_spacing:size(ZXgrid,2)
             [Zlon(ceil(j/geoid_spacing),ceil(k/geoid_spacing)),Zlat(ceil(j/geoid_spacing),ceil(k/geoid_spacing))] = ps2wgs(ZXgrid(j,k),ZYgrid(j,k));
-            zeros G(ceil(j/geoid_spacing),ceil(k/geoid_spacing)) = geoidheight(Zlat(ceil(j/geoid_spacing),ceil(k/geoid_spacing)),Zlon(ceil(j/geoid_spacing),ceil(k/geoid_spacing)));
+            G(ceil(j/geoid_spacing),ceil(k/geoid_spacing)) = geoidheight(Zlat(ceil(j/geoid_spacing),ceil(k/geoid_spacing)),Zlon(ceil(j/geoid_spacing),ceil(k/geoid_spacing)));
         end
     end
     %interpolate the sparse geoid height values to the DEM grid
@@ -167,16 +180,16 @@ for i = 1:length(site_names)
     %plot the melange DEM
     figDEM = figure; set(figDEM,'position',[550 100 1000 500]);
     imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on; %plot the image of melange elevations
-    melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap); %set the colormap 
+    melange_cmap = cmocean('balance',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap); %set the colormap 
     DEMax = gca; %create an axis handle
     set(gca,'clim',[0 cmax]); %set the elevation limits 
     cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)'; %label the colorbar
     
-    
+        
     
     %plot dummy lines for colorbar to ensure all years are included
     for j = 1:length(cmap)
-        zeros pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); hold on; %Note to self: put zeros in front of pl(j)
+        pl(j) = plot(melmask.dated(1).x,melmask.dated(1).y,'-','color',cmap(j,:),'linewidth',1.5); hold on; %Note to self: put zeros in front of pl(j)
     end
     %plot actual data
     for j = 1:length(melmask.dated)
@@ -207,7 +220,8 @@ for i = 1:length(site_names)
     %save the figure
     saveas(figDEM,[root_dir,site_names(i,:),'/',site_names(i,:),'_',DEMmat_dates(:)','-melange-rawDEM.eps'],'epsc');
     saveas(figDEM,[root_dir,site_names(i,:),'/',site_names(i,:),'_',DEMmat_dates(:)','-melange-rawDEM.png'],'png');
-    close all; drawnow;
+     drawnow;
     disp('moving on...');
     clear M Z melange melmask in G Z*grid Zlat Zlon;
+    
 end
