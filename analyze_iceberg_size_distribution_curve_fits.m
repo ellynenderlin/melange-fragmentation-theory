@@ -4,10 +4,13 @@
 
 %% Section 0: Initialize (run every time)
 clearvars; close all;
-addpath('/Users/icebergs/iceberg-fragmentation/AGU2021');
+addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
 
-%specify directories for required files ([root_dir,'/',site_names(i)])
-root_dir = '/Users/icebergs/iceberg-fragmentation/'; %include trailing / in file name
+%specify directories for required files ([root_dir,'/',site_abbrevs(i)])
+root_dir = '/Volumes/CALVING/Greenland_icebergs/iceberg-fragmentation/'; %include trailing / in file name
+cd(root_dir);
 
 %automated fit file info
 auto_folder = 'models';
@@ -19,72 +22,83 @@ man_filepart = '-parameters-adjusted';
 
 %create a month naming matrix to convert 3-letter months to numeric months
 month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov';'Dec'};
+years = 2011:1:2020; start_yr = years(1); end_yr = years(end);
 
 %2-letter region flagging (based on alphabetical order of site folders)
-site_names = ['AG';'DJ';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
-region_flag = ['NW';'CE';'SE';'NW';'CW';'NW';'CW';'SE';'SE';'NW';'CE';'SE';'CW';'CW';'NW';'NW';'NE'];
+site_abbrevs = ['AG';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
+site_names = [{'Alison'},{'Helheim'},{'Ullip Sermia'},{'Salliarutsip Sermia'},{'Illulip Sermia'},...
+    {'Sermeq Kujalleq'},{'Koge Bugt'},{'Kangerlussuaq'},{'Kong Oscar'},{'Magga Dan'},...
+    {'Nigertiip Apusiia'},{'Kangilliup Sermia'},{'Umiammakku Sermia'},{'Upernavik North'},{'Upernavik South'},{'Zachariae Isstrom'}];
+region_flag = ['NW';'SE';'NW';'CW';'NW';'CW';'SE';'SE';'NW';'CE';'SE';'CW';'CW';'NW';'NW';'NE'];
+site_geog_order = [3;12;1;7;4;10;11;14;2;15;13;9;8;5;6;16]; %geographic order, counterclockwise from NW
+%NOTE: data are added to F structure according to index specified by
+%site_geog_order and plot locations and letters below are for those sorted data
+%create a vector specifying subplot locations according to geography
+site_plotlocs = ones(size(site_geog_order));
+site_plotlocs(1:10) = 2*[1:1:10]'-1; %based on 10 sites along W coast
+site_plotlocs(11:end-1) = [11:1:length(site_plotlocs)-1]' - 3*([11:1:length(site_plotlocs)-1]'-14);
+site_plotlocs(end) = 2;
+%letters for labels
+site_plotletts = [{'a)'},{'b)'},{'c)'},{'d)'},{'e)'},{'f)'},{'g)'},{'h)'},{'i)'},{'j)'},{'k)'},{'l)'},{'m)'},{'n)'},{'o)'},{'p)'}];
 
 %specify a regional colorramp
 regions = unique(region_flag,'rows');
 region_cmap = [171,217,233; 253,174,97; 44,123,182; 255,255,191; 215,25,28]/255; %same colorblind-friendly color scheme as plot_Greenland_iceberg_calving_fragmentation_fits.m
 
+%specify annual colorramp
+annual_cmap = cmocean('thermal',length([start_yr:1:end_yr]));
+%specify seasonal colorramp
+season_cmap = cmocean('curl',6); season_cmap = season_cmap(2:end-1,:);
+
+disp('Initialized iceberg fragmentation data compilation code');
 %% Section 1: Loop through the files for each site & pull the best fit information
+disp('Compile observed & fit iceberg size distributions');
 
  %identify the site folders
 %cd(root_dir);
-%sites = dir; site_names = [];
+%sites = dir; site_abbrevs = [];
  %for i = 1:length(sites)
   %   if ~contains(sites(i).name,'.') && length(sites(i).name) == 2
-   %      site_names = [site_names; sites(i).name];
+   %      site_abbrevs = [site_abbrevs; sites(i).name];
     % end
     %end
 
 %loop through the folders & extract info
-disp('Extracting fits...');
-for i = 1:length(site_names)
-    cd([root_dir,site_names(i,:)]);
-    F(i).site = site_names(i,:); F(i).region = region_flag(i,:); %save the site name and region to the data structure
+disp('Extracting observations & fits...');
+for i = 1:max(site_geog_order)
+    cd([root_dir,site_abbrevs(i,:)]);
+    F(site_geog_order(i)).site_name = site_names(:,i); 
+    F(site_geog_order(i)).site_abbrev = site_abbrevs(i,:); F(site_geog_order(i)).region = region_flag(i,:); %save the site name and region to the data structure
+    
+    %load the center coordinates for the conservative melange polygon
+    load([site_abbrevs(i,:),'-melange-masks.mat']);
+    F(site_geog_order(i)).x = nanmean(melmask.uncropped.x); F(site_geog_order(i)).y = nanmean(melmask.uncropped.y); 
+    clear melmask;
     
     %load the average iceberg surface area for each bin
-    if i == 1
-        distributions = dir('*-iceberg-distribution.txt');
-        dist_example = readmatrix(distributions(1).name); %read the text file as a matrix
+    distributions = dir('*-iceberg-distribution.txt');
+    for j = 1:length(distributions)
+        dist_example = readmatrix(distributions(j).name); %read the text file as a matrix
+        bin_no(:,j) = dist_example(:,1); %grab the number of icebergs for the surface area bin
         surfA = dist_example(:,2); %grab the surface area (m^2)
         surfA_binwidth = dist_example(:,3); %grab the "bin width" for surface areas
     end
-    F(i).Abin_mean = surfA'; F(i).Abin_width = surfA_binwidth'; %save surface are info to the data structure
+    F(site_geog_order(i)).Abin_mean = surfA'; F(site_geog_order(i)).Abin_width = surfA_binwidth'; %save surface are info to the data structure
+    
+    %compile observed numbers of icebergs for each bin
+    F(site_geog_order(i)).Abin_no = bin_no';
     
     %extract automated fits
-    cd([root_dir,site_names(i,:),'/',auto_folder]);
+    cd([root_dir,site_abbrevs(i,:),'/',auto_folder]);
     auto_files = dir(['*',auto_filepart,'*']); %find the files with the specified name
-    %there should only be one file (old ones should now be automatically
-    %deleted)
-    %create a matrix of the fit data, replacing the oldest data with everything more recent
-    %         T = readtable(auto_files(sort_ref(j)).name); fit_data = table2array(T);
     fit_data = readmatrix(auto_files(1).name);
     fit_data(fit_data(:,1)==0,:) = [];
     
     %create a master matrix
-%     if j == 1
-        fit_table = fit_data; 
-%     end
-    
-    %identify rows of data that need to be replaced with newer estimates
-%     if j > 1
-%         for k = 1:size(fit_data,1)
-%             row_ref = find(fit_table(:,1) - fit_data(k,1) == 0);
-%             if isempty(row_ref)
-%                 fit_table = [fit_table; fit_data(k,:)];
-%             else
-%                 fit_table(row_ref,:) = fit_data(k,:);
-%             end
-%             clear row_ref;
-%         end
-%     end
-%     clear T fit_data;
+    fit_table = fit_data; 
     
     %replace automated fits with manual fits where needed
-    cd([root_dir,site_names(i,:),'/',man_folder]);
+    cd([root_dir,site_abbrevs(i,:),'/',man_folder]);
     man_files = dir(['*',man_filepart,'.csv']); %find all the manually-adjusted data files
     for j = 1:length(man_files)
 %         T = readtable(man_files(j).name); fit_data = table2array(T); 
@@ -109,39 +123,39 @@ for i = 1:length(site_names)
     %convert all dates to decimal date format
     YYYYMMDD = num2str(fit_table(:,1));
     for j = 1:size(YYYYMMDD,1)
-        F(i).dates(j,1) = convert_to_decimaldate(YYYYMMDD(j,:)); %requires convert_to_decimaldate.m function written by Ellyn Enderlin
+        F(site_geog_order(i)).dates(j,1) = convert_to_decimaldate(YYYYMMDD(j,:)); %requires convert_to_decimaldate.m function written by Ellyn Enderlin
     end
     
     %add to over-arching structure
-    F(i).alpha = fit_table(:,4); %branching fragmentation exponent
-    F(i).c1 = fit_table(:,2); %branching fragmentation constant
-    F(i).c2 = fit_table(:,3); %branching fragmentation 'cut-off'
-    F(i).c3 = fit_table(:,5); %tabular fragmentation constant
-    F(i).c4 = fit_table(:,6); %tabular calving 'cut-off'
-    F(i).c5 = fit_table(:,7); %submarine melt constant
-    F(i).beta = fit_table(:,8); %submarine melt exponent
+    F(site_geog_order(i)).alpha = fit_table(:,4); %branching fragmentation exponent
+    F(site_geog_order(i)).c1 = fit_table(:,2); %branching fragmentation constant
+    F(site_geog_order(i)).c2 = fit_table(:,3); %branching fragmentation 'cut-off'
+    F(site_geog_order(i)).c3 = fit_table(:,5); %tabular fragmentation constant
+    F(site_geog_order(i)).c4 = fit_table(:,6); %tabular calving 'cut-off'
+    F(site_geog_order(i)).c5 = fit_table(:,7); %submarine melt constant
+    F(site_geog_order(i)).beta = fit_table(:,8); %submarine melt exponent
     
-    clear file_creation* sort_* fit_table *_files YYYYMMDD;
-    disp(['finished extracting fit time series for ',F(i).site]);
+    clear bin_no file_creation* sort_* fit_table *_files YYYYMMDD;
+    disp(['finished extracting fit time series for ',F(site_geog_order(i)).site_abbrev]);
 end
 save([root_dir,'Greenland-iceberg-fragmentation-curves.mat'],'F','-v7.3');
 
 %filter nonsense results
 badcutoff_threshold =  surfA(find(surfA == max(surfA))-4); %semi arbitrary based on typical maximum iceberg sizes around Greenland
 for i = 1:length(F)
-    if ~isempty(find(F(i).c2>badcutoff_threshold))
-%         disp([F(i).site,' (i = ',num2str(i),'), bad ref = ',num2str(find(F(i).c2>badcutoff_threshold))])
-        F(i).dates(find(F(i).c2>badcutoff_threshold)) = []; F(i).alpha(find(F(i).c2>badcutoff_threshold)) = [];
-        F(i).c1(find(F(i).c2>badcutoff_threshold)) = []; F(i).c3(find(F(i).c2>badcutoff_threshold)) = []; F(i).c4(find(F(i).c2>badcutoff_threshold)) = []; 
-        F(i).c5(find(F(i).c2>badcutoff_threshold)) = []; F(i).beta(find(F(i).c2>badcutoff_threshold)) = []; 
-        F(i).c2(find(F(i).c2>badcutoff_threshold)) = []; 
+    if ~isempty(find(F(site_geog_order(i)).c2>badcutoff_threshold))
+%         disp([F(site_geog_order(i)).site_abbrev,' (i = ',num2str(i),'), bad ref = ',num2str(find(F(site_geog_order(i)).c2>badcutoff_threshold))])
+        F(site_geog_order(i)).dates(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; F(site_geog_order(i)).alpha(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = [];
+        F(site_geog_order(i)).c1(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; F(site_geog_order(i)).c3(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; F(site_geog_order(i)).c4(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; 
+        F(site_geog_order(i)).c5(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; F(site_geog_order(i)).beta(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; 
+        F(site_geog_order(i)).c2(find(F(site_geog_order(i)).c2>badcutoff_threshold)) = []; 
     end
 end
 disp('Filtered bad data based on branching fracture size cut-off');
 save([root_dir,'Greenland-iceberg-fragmentation-curves.mat'],'F','-v7.3');
+disp('Saved compiled size distribution data to a single mat file');
 
-
-%% Section 2: Plot curves for each glacier: color-code (1) seasonally & (2) annually
+%% Section 2: Plot observed size distributions for each glacier
 close all;
 
 %load the data (if skipping Section 1)
@@ -149,43 +163,352 @@ if ~exist('F')
     load([root_dir,'Greenland-iceberg-fragmentation-curves.mat']);
 end
 
-%specify years for dataset
-start_yr = years(1); end_yr = years(end);
 
-% %specify annual colorramp
-% annual_cmap = cmocean('thermal',length([start_yr:1:end_yr]));
-% %specify seasonal colorramp
-% season_cmap = cmocean('dense',4);
+%create figures showing observations for each site
+for i = 1:length(F)
+    %create the template figures
+    annual_sitefig = figure; set(annual_sitefig,'position',[50 50 800 600]);
+    for k = 1:size(annual_cmap,1)
+        dpa(k) = loglog(F(i).Abin_mean(1:2),F(i).Abin_no(1,1:2),'-','linewidth',1.5,'color',annual_cmap(k,:)); hold on;
+    end
+    season_sitefig = figure; set(season_sitefig,'position',[50 650 800 600]);
+    for k = 1:size(season_cmap,1)
+        dps(k) = loglog(F(i).Abin_mean(1:2),F(i).Abin_no(1,1:2),'-','linewidth',1.5,'color',season_cmap(k,:)); hold on;
+    end
+    
+    %plot the observed size distributions
+    for j = 1:size(F(i).Abin_no,1)
+        figure(annual_sitefig);
+        loglog(F(i).Abin_mean,F(i).Abin_no(j,:),'-','linewidth',1.5,'color',annual_cmap(floor(F(i).dates(j)-start_yr)+1,:)); hold on;
+        figure(season_sitefig);
+        loglog(F(i).Abin_mean,F(i).Abin_no(j,:),'-','linewidth',1.5,'color',season_cmap(ceil(4*(F(i).dates(j)-floor(F(i).dates(j)))),:)); hold on;
+    end
+    %add labels to the annual profiles
+    figure(annual_sitefig); grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,1000,10000,100000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[0.1 max(ylims)]); %set the y axis limits
+    xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    lega = legend(dpa,num2str([start_yr:1:end_yr]'));
+    drawnow;
+    %add labels to the seasonal profiles
+    figure(season_sitefig); grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,1000,10000,100000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[0.1 max(ylims)]); %set the y axis limits
+    xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    legs = legend(dps,'winter','spring','summer','autumn');
+    drawnow;
+    
+    %save the figures then close
+    saveas(annual_sitefig,[root_dir,F(i).site_abbrev,'/',F(i).site_abbrev,'-annual-iceberg-size-distribution_plot.png'],'png');
+    saveas(season_sitefig,[root_dir,F(i).site_abbrev,'/',F(i).site_abbrev,'-seasonal-iceberg-size-distribution_plot.png'],'png');
+    close(annual_sitefig); close(season_sitefig);
+    clear dpa dps lega legs;
+end
 
-%find the intersection of the two fragmentation theory curves & plot
+%create figures showing fitted models for each site
+for i = 1:length(F)
+    %create the template figures
+    annual_sitefig = figure; set(annual_sitefig,'position',[50 50 800 600]);
+    for k = 1:size(annual_cmap,1)
+        dpa(k) = loglog(F(i).Abin_mean(1:2),F(i).c1(1).*F(i).Abin_mean(1:2).^-F(i).alpha(1).*exp(-F(i).Abin_mean(1:2)./F(i).c2(1))+F(i).c3(1).*exp(-F(i).Abin_mean(1:2)./F(i).c4(1)),'-','linewidth',1.5,'color',annual_cmap(k,:)); hold on;
+    end
+    season_sitefig = figure; set(season_sitefig,'position',[50 650 800 600]);
+    for k = 1:size(season_cmap,1)
+        dps(k) = loglog(F(i).Abin_mean(1:2),F(i).c1(1).*F(i).Abin_mean(1:2).^-F(i).alpha(1).*exp(-F(i).Abin_mean(1:2)./F(i).c2(1))+F(i).c3(1).*exp(-F(i).Abin_mean(1:2)./F(i).c4(1)),'-','linewidth',1.5,'color',season_cmap(k,:)); hold on;
+    end
+    
+    %plot the observed size distributions
+    for j = 1:size(F(i).Abin_no,1)
+        figure(annual_sitefig);
+        loglog(F(i).Abin_mean,F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j))+F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j)),'-','linewidth',1.5,'color',annual_cmap(floor(F(i).dates(j)-start_yr)+1,:)); hold on;
+        figure(season_sitefig);
+        loglog(F(i).Abin_mean,F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j))+F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j)),'-','linewidth',1.5,'color',season_cmap(ceil(4*(F(i).dates(j)-floor(F(i).dates(j)))),:)); hold on;
+    end
+    %add labels to the annual profiles
+    figure(annual_sitefig); grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,1000,10000,100000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[10^-6 10^3]); %set the y axis limits
+    xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    lega = legend(dpa,num2str([start_yr:1:end_yr]'));
+    drawnow;
+    %add labels to the seasonal profiles
+    figure(season_sitefig); grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,1000,10000,100000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[10^-6 10^3]); %set the y axis limits
+    xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    legs = legend(dps,'winter','spring','summer','autumn');
+    drawnow;
+    
+    %save the figures then close
+    saveas(annual_sitefig,[root_dir,F(i).site_abbrev,'/',F(i).site_abbrev,'-annual-iceberg-size-fragmentation_plot.png'],'png');
+    saveas(season_sitefig,[root_dir,F(i).site_abbrev,'/',F(i).site_abbrev,'-seasonal-iceberg-size-fragmentation_plot.png'],'png');
+    close(annual_sitefig); close(season_sitefig);
+    clear dpa dps lega legs;
+end
+disp('Created annual & seasonal plots of observations and fragmentation fits for each site');
 
 
+%% Section 3: Plot gographically-arranged observations colored by day of year
+
+%specify daily colorramp
+accum_cmap = cmocean('ice',233); ablat_cmap = flipud(cmocean('solar',162));
+% day_cmap = cmocean('phase',365);
+day_cmap = [accum_cmap(103:end-10,:); ablat_cmap(11:end,:); accum_cmap(11:102,:)];
+
+%create a HUGE composite plot in which ever day of the year gets a different color to
+%better resolve seasonal variations
+day_sitefig = figure; set(day_sitefig,'position',[50 50 800 1200]);
+%add the data to the figure template
+for i = 1:length(F)
+    eval(['sub',num2str(site_plotlocs(i)),' = subplot(10,2,site_plotlocs(i));']);
+    
+    %plot the observed size distributions
+    for j = 1:size(F(i).Abin_no,1)
+        loglog(F(i).Abin_mean,F(i).Abin_no(j,:),'-','linewidth',1.5,'color',day_cmap(round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))),:)); hold on;
+    end
+    %add labels to the annual profiles
+    grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[0.1 max(ylims)],'ytick',[1e0 1e3 1e6]); %set the y axis limits
+    text(100,1,[char(site_plotletts(i)),char(' '),char(F(i).site_name)],'FontSize',12);
+    if site_plotlocs(i) == max(site_plotlocs)-1
+%         set(gca,'xticklabel',[10^2,10^4,10^6],...
+%             'yticklabel',[1 10^2 10^4 10^6]); %set the x axis limits and labels
+        xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    else
+        set(gca,'yticklabel',[],'xticklabel',[]);
+    end
+    pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.25*pos(3) 1.25*pos(4)]);
+    drawnow;
+end
+eval(['subplot(sub',num2str(max(site_plotlocs)),')']);
+pos = get(gca,'position');
+%plot artificial colorbar as legend
+annotation('rectangle',[pos(1) pos(2)-0.06 pos(3) 0.05],'facecolor','w','edgecolor','k');
+for k = 1:size(day_cmap,1)
+    annotation('line',[pos(1)+17.5*(pos(3)/400)+k*(pos(3)/400) pos(1)+17.5*(pos(3)/400)+k*(pos(3)/400)],[pos(2)-0.0275 pos(2)-0.0125],'linewidth',1,'color',day_cmap(k,:)); hold on;
+end
+%label doy 1
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+1*(pos(3)/400)-0.01 pos(2)-0.050 0.05 0.05]; tb.String = '1'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 92
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+92*(pos(3)/400)-0.015 pos(2)-0.050 0.05 0.05]; tb.String = '92'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 183
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+183*(pos(3)/400)-0.02 pos(2)-0.050 0.05 0.05]; tb.String = '183'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 274
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+274*(pos(3)/400)-0.025 pos(2)-0.050 0.05 0.05]; tb.String = '274'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 365
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+365*(pos(3)/400)-0.03 pos(2)-0.050 0.05 0.05]; tb.String = '365'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label units
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+137*(pos(3)/400)-0.02 pos(2)-0.0635 0.15 0.05]; tb.String = 'day of year'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%add a sitemap
+subplot(20,2,[site_plotlocs(site_geog_order == max(site_geog_order))+4:2:site_plotlocs(site_geog_order == max(site_geog_order)-1)-2]);
+if ~exist('I')
+    load('/Volumes/CALVING/Greenland_icebergs/mapping/GIMP_image_mosaic_150m.mat');
+end
+imagesc(I.x,I.y,I.z_adjust); axis xy equal; hold on;
+colormap gray; drawnow; pos = get(gca,'position'); 
+set(gca,'xlim',[-0.625e6 0.85e6],'ylim',[-3e6 -1e6],...
+    'xticklabel',[],'yticklabel',[],'fontsize',16);
+graticulepsn([55:5:85],[-95:10:-15]);
+set(gca,'position',[0.575 0.535 1.25*pos(3) 1.25*pos(4)]);
+for i = 1:length(F)
+    %adjust letter plotting based on clustering & location
+    if i == 1 || i == 15
+        text(F(i).x+10000,F(i).y-10000,site_plotletts(i),'color','r');
+    elseif i == 2 || i == 10 
+        text(F(i).x+10000,F(i).y,site_plotletts(i),'color','r');
+    elseif i > 10 && i ~=15
+        text(F(i).x-100000,F(i).y,site_plotletts(i),'color','r');
+    elseif i == 3
+        text(F(i).x+10000,F(i).y,'c-d)','color','r');
+    elseif i == 5
+        text(F(i).x+10000,F(i).y,'e-f)','color','r');
+    elseif i== 7
+        text(F(i+1).x+10000,F(i+1).y,'g-i)','color','r');
+    end
+end
+%save the figure
+saveas(day_sitefig,[root_dir,'Greenland-daily-iceberg-size-distribution_subplots.png'],'png');
+
+%plot the same composite figure but only showing accumulation season data
+accumday_sitefig = figure; set(accumday_sitefig,'position',[550 50 800 1200]);
+%add the data to the figure template
+for i = 1:length(F)
+    eval(['sub',num2str(site_plotlocs(i)),' = subplot(10,2,site_plotlocs(i));']);
+    
+    %plot the observed size distributions
+    for j = 1:size(F(i).Abin_no,1)
+        if round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))) <= 121 || round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))) > 274
+            loglog(F(i).Abin_mean,F(i).Abin_no(j,:),'-','linewidth',1.5,'color',day_cmap(round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))),:)); hold on;
+        end
+    end
+    %add labels to the annual profiles
+    grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[0.1 max(ylims)],'ytick',[1e0 1e3 1e6]); %set the y axis limits
+    text(100,1,[char(site_plotletts(i)),char(' '),char(F(i).site_name)],'FontSize',12);
+    if site_plotlocs(i) == max(site_plotlocs)-1
+%         set(gca,'xticklabel',[10^2,10^4,10^6],...
+%             'yticklabel',[1 10^2 10^4 10^6]); %set the x axis limits and labels
+        xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    else
+        set(gca,'yticklabel',[],'xticklabel',[]);
+    end
+    pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.25*pos(3) 1.25*pos(4)]);
+    drawnow;
+end
+eval(['subplot(sub',num2str(max(site_plotlocs)),')']);
+pos = get(gca,'position');
+%plot artificial colorbar as legend
+annotation('rectangle',[pos(1) pos(2)-0.06 pos(3) 0.05],'facecolor','w','edgecolor','k');
+for k = 1:size(day_cmap,1)
+    annotation('line',[pos(1)+17.5*(pos(3)/400)+k*(pos(3)/400) pos(1)+17.5*(pos(3)/400)+k*(pos(3)/400)],[pos(2)-0.0275 pos(2)-0.0125],'linewidth',1,'color',day_cmap(k,:)); hold on;
+end
+%label doy 1
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+1*(pos(3)/400)-0.01 pos(2)-0.050 0.05 0.05]; tb.String = '1'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 92
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+92*(pos(3)/400)-0.015 pos(2)-0.050 0.05 0.05]; tb.String = '92'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 183
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+183*(pos(3)/400)-0.02 pos(2)-0.050 0.05 0.05]; tb.String = '183'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 274
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+274*(pos(3)/400)-0.025 pos(2)-0.050 0.05 0.05]; tb.String = '274'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 365
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+365*(pos(3)/400)-0.03 pos(2)-0.050 0.05 0.05]; tb.String = '365'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label units
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+137*(pos(3)/400)-0.02 pos(2)-0.0635 0.15 0.05]; tb.String = 'day of year'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%add a sitemap
+subplot(20,2,[site_plotlocs(site_geog_order == max(site_geog_order))+4:2:site_plotlocs(site_geog_order == max(site_geog_order)-1)-2]);
+if ~exist('I')
+    load('/Volumes/CALVING/Greenland_icebergs/mapping/GIMP_image_mosaic_150m.mat');
+end
+imagesc(I.x,I.y,I.z_adjust); axis xy equal; hold on;
+colormap gray; drawnow; pos = get(gca,'position'); 
+set(gca,'xlim',[-0.625e6 0.85e6],'ylim',[-3e6 -1e6],...
+    'xticklabel',[],'yticklabel',[],'fontsize',16);
+graticulepsn([55:5:85],[-95:10:-15]);
+set(gca,'position',[0.575 0.535 1.25*pos(3) 1.25*pos(4)]);
+for i = 1:length(F)
+    %adjust letter plotting based on clustering & location
+    if i == 1 || i == 15
+        text(F(i).x+10000,F(i).y-10000,site_plotletts(i),'color','b');
+    elseif i == 2 || i == 10 
+        text(F(i).x+10000,F(i).y,site_plotletts(i),'color','b');
+    elseif i > 10 && i ~=15
+        text(F(i).x-100000,F(i).y,site_plotletts(i),'color','b');
+    elseif i == 3
+        text(F(i).x+10000,F(i).y,'c-d)','color','b');
+    elseif i == 5
+        text(F(i).x+10000,F(i).y,'e-f)','color','b');
+    elseif i== 7
+        text(F(i+1).x+10000,F(i+1).y,'g-i)','color','b');
+    end
+end
+%save the figure
+saveas(accumday_sitefig,[root_dir,'Greenland-daily-winter-iceberg-size-distribution_subplots.png'],'png');
 
 
+%plot the same composite figure but only showing ablation season data
+ablatday_sitefig = figure; set(ablatday_sitefig,'position',[1050 50 800 1200]);
+%add the data to the figure template
+for i = 1:length(F)
+    eval(['sub',num2str(site_plotlocs(i)),' = subplot(10,2,site_plotlocs(i));']);
+    
+    %plot the observed size distributions
+    for j = 1:size(F(i).Abin_no,1)
+        if round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))) > 121 && round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))) <= 274
+            loglog(F(i).Abin_mean,F(i).Abin_no(j,:),'-','linewidth',1.5,'color',day_cmap(round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))),:)); hold on;
+        end
+    end
+    %add labels to the annual profiles
+    grid on; ylims = get(gca,'ylim');
+    set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
+    set(gca,'fontsize',16,'ylim',[0.1 max(ylims)],'ytick',[1e0 1e3 1e6]); %set the y axis limits
+    text(100,1,[char(site_plotletts(i)),char(' '),char(F(i).site_name)],'FontSize',12);
+    if site_plotlocs(i) == max(site_plotlocs)-1
+%         set(gca,'xticklabel',[10^2,10^4,10^6],...
+%             'yticklabel',[1 10^2 10^4 10^6]); %set the x axis limits and labels
+        xlabel('Iceberg surface area (m^2)'); ylabel('Count');
+    else
+        set(gca,'yticklabel',[],'xticklabel',[]);
+    end
+    pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.25*pos(3) 1.25*pos(4)]);
+    drawnow;
+end
+eval(['subplot(sub',num2str(max(site_plotlocs)),')']);
+pos = get(gca,'position');
+%plot artificial colorbar as legend
+annotation('rectangle',[pos(1) pos(2)-0.06 pos(3) 0.05],'facecolor','w','edgecolor','k');
+for k = 1:size(day_cmap,1)
+    annotation('line',[pos(1)+17.5*(pos(3)/400)+k*(pos(3)/400) pos(1)+17.5*(pos(3)/400)+k*(pos(3)/400)],[pos(2)-0.0275 pos(2)-0.0125],'linewidth',1,'color',day_cmap(k,:)); hold on;
+end
+%label doy 1
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+1*(pos(3)/400)-0.01 pos(2)-0.050 0.05 0.05]; tb.String = '1'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 92
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+92*(pos(3)/400)-0.015 pos(2)-0.050 0.05 0.05]; tb.String = '92'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 183
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+183*(pos(3)/400)-0.02 pos(2)-0.050 0.05 0.05]; tb.String = '183'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 274
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+274*(pos(3)/400)-0.025 pos(2)-0.050 0.05 0.05]; tb.String = '274'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label doy 365
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+365*(pos(3)/400)-0.03 pos(2)-0.050 0.05 0.05]; tb.String = '365'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%label units
+tb = annotation('textbox'); tb.Position = [pos(1)+17.5*(pos(3)/400)+137*(pos(3)/400)-0.02 pos(2)-0.0635 0.15 0.05]; tb.String = 'day of year'; 
+tb.EdgeColor = 'none';  tb.VerticalAlignment = 'bottom'; tb.FontSize = 16;
+%add a sitemap
+subplot(20,2,[site_plotlocs(site_geog_order == max(site_geog_order))+4:2:site_plotlocs(site_geog_order == max(site_geog_order)-1)-2]);
+if ~exist('I')
+    load('/Volumes/CALVING/Greenland_icebergs/mapping/GIMP_image_mosaic_150m.mat');
+end
+imagesc(I.x,I.y,I.z_adjust); axis xy equal; hold on;
+colormap gray; drawnow; pos = get(gca,'position'); 
+set(gca,'xlim',[-0.625e6 0.85e6],'ylim',[-3e6 -1e6],...
+    'xticklabel',[],'yticklabel',[],'fontsize',16);
+graticulepsn([55:5:85],[-95:10:-15]);
+set(gca,'position',[0.575 0.535 1.25*pos(3) 1.25*pos(4)]);
+for i = 1:length(F)
+    %adjust letter plotting based on clustering & location
+    if i == 1 || i == 15
+        text(F(i).x+10000,F(i).y-10000,site_plotletts(i),'color','r');
+    elseif i == 2 || i == 10 
+        text(F(i).x+10000,F(i).y,site_plotletts(i),'color','r');
+    elseif i > 10 && i ~=15
+        text(F(i).x-100000,F(i).y,site_plotletts(i),'color','r');
+    elseif i == 3
+        text(F(i).x+10000,F(i).y,'c-d)','color','r');
+    elseif i == 5
+        text(F(i).x+10000,F(i).y,'e-f)','color','r');
+    elseif i== 7
+        text(F(i+1).x+10000,F(i+1).y,'g-i)','color','r');
+    end
+end
+%save the figure
+saveas(ablatday_sitefig,[root_dir,'Greenland-daily-summer-iceberg-size-distribution_subplots.png'],'png');
 
-%Create new variable for 4x4 plots, insert here: (NSEW orientation) Be sure
-%to include 2nd direction, just getting it formatted for now: 
 
-%North_fig = figure; (North_fig, 'position', []);
-%South_fig = figure; (South_fig, 'position', []);
-%East_fig = figure; (East_fig, 'position', []);
-%West_fig = figure; (West_fig, 'position', []);
-%hold on; 
+%% Section 4: Plot fragmentation theory-modeled size distributions
+close all;
 
-%for i = 1:length(F) Totally used old code here. Defs feel like an idiot -
-%probably not a good plan to reuse code like that.
-
-    %for j = 1:size(F(i).c1,1)
-        %calculate the expected iceberg counts for each size bin using the "branching fracture" portion of the fragmentation equation
-        %branching(j,:) = F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j)); 
-        %calculate the expected iceberg counts for each size bin using the "isolated fracture" portion of the fragmentation equation...
-        %produces tabular icebergs
-        %tabular(j,:) = F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j));
-
-
-
-annual_fig = figure; set(annual_fig,'position',[50 50 800 1200]); 
-season_fig = figure; set(season_fig,'position',[650 50 800 1200]); 
+%create subplots of fit curves, with each panel corresponding to a
+%different year or season
+annual_fig = figure; set(annual_fig,'position',[650 50 800 1200]); 
+season_fig = figure; set(season_fig,'position',[1050 50 800 1200]); 
 for i = 1:length(F)
     for j = 1:size(F(i).c1,1)
         %calculate the expected iceberg counts for each size bin using the "branching fracture" portion of the fragmentation equation
@@ -205,8 +528,8 @@ for i = 1:length(F)
         end
 %         pl(floor(F(i).dates(j)-(start_yr-1))) = loglog(F(i).Abin_mean,(branching(j,:)+tabular(j,:))./max(branching(j,:)+tabular(j,:)),'-','color',annual_cmap(floor(F(i).dates(j)-(start_yr-1)),:),'linewidth',1.5); hold on;
         loglog(F(i).Abin_mean,(branching(j,:)+tabular(j,:))./max(branching(j,:)+tabular(j,:)),'-','color',region_cmap(strmatch(F(i).region,regions),:),'linewidth',1.5); hold on; %plot the fit curves color-coded to region
-        set(gca,'xlim',[0 ceil(max(surfA)./10^6)*10^6],'xtick',[100,1000,10000,100000,1000000],'xticklabel',[100,1000,10000,100000,1000000]); %set the x axis limits and labels
-        set(gca,'fontsize',20,'ylim',[10^-13 1]); %set the y axis limits
+        set(gca,'xlim',[0 ceil(max(surfA)./10^6)*10^6],'xtick',[100,1000,10000,100000,1000000],'xticklabel',[10^2,10^3,10^4,10^5,10^6]); %set the x axis limits and labels
+        set(gca,'fontsize',16,'ylim',[10^-13 1]); %set the y axis limits
         
         %create a plot that sorts the data according to season
         figure(season_fig); 
@@ -224,8 +547,8 @@ for i = 1:length(F)
         loglog(F(i).Abin_mean,(branching(j,:)+tabular(j,:))./max(branching(j,:)+tabular(j,:)),'-','color','k','linewidth',2); hold on; %plot the fit curves color-coded to region
         pr(strmatch(F(i).region,regions)) = loglog(F(i).Abin_mean,(branching(j,:)+tabular(j,:))./max(branching(j,:)+tabular(j,:)),...
             '-','color',region_cmap(strmatch(F(i).region,regions),:),'linewidth',1.5); hold on; %create dummy lines for each region to include in the legend
-        set(gca,'xlim',[0 ceil(max(surfA)./10^6)*10^6],'xtick',[100,1000,10000,100000,1000000],'xticklabel',[100,1000,10000,100000,1000000]); %set the x axis limits and labels
-        set(gca,'fontsize',20,'ylim',[10^-13 1]); %set the y axis limits
+        set(gca,'xlim',[0 ceil(max(surfA)./10^6)*10^6],'xtick',[100,1000,10000,100000,1000000],'xticklabel',[10^2,10^3,10^4,10^5,10^6]); %set the x axis limits and labels
+        set(gca,'fontsize',16,'ylim',[10^-13 1]); %set the y axis limits
 
         drawnow;
     end
@@ -235,21 +558,21 @@ end
 % subplot(sub1a);
 % leg = legend(pl,{num2str([2011:1:2019]')}); set(leg,'location','eastoutside');
 % set(gca,'xlim',[0 ceil(max(surfA)./10^6)*10^6]); xticks = get(gca,'xtick');
-% set(gca,'fontsize',20,'xticklabel',xticks./10^6,'ylim',[10^-13 1]); 
+% set(gca,'fontsize',16,'xticklabel',xticks./10^6,'ylim',[10^-13 1]); 
 % xlabel('Iceberg surface area (km^2)'); ylabel('Normalized count');
-% text(0.00003*max(get(gca,'xlim')),0.4*max(get(gca,'ylim')),'a) ','fontsize',20);
+% text(0.00003*max(get(gca,'xlim')),0.4*max(get(gca,'ylim')),'a) ','fontsize',16);
 % subplot(sub1b);
 % legr = legend(pr,'winter','spring','summer','fall'); set(legr,'location','eastoutside');
 % set(gca,'xlim',[0 ceil(max(surfA)./10^6)*10^6]); xticks = get(gca,'xtick');
-% set(gca,'fontsize',20,'xticklabel',xticks./10^6,'ylim',[10^-13 1]); 
+% set(gca,'fontsize',16,'xticklabel',xticks./10^6,'ylim',[10^-13 1]); 
 % xlabel('Iceberg surface area (km^2)'); ylabel('Normalized count');
-% text(0.00003*max(get(gca,'xlim')),0.4*max(get(gca,'ylim')),'b) ','fontsize',20);
+% text(0.00003*max(get(gca,'xlim')),0.4*max(get(gca,'ylim')),'b) ','fontsize',16);
 
 %format the annual plot figure
 figure(annual_fig);
 for j = 1:length([start_yr:1:end_yr])
     subplot(length([start_yr:1:end_yr]),1,j);
-    text(0.00003*max(get(gca,'xlim')),0.01*max(get(gca,'ylim')),num2str(start_yr-1+j),'fontsize',20);
+    text(0.00003*max(get(gca,'xlim')),0.01*max(get(gca,'ylim')),num2str(start_yr-1+j),'fontsize',16);
     %only add x and y axis labels to the lower left plot (may need to
     %change if statement to length([start_yr:1:end_yr])-1)
     if j == length([start_yr:1:end_yr])
@@ -263,13 +586,13 @@ end
 %add season labels to the seasonal subplots
 figure(season_fig); 
 subplot(4,1,1);
-text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'a) winter','fontsize',20);
+text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'a) winter','fontsize',16);
 subplot(4,1,2);
-text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'b) spring','fontsize',20);
+text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'b) spring','fontsize',16);
 subplot(4,1,3);
-text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'c) summer','fontsize',20);
+text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'c) summer','fontsize',16);
 subplot(4,1,4);
-text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'d) fall','fontsize',20);
+text(0.15*max(get(gca,'xlim')),0.05*max(get(gca,'ylim')),'d) fall','fontsize',16);
 %format the seasonal plot figure
 subplot(4,1,3); xlabel('Iceberg surface area (km^2)'); ylabel('Normalized count'); %add axis labels to the lower left panel
 plot_pos = get(gca,'position');
@@ -286,18 +609,6 @@ saveas(season_fig,[root_dir,'Greenland-seasonal-iceberg-size-distribution_subplo
 
 %resave with the fragmentation curve data
 save([root_dir,'Greenland-iceberg-fragmentation-curves.mat'],'F','-v7.3');
-
-
-%% Section 3: Plot quantitative data:(1) fragmentation theory curve intercept, (2) branching fracture cut-off, (3) submarine melt volume loss
-close all;
-
-%load the data (if skipping Sections 1-2)
-if ~exist('F')
-    load([root_dir,'Greenland-iceberg-fragmentation-curves.mat']);
-end
-
-%specify site-specific colorramp
-site_cmap = cmocean('curl',length(F));
 
 %find the intersection of the two fragmentation theory curves & plot: this
 %tells us the size threshold where iceberg sizes switch from being
@@ -319,7 +630,7 @@ end
 %format the plot
 legr = legend(pr,regions); set(legr,'location','eastoutside');
 yticks = get(gca,'ytick');
-set(gca,'fontsize',20,'yticklabel',yticks./10^6); 
+set(gca,'fontsize',16,'yticklabel',yticks./10^6); 
 xlabel('Year'); ylabel('Iceberg surface area (km^2)');
 
 
@@ -332,7 +643,7 @@ for i = 1:length(F)
 end
 legr = legend(pr,regions); set(legr,'location','eastoutside');
 yticks = get(gca,'ytick');
-set(gca,'fontsize',20,'yticklabel',yticks./10^6); 
+set(gca,'fontsize',16,'yticklabel',yticks./10^6); 
 xlabel('Year'); ylabel('Branching size cut-off (km^2)');
 clear pl pr;
 

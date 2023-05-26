@@ -21,21 +21,21 @@
 clearvars; close all;
 
 %specify directories for required files
-root_dir = '/Users/icebergs/iceberg-fragmentation/'; %over-arching directory (include trailing /)
-DEM_dir = [root_dir,'AGU2021/']; %code will navigate to this directory and then into a site name directory to look for DEMs
+root_dir = '/Volumes/CALVING/Greenland_icebergs/iceberg-fragmentation/'; %over-arching directory (include trailing /)
+DEM_dir = root_dir; %code will navigate to this directory and then into a site name directory to look for images
 
 %add cmocean toolbox to your Matlab path
-addpath('/Users/icebergs/general-code/');
-addpath('/Users/icebergs/general-code/cmocean/');
+addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
 
 %set plot variables
 years = (2011:1:2021); %Note to self: Changed to parenthesis. 
 cmap = cmocean('solar',length(years)); %color map for the terminus delineations -- Note: Changed from Haline to Parula. 
 % cmap = colormap(gray(length(year))); %alternative gray-scale colormap for terminus delineations
-
-site_names = ['HM';'KO';'AG';'IG';'UN';'US';'IB';'UM';'RI';'JI';'KB';'HH';'MG';'KL';'MD';'DJ';'ZI']; %used to identify site-specific directories
+site_names = ['HM';'KO';'AG';'IG';'UN';'US';'IB';'UM';'RI';'JI';'KB';'HH';'MG';'KL';'MD';'DJ';'ZI']; %used to identify site-specific directories (counter-clockwise from NW)
 reg_flags = [3;3;3;3;3;3;2;2;2;2;1;1;1;1;4;4;5]; %specifies the region for each site listed in site_names (1=SE,2=SW,3=NW,4=CE,5=NE)
 reg_colors = [215,25,28; 253,174,97; 255,255,191; 171,217,233; 44,123,182]/255; %same colorblind-friendly color scheme as analyze_iceberg_size_distribution_curve_fits.m
+region_flag = ['NW';'NW';'NW';'NW';'NW';'NW';'CW';'CW';'CW';'CW';'SE';'SE';'SE';'SE';'CE';'CE';'NE']; 
 
 %specify generic variables
 rho_i = 900; rho_sw = 1026; %density of ice and sea water in kg/m^3 (constant)
@@ -45,9 +45,7 @@ Hmax = 800; %threshold thickness in meters that you do not expect icebergs to ex
 cmax = 16; %melange elevation map upper limit in meters
 
 
-
 cd(root_dir);
-disp(site_names); %displays site names before running. 
 
 %% Section 1: plot each Landsat images with an overlay of the fjord polygon
 disp('Plotting overview figure for each melange size distribution study site');
@@ -102,12 +100,6 @@ for i = 1:length(site_names)
     else
         leg = legend(pl,num2str(years'),'location','east','orientation','vertical');
     end
-
-    %title(DEM_name(1:17));
-    %Title of each figure
-title('Insert here later - find out how to make it date specific','fontsize',10);
-
-
     drawnow;
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.eps'],'epsc'); 
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.png'],'png'); %save the image
@@ -119,7 +111,7 @@ end
 disp('Move onto step 2!');
 
 
-%% Section 2: plot example DEMs
+%% Section 2: plot example DEMs (only run if you have a good example DEM for each site)
 disp('Plotting example DEM for each melange size distribution study site');
 
 % %uncomment lines below to selectively replot
@@ -184,7 +176,6 @@ for i = 1:length(site_names)
     DEMax = gca; %create an axis handle
     set(gca,'clim',[0 cmax]); %set the elevation limits 
     cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)'; %label the colorbar
-    
         
     
     %plot dummy lines for colorbar to ensure all years are included
@@ -225,3 +216,13 @@ for i = 1:length(site_names)
     clear M Z melange melmask in G Z*grid Zlat Zlon;
     
 end
+%% Section 3: Size distribution scatterplots
+%load the aggregated data
+if ~exist('F')
+    load([root_dir,'Greenland-iceberg-fragmentation-curves.mat']);
+end
+
+
+
+
+
