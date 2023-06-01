@@ -864,10 +864,9 @@ for i = 1:length(F)
             subplot(length(focus_sites),3,k*3-1); grid on; pos = get(gca,'position');
             set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
             set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
-            annotation('textbox',[pos(1)+0.25*pos(3) pos(2)+pos(4) pos(3) 0.025],'String',string(F(i).site_name),...
+            annotation('textbox',[pos(1)-0.5*pos(3) pos(2)+pos(4)+0.02 pos(3) 0.025],'String',string(F(i).site_name),...
                 'FontSize',16,'EdgeColor','none','HorizontalAlignment','center');
             subplot(length(focus_sites),3,k*3); grid on;
-%             pos = get(gca,'position'); set(gca,'position',[pos(1)+0.03 pos(2) pos(3) pos(4)]);
             set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
             set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
             
@@ -879,7 +878,7 @@ for i = 1:length(F)
                 ylbl_cum = ylabel('Iceberg concentration (count/km^2)'); 
                 subplot(length(focus_sites),3,k*3-1);
                 xlabel('Iceberg surface area (m^2)');
-%                 ylbl_abl = ylabel('Iceberg concentration (count/km^2)'); 
+                ylbl_abl = ylabel('Iceberg concentration (count/km^2)'); 
                 subplot(length(focus_sites),3,k*3);
                 xlabel('Iceberg surface area (m^2)');
                 ylbl_mod = ylabel('Iceberg number density'); 
@@ -889,8 +888,7 @@ for i = 1:length(F)
     drawnow;
     end
 end
-annotation('rectangle',[0.08 0.055 0.575 0.9],'linewidth',3);
-annotation('rectangle',[0.08+0.575 0.055 0.3 0.9],'linewidth',3);
+
 
 
 %% Section 6: Plot fragmentation theory-modeled size distributions
