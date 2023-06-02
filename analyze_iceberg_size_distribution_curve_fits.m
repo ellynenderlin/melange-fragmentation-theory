@@ -274,16 +274,18 @@ for i = 1:length(F)
 
 end
 %format subplots
-subplot(subacc);
+subplot(subacc); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.05*pos(4)]);
 grid on; ylims = get(gca,'ylim');
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[0.1 max(ylims)],'ytick',[1e0 1e3 1e6]); %set the y axis limits
+text(70,0.2,'a) accumulation season','FontSize',16);
 xlabel('Iceberg surface area (m^2)'); ylabel('Iceberg count');
-subplot(subabl);
+subplot(subabl); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.05*pos(4)]);
 grid on; ylims = get(gca,'ylim');
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[0.1 max(ylims)],'ytick',[1e0 1e3 1e6]); %set the y axis limits
 set(gca,'yticklabel',[]);
+text(70,0.2,'b) ablation season','FontSize',16);
 xlabel('Iceberg surface area (m^2)'); 
 drawnow;
 clear sub*;
@@ -312,22 +314,26 @@ subplot(subablW); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1
 grid on; 
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'b) west: ablation season','FontSize',16);
 ylabel('Iceberg concentration (count/km^2)'); xlabel('Iceberg surface area (m^2)'); 
 subplot(subablE); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.15*pos(3) 1.15*pos(4)]);
 grid on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
 set(gca,'yticklabel',[]);
+text(70,0.8e-3,'d) east: ablation season','FontSize',16);
 xlabel('Iceberg surface area (m^2)'); 
 subplot(subaccW); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 grid on; 
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'a) west: accumulation season','FontSize',16);
 ylabel('Iceberg concentration (count/km^2)'); 
 subplot(subaccE); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 grid on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'c) east: accumulation season','FontSize',16);
 set(gca,'yticklabel',[]);
 drawnow;
 clear sub*;
@@ -357,22 +363,26 @@ subplot(subablW); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1
 grid on; 
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'b) west: ablation season','FontSize',16);
 ylabel('Iceberg number density'); xlabel('Iceberg surface area (m^2)'); 
 subplot(subablE); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.15*pos(3) 1.15*pos(4)]);
 grid on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
 set(gca,'yticklabel',[]);
+text(70,0.2e-4,'d) east: ablation season','FontSize',16);
 xlabel('Iceberg surface area (m^2)'); 
 subplot(subaccW); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 grid on; 
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'a) west: accumulation season','FontSize',16);
 ylabel('Iceberg number density'); 
 subplot(subaccE); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 grid on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'c) east: accumulation season','FontSize',16);
 set(gca,'yticklabel',[]);
 drawnow;
 clear sub*;
@@ -444,12 +454,14 @@ loglog(F(1).Abin_mean,ablatW_con,'-','linewidth',2,'color',nanmean(ablat_cmap));
 loglog(F(1).Abin_mean,nanmean(ablatW_con,1),'-k','linewidth',2); hold on; 
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'b) west: ablation season','FontSize',16);
 ylabel('Iceberg concentration (count/km^2)'); xlabel('Iceberg surface area (m^2)'); 
 subplot(subablEc); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,ablatE_con,'-','linewidth',2,'color',nanmean(ablat_cmap)); hold on; grid on; 
 loglog(F(1).Abin_mean,nanmean(ablatE_con,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'d) east: ablation season','FontSize',16);
 set(gca,'yticklabel',[]);
 xlabel('Iceberg surface area (m^2)'); 
 subplot(subaccWc); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
@@ -457,12 +469,14 @@ loglog(F(1).Abin_mean,accumW_con,'-','linewidth',2,'color',nanmean(accum_cmap));
 loglog(F(1).Abin_mean,nanmean(accumW_con,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'a) west: accumulation season','FontSize',16);
 ylabel('Iceberg concentration (count/km^2)'); 
 subplot(subaccEc); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,accumE_con,'-','linewidth',2,'color',nanmean(accum_cmap)); hold on; grid on; 
 loglog(F(1).Abin_mean,nanmean(accumE_con,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.8e-3,'c) east: accumulation season','FontSize',16);
 set(gca,'yticklabel',[]);
 drawnow;
 figure(meannorm_fig); 
@@ -471,12 +485,14 @@ loglog(F(1).Abin_mean,ablatW_no./F(i).Abin_width,'-','linewidth',2,'color',nanme
 loglog(F(1).Abin_mean,nanmean(ablatW_no,1)./F(i).Abin_width,'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'b) west: ablation season','FontSize',16);
 ylabel('Iceberg number density'); xlabel('Iceberg surface area (m^2)'); 
 subplot(subablEn); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,ablatE_no./F(i).Abin_width,'-','linewidth',2,'color',nanmean(ablat_cmap)); hold on; grid on; 
 loglog(F(1).Abin_mean,nanmean(ablatE_no,1)./F(i).Abin_width,'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'d) east: ablation season','FontSize',16);
 set(gca,'yticklabel',[]);
 xlabel('Iceberg surface area (m^2)'); 
 subplot(subaccWn); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
@@ -484,15 +500,18 @@ loglog(F(1).Abin_mean,accumW_no./F(i).Abin_width,'-','linewidth',2,'color',nanme
 loglog(F(1).Abin_mean,nanmean(accumW_no,1)./F(i).Abin_width,'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'a) west: accumulation season','FontSize',16);
 ylabel('Iceberg number density'); 
 subplot(subaccEn); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,accumE_no./F(i).Abin_width,'-','linewidth',2,'color',nanmean(accum_cmap)); hold on; grid on; 
 loglog(F(1).Abin_mean,nanmean(accumE_no,1)./F(i).Abin_width,'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'c) east: accumulation season','FontSize',16);
 set(gca,'yticklabel',[]);
 drawnow;
 saveas(meancon_fig,[root_dir,'Greenland-mean-seasonal-iceberg-size-concentration_lumped-plot.png'],'png');
+saveas(meancon_fig,[root_dir,'Greenland-mean-seasonal-iceberg-size-concentration_lumped-plot.eps'],'epsc');
 saveas(meannorm_fig,[root_dir,'Greenland-mean-seasonal-iceberg-size-density_lumped-plot.png'],'png');
 
 %recreate the same normalized lumped plot but for model fits
@@ -545,6 +564,7 @@ loglog(F(1).Abin_mean,ablatW_dens,'-','linewidth',2,'color',nanmean(ablat_cmap))
 loglog(F(1).Abin_mean,nanmean(ablatW_dens,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'b) west: ablation season','FontSize',16);
 ylabel('Iceberg number density'); xlabel('Iceberg surface area (m^2)'); 
 subplot(subablEd); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,ablatE_dens,'-','linewidth',2,'color',nanmean(ablat_cmap)); hold on; grid on; 
@@ -552,18 +572,21 @@ loglog(F(1).Abin_mean,nanmean(ablatE_dens,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
 set(gca,'yticklabel',[]);
+text(70,0.2e-4,'d) east: ablation season','FontSize',16);
 xlabel('Iceberg surface area (m^2)'); 
 subplot(subaccWd); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,accumW_dens,'-','linewidth',2,'color',nanmean(accum_cmap)); hold on; grid on; 
 loglog(F(1).Abin_mean,nanmean(accumW_dens,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'a) west: accumulation season','FontSize',16);
 ylabel('Iceberg number density'); 
 subplot(subaccEd); pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)-0.05 1.15*pos(3) 1.15*pos(4)]);
 loglog(F(1).Abin_mean,accumE_dens,'-','linewidth',2,'color',nanmean(accum_cmap)); hold on; grid on; 
 loglog(F(1).Abin_mean,nanmean(accumE_dens,1),'-k','linewidth',2); hold on;
 set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000],'xticklabel',[]); %set the x axis limits and labels
 set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+text(70,0.2e-4,'c) east: accumulation season','FontSize',16);
 set(gca,'yticklabel',[]);
 drawnow;
 saveas(modelnorm_fig,[root_dir,'Greenland-modeled-mean-seasonal-iceberg-size-density_lumped-plot.png'],'png');
@@ -579,6 +602,7 @@ clear sub*;
 
 
 %% Section 4: Plot gographically-arranged observations colored by day of year
+close all;
 
 %create a HUGE composite plot in which every day of the year gets a different color to
 %better resolve seasonal variations
@@ -660,6 +684,7 @@ for i = 1:length(F)
 end
 %save the figure
 saveas(day_sitefig,[root_dir,'Greenland-daily-iceberg-size-distribution_subplots.png'],'png');
+saveas(day_sitefig,[root_dir,'Greenland-daily-iceberg-size-distribution_subplots.eps'],'epsc');
 
 %plot the same composite figure but only showing accumulation season data
 accumday_sitefig = figure; set(accumday_sitefig,'position',[550 50 800 1200]);
@@ -828,14 +853,15 @@ saveas(ablatday_sitefig,[root_dir,'Greenland-daily-summer-iceberg-size-distribut
 
 
 %% Section 5: Plot examples for a few sites to highlight patterns
-%subplots for each site: winter observed concentration, summer observed concentration, all observed & modeled density
-focus_sites = [{'Alison'},{'Upernavik South'},{'Kangerlussuaq'},{'Zachariae Isstrom'}];
+close all;
 
-%Alison: highlights winter "kink" 
+%subplots for each site: winter observed concentration, summer observed concentration, all observed & modeled density
+focus_sites = [{'Upernavik South'},{'Kangerlussuaq'},{'Zachariae Isstrom'}];
+
 %Upernavik South: highlights summer decrease in larger icebergs
 %Kangerlussuaq: highlights persistent "kink"
 %Zachariae: highlights tabular icebergs
-example_fig = figure; set(example_fig,'position',[1050 50 800 1200]);
+example_fig = figure; set(example_fig,'position',[50 50 800 900]);
 for i = 1:length(F)
     if ~isempty(strmatch(string(F(i).site_name),focus_sites))
     
@@ -843,54 +869,134 @@ for i = 1:length(F)
     for k = 1:length(focus_sites)
         %accumulation season iceberg concentration
         if ~isempty(strmatch(string(F(i).site_name),string(focus_sites(k))))
+            accum_obsdens = []; accum_moddens = [];
+            ablat_obsdens = []; ablat_moddens = [];
+            
             for j = 1:size(F(i).Abin_no,1)
+                %bin the data by season
                 if round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))) <= 121 || round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))) > 274
-                    subplot(length(focus_sites),3,k*3-2); %accumulation season iceberg concentration
-                    loglog(F(i).Abin_mean,F(i).Abin_no(j,:)./(sum(F(i).Abin_mean.*F(i).Abin_no(j,:))/10^6),'-','linewidth',1,'color',day_cmap(round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))),:)); hold on;
+                    %accumulation season ice fragment density
+                    accum_obsdens = [accum_obsdens; F(i).Abin_no(j,:)./F(i).Abin_width]; 
+                    accum_moddens = [accum_moddens; (F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j)))+(F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j)))];
                 else
-                    subplot(length(focus_sites),3,k*3-1); %ablation season iceberg concentration
-                    loglog(F(i).Abin_mean,F(i).Abin_no(j,:)./(sum(F(i).Abin_mean.*F(i).Abin_no(j,:))/10^6),'-','linewidth',1,'color',day_cmap(round(365*(F(i).dates(j,:)-floor(F(i).dates(j,:)))),:)); hold on;
+                    %ablation season iceberg concentration
+                    ablat_obsdens = [ablat_obsdens; F(i).Abin_no(j,:)./F(i).Abin_width]; 
+                    ablat_moddens = [ablat_moddens; (F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j)))+(F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j)))];
                 end
-                
-                subplot(length(focus_sites),3,k*3); %observed & modeled density
-                loglog(F(i).Abin_mean,F(i).Abin_no(j,:)./F(i).Abin_width,'-','linewidth',1,'color',[0.75 0.75 0.75]); hold on;
-                loglog(F(i).Abin_mean,(F(i).c1(j).*F(i).Abin_mean.^-F(i).alpha(j).*exp(-F(i).Abin_mean./F(i).c2(j)))+(F(i).c3(j).*exp(-F(i).Abin_mean./F(i).c4(j))),'-','linewidth',1,'color','k'); hold on;
             end
+            %replace zeros with NaNs
+            accum_obsdens(accum_obsdens==0) = NaN;
+            ablat_obsdens(ablat_obsdens==0) = NaN;
+            
+            %create min & max vectors for seasonal observations
+            accum_min = min(accum_obsdens,[],1); accum_max = max(accum_obsdens,[],1);
+            ablat_min = min(ablat_obsdens,[],1); ablat_max = max(ablat_obsdens,[],1);
+            %eliminate vector points with equal values unless for the largest iceberg size class
+            match_inds = find(min(accum_obsdens,[],1) == max(accum_obsdens,[],1));
+            accum_min(match_inds(1:end-1)) = NaN; clear match_inds;
+            match_inds = find(min(ablat_obsdens,[],1) == max(ablat_obsdens,[],1));
+            ablat_min(match_inds(1:end-1)) = NaN; clear match_inds;
+                
+            %plot the observed data binned by season
+%             subplot(length(focus_sites),2,k*2-1);
+            subplot(length(focus_sites),1,k);
+            accum_lims = []; ablat_lims = [];
+            accum_lims(:,1) = [F(i).Abin_mean';fliplr(F(i).Abin_mean)']; accum_lims(:,2) = [accum_min'; fliplr(accum_max)'];
+            accum_lims(isnan(accum_lims(:,2)),:) = []; %remove NaNs (otherwise patch won't fill)
+            p(1) = patch('Faces',[1:size(accum_lims,1)],'Vertices',accum_lims,'FaceColor',nanmean(accum_cmap),'FaceAlpha',0.5,'EdgeColor','none'); hold on;
+            for j = 1:size(accum_moddens,1)
+                plot(F(i).Abin_mean,accum_moddens(j,:),'-','color',nanmean(accum_cmap),'linewidth',1.5); hold on;
+            end
+            set(gca, 'XScale', 'log', 'YScale','log');
+%             clear accum_min accum_max ablat_min ablat_max accum_lims ablat_lims p;
+            
+%             %create min & max vectors for seasonal models
+%             accum_min = min(accum_moddens,[],1); accum_max = max(accum_moddens,[],1);
+%             ablat_min = min(ablat_moddens,[],1); ablat_max = max(ablat_moddens,[],1);
+%             %eliminate vector points with equal values unless for the largest iceberg size class
+%             match_inds = find(min(accum_moddens,[],1) == max(accum_moddens,[],1));
+%             accum_min(match_inds(1:end-1)) = NaN; clear match_inds;
+%             match_inds = find(min(ablat_moddens,[],1) == max(ablat_moddens,[],1));
+%             ablat_min(match_inds(1:end-1)) = NaN; clear match_inds;
+            
+            %plot the modeled data binned by season
+%             subplot(length(focus_sites),2,k*2); %observed & modeled density
+%             accum_lims = []; ablat_lims = [];
+%             accum_lims(:,1) = [F(i).Abin_mean';fliplr(F(i).Abin_mean)']; accum_lims(:,2) = [accum_min'; fliplr(accum_max)'];
+%             accum_lims(isnan(accum_lims(:,2)),:) = []; %remove NaNs (otherwise patch won't fill)
+%             p(1) = patch('Faces',[1:size(accum_lims,1)],'Vertices',accum_lims,'FaceColor',nanmean(accum_cmap),'FaceAlpha',0.5,'EdgeColor','none'); hold on;
+%             ablat_lims(:,1) = [F(i).Abin_mean';fliplr(F(i).Abin_mean)']; ablat_lims(:,2) = [ablat_min'; fliplr(ablat_max)'];
+%             ablat_lims(isnan(ablat_lims(:,2)),:) = []; %remove NaNs (otherwise patch won't fill)
+%             p(2) = patch('Faces',[1:size(ablat_lims,1)],'Vertices',ablat_lims,'FaceColor',nanmean(ablat_cmap),'FaceAlpha',0.5,'EdgeColor','none'); hold on;
+            ablat_lims(:,1) = [F(i).Abin_mean';fliplr(F(i).Abin_mean)']; ablat_lims(:,2) = [ablat_min'; fliplr(ablat_max)'];
+            ablat_lims(isnan(ablat_lims(:,2)),:) = []; %remove NaNs (otherwise patch won't fill)
+            p(2) = patch('Faces',[1:size(ablat_lims,1)],'Vertices',ablat_lims,'FaceColor',nanmean(ablat_cmap),'FaceAlpha',0.3,'EdgeColor','none'); hold on;
+            for j = 1:size(ablat_moddens,1)
+                plot(F(i).Abin_mean,ablat_moddens(j,:),'-','color',nanmean(ablat_cmap),'linewidth',1.5); hold on;
+            end
+            set(gca, 'XScale', 'log', 'YScale','log');
+            clear accum_min accum_max ablat_min ablat_max accum_lims ablat_lims p;
             
             %format subplots
-            subplot(length(focus_sites),3,k*3-2); grid on;
-            set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
-            set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
-            subplot(length(focus_sites),3,k*3-1); grid on; pos = get(gca,'position');
-            set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
-            set(gca,'fontsize',16,'ylim',[5e-4 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
-            annotation('textbox',[pos(1)+0.25*pos(3) pos(2)+pos(4) pos(3) 0.025],'String',string(F(i).site_name),...
-                'FontSize',16,'EdgeColor','none','HorizontalAlignment','center');
-            subplot(length(focus_sites),3,k*3); grid on;
-%             pos = get(gca,'position'); set(gca,'position',[pos(1)+0.03 pos(2) pos(3) pos(4)]);
-            set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
-            set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
-            
-            
+%             subplot(length(focus_sites),2,k*2-1); grid on;
+            subplot(length(focus_sites),1,k); grid on; box on; 
+            set(gca,'xlim',[0 2e6],'xtick',[1e2,1e3,1e4,1e5,1e6]); %set the x axis limits and labels
+            set(gca,'fontsize',16,'ylim',[1e-5 5e4],'ytick',[1e-4 1e-2 1e0 1e2 1e4]); %set the y axis limits
+%             subplot(length(focus_sites),2,k*2); grid on; pos = get(gca,'position');
+%             set(gca,'xlim',[0 2e6],'xtick',[100,10000,1000000]); %set the x axis limits and labels
+%             set(gca,'fontsize',16,'ylim',[1e-5 2e4],'ytick',[1e-3 1e0 1e3]); %set the y axis limits
+%             annotation('textbox',[pos(1) pos(2)+pos(4) pos(3) 0.025],'String',string(F(i).site_name),...
+%                 'FontSize',16,'EdgeColor','none','HorizontalAlignment','center');
+            text(70,0.5e-4,[char(site_plotletts(k)),' ',char(F(i).site_name)],'fontsize',16);
+
             %add y-axis labels
             if k == length(focus_sites)
-                subplot(length(focus_sites),3,k*3-2);
                 xlabel('Iceberg surface area (m^2)');
-                ylbl_cum = ylabel('Iceberg concentration (count/km^2)'); 
-                subplot(length(focus_sites),3,k*3-1);
-                xlabel('Iceberg surface area (m^2)');
-%                 ylbl_abl = ylabel('Iceberg concentration (count/km^2)'); 
-                subplot(length(focus_sites),3,k*3);
-                xlabel('Iceberg surface area (m^2)');
-                ylbl_mod = ylabel('Iceberg number density'); 
+                ylbl = ylabel('Iceberg number density');
+            else
+                set(gca,'xticklabel',[]);
             end
+            %add extra annotation for the first subplot
+            if k == 1
+            	plot([F(i).Abin_mean(2) F(i).Abin_mean(2)],[min(get(gca,'ylim')) max(get(gca,'ylim'))],'-k','linewidth',1.0); hold on; 
+            end
+            %adjust positions
+            pos = get(gca,'position');
+            set(gca,'position',[pos(1) pos(2) 1.05*pos(3) 1.25*pos(4)]);
         end
     end
     drawnow;
+    
+    %add additional annotation to call out important features 
+    %ALL HARD-CODED IN WITH ANNOTATIONS SO THEY REQUIRE ADJUSTMENTS FOR ANY
+    %CHANGES IN PLOT POSITIONS (SUBPLOT NUMBER OR SIZE)
+    %tabular icebergs captured by fragmentation fits
+    annotation('textbox',[0.67 0.175 0.25 0.05],'String',...
+        'tabular icebergs calved via uncorrelated fracture','FontSize',16,'EdgeColor','none',...
+        'HorizontalAlignment','center');
+    annotation('rectangle',[0.69 0.11 0.2 0.06],'FaceColor','none','LineWidth',2);
+    %potential bias in smallest "observed" icebergs
+    annotation('textbox',[0.135 0.35 0.7 0.02],'String',...
+        'more icebergs than predicted by fragmentation theory','FontSize',16,'EdgeColor','none');
+    annotation('doublearrow',[0.13 0.13],[0.34 0.37],'HeadStyle','plain','Head1Length',6,'Head2Length',6);
+    %"kink" in profiles from preferential crushing or melting
+    annotation('textbox',[0.17 0.54 0.25 0.02],'String',...
+        'fewer icebergs than predicted by fragmentation theory','FontSize',16,'EdgeColor','none',...
+        'HorizontalAlignment','center');
+    annotation('doublearrow',[0.295 0.295],[0.565 0.595],'HeadStyle','plain','Head1Length',6,'Head2Length',6);
+    %seasonality in size distributions: shift to fewer larger bergs in summer
+    annotation('textbox',[0.30 0.95 0.35 0.02],'String',...
+        'seasonal decrease in iceberg abundance','FontSize',16,'EdgeColor','none',...
+        'HorizontalAlignment','left');
+    annotation('textbox',[0.15 0.95 0.15 0.02],'String',...
+        'steady iceberg abundance','FontSize',16,'EdgeColor','none',...
+        'HorizontalAlignment','right');
+    
     end
 end
-annotation('rectangle',[0.08 0.055 0.575 0.9],'linewidth',3);
-annotation('rectangle',[0.08+0.575 0.055 0.3 0.9],'linewidth',3);
+%save the figure
+saveas(example_fig,[root_dir,'Greenland-example-iceberg-size-distribution_subplots.png'],'png');
+saveas(example_fig,[root_dir,'Greenland-example-iceberg-size-distribution_subplots.eps'],'epsc');
 
 
 %% Section 6: Plot fragmentation theory-modeled size distributions
