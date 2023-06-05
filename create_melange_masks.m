@@ -1,4 +1,4 @@
-function create_melange_masks_v4(root_path,glacier_abbrev,output_path)
+function create_melange_masks(root_path,glacier_abbrev,output_path)
 %------------------------------------
 % Description: Intersect the melange masks used to crop digital elevation
 % models with manual terminus delineations to create a time series of
@@ -85,7 +85,7 @@ else
     close(gcf); drawnow;
     eval(cd_to_output);
     melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
-    save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
+    save([glacier_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
 end
 melange_xlims = [min(melmask.uncropped.x)-2000 max(melmask.uncropped.x)+2000]; melange_ylims = [min(melmask.uncropped.y)-2000 max(melmask.uncropped.y)+2000];
 disp('...moving on');
@@ -182,7 +182,7 @@ for p = 1:length(DEMmat_dates)
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
         eval(cd_to_output);
-        save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+        save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
         disp(['Saved DEM geotiff from ',DEMmat_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
         close all; drawnow;
@@ -261,7 +261,7 @@ for p = 1:length(tifs)
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
         eval(cd_to_output);
-        save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+        save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
         disp(['Saved DEM geotiff from ',DEMtif_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
         close all; drawnow;
@@ -352,7 +352,7 @@ switch answer
         cd([output_path,'/',glacier_abbrev,'/']);
         melmask = rmfield(melmask,'uncropped');
         melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
-        save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
+        save([glacier_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
         disp('Edited mask saved');
     case '2) No!'
         disp('Carrying on with already-edited melange mask');
@@ -1025,8 +1025,8 @@ for p = 1:length(melange_mats)
         eval(cd_to_output);
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
-        save_mask = ['save(''',glacier_abbrev,'-melange-masks.mat',''',''melmask'',''-v7.3'')']; eval(save_mask);
-        save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; eval(save_DEM); %raw & intermediate elevation data
+        save([glacier_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+        save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
         saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         disp(['Saved ',DEM_name]);
         clear Z melpoly* out_* *in Z*grid;

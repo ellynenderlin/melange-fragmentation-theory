@@ -47,7 +47,7 @@ season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
 for p = 1:nfiles
     % load the data
     name = fnames(p,:); 
-    load_data = ['load ',name,' ''m''']; eval(load_data);
+    load(name,'m');
     disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
     v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)'); 
     n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; % clear m;
@@ -70,7 +70,7 @@ end
 %     if p == 2;
 %         % load the data
 %         name = fnames(p,:);
-%         load_data = ['load ',name]; eval(load_data);
+%         load(name);
 %         disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
 %         v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)');
 %         n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; % clear m;
@@ -151,7 +151,7 @@ for p = 1:nfiles
 %     if p > 21 % TOGGLE TO SELECT A SINGLE FILE FOR TESTING
         figure(p); set(gcf, 'Position', [500 500 1000 400]); % generate figure
         name = fnames(p,:); 
-        load_data = ['load ',name,' ''m''']; eval(load_data);
+        load(name,'m');
         disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
         v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)'); 
         n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; clear m;
@@ -278,46 +278,4 @@ dt = strrep(dt,':',''); dtstring = extractBefore(dt(1),17); % grab datetime
 delete_csvs = ['delete ',strcat(basepath,glacier_abbrev,'/models/',glacier_abbrev,'_parameters_*.csv')]; eval(delete_csvs);
 writematrix(params,strcat(basepath,glacier_abbrev,'/models/',glacier_abbrev,'_parameters_',dtstring,'.csv'));
 
-%% FUNCTIONS
-
-% Fit function:
-function [error,c] = EBC_fit(v,n,i_cut,j_cut,a,norm_type)
-%the actual fitting function
-
-%exponential fit - left side
-vl = v(1:i_cut); nl = n(1:i_cut);
-
-m = length(vl);
-A = [ones(m,1),vl];
-lhs = log(nl) - log(vl.^(-a)); % linearize by taking hte log
-% b = (A'*A)\(A'*lhs);
-b = pinv(A)*lhs; % psuedoinverse
-cl(1) = exp(b(1));
-cl(2) = -1/b(2);
-cl(3) = a;
-
-%exponential fit - right side
-vr = v(j_cut:end); nr = n(j_cut:end);
-
-m = length(vr);
-A = [ones(m,1),vr];
-rhs = log(nr); % linearize by taking the log
-% b = (A'*A)\(A'*rhs);
-b = pinv(A)*rhs; % psuedoinverse
-cr(1) = exp(b(1));
-cr(2) = -1/b(2);
-
-%now use the linear approach as an initial guess to fit the entire function
-c0 = [cl, cr]; %Initial guess
-c0 = abs(c0); %making sure initial guess is at least positive in all coeficients
-
-opts = optimset('Display','off');
-c = lsqcurvefit(@EBC_model, c0, v, n, [0 1e4 0 0 0], [1e12 1e12 3 1e12 1e12],opts); % ADJUST BOUNDS!!
-
-if norm_type == 'log' % if log norm is specified
-    error = sqrt(mean(((log10(EBC_model(c,v)+1) - log10(n+1))./(n.^normalize_exp)).^2)); % RMSLE
-else % otherwise use L2 or Inf in the norm function
-    error = norm((EBC_model(c,v)-n)./(n.^normalize_exp),norm_type); % normalized residuals
-end
-end
 end

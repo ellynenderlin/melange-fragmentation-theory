@@ -216,13 +216,4 @@ for i = 1:length(site_names)
     clear M Z melange melmask in G Z*grid Zlat Zlon;
     
 end
-%% Section 3: Size distribution scatterplots
-%load the aggregated data
-if ~exist('F')
-    load([root_dir,'Greenland-iceberg-fragmentation-curves.mat']);
-end
-
-
-
-
 

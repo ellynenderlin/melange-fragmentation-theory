@@ -2,6 +2,22 @@
 %%% have fragmentation theory curve parameters (both those with automated
 %%% and manual fits) and group data for analysis
 
+%Section 0: Initializes the code. This should be the only subsection that
+%needs to be modified by the user. It is set-up to pull data from the
+%automatically-created "models" and "manually_adjusted_models" directories
+%within each site's directory structure, with 16 sites used for code
+%generation and analysis by the developer (see site_abbrevs variable
+%specifying site directory names and site_names variable for their official
+%names). Relies on independent cmocean and ArcticMappingTools that must be
+%added to the Matlab code path.
+
+%Section 1: Creates a matfile containing all observed size distributions
+%and best model fits (manual overwrite automated) for all sites saved in a single structure, F, called
+%Greenland-iceberg-fragmentation-curves.mat.
+
+%Sections 2-6: Visualize the data in different ways, pulling data from the
+%compiled site structure, F, created in Section 1.
+
 %% Section 0: Initialize (run every time)
 clearvars; close all;
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
