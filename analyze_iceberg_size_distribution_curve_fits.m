@@ -25,7 +25,8 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
 
 %specify directories for required files ([root_dir,'/',site_abbrevs(i)])
-root_dir = '/Volumes/CALVING/Greenland_icebergs/iceberg-fragmentation/'; %include trailing / in file name
+% root_dir = '/Volumes/CALVING/Greenland_icebergs/iceberg-fragmentation/'; %include trailing / in file name
+root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/';
 cd(root_dir);
 
 %automated fit file info
