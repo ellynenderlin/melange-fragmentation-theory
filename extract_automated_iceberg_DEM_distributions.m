@@ -13,15 +13,19 @@ function extract_automated_iceberg_DEM_distributions(root_path,glacier_abbrev,ou
 %     '/users/ellynenderlin/mfiles/Greenland-calving/icebergs/fragtheory_data_fit');
 %
 %------------------------------------------
-% %% set manually
-% clear all; 
-% 
-% basepath='/users/ellynenderlin/iceberg-fragmentation/';
-% root_path = basepath;
-% glacier_abbrev = 'KL';
-% output_path = basepath;
 
-%% specify variables
+%% customization/initialization
+
+%account for different date location in file name depending on length of site abbreviation
+if length(glacier_abbrev) == 3
+    matfile_daterefs = [5:12];
+elseif length(glacier_abbrev) == 2
+    matfile_daterefs = [4:11];
+else
+    error('Using a non-standard naming format! Switch to a 2- or 3-letter site abbreviation.');
+end
+
+% specify variables
 rho_i = 900; rho_sw = 1026; %density of ice and sea water in kg/m^3 (constant)
 WV_sigma = 2.9; %DEM uncertainty in meters (used when filtering bad data)
 z_inc = ceil(WV_sigma); %increment for melange elevation bins (min ~= WV_sigma; controls number of iceberg size classes)
@@ -33,7 +37,7 @@ ARcomp.best.autoALL = 2; % iceberg aspect ratio
 ARcomp.range.autoALL = [1.7, 2.3]; % range in iceberg aspect ratio
 
 %load data
-cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+cd([output_path,'/',glacier_abbrev,'/']);
 load([glacier_abbrev,'-melange-masks.mat']); %created using create_melange_masks
 mask_dates = '';
 for i = 1:length(melmask.dated)
@@ -41,12 +45,13 @@ for i = 1:length(melmask.dated)
 end
 
 %extract decimal dates for DEMs
+cd([root_path,'/',glacier_abbrev,'/DEMs/']);
 mats = dir([glacier_abbrev,'*melange-DEM.mat']);
 leap_doys = [31 29 31 30 31 30 31 31 30 31 30 31]; norm_doys = [31 28 31 30 31 30 31 31 30 31 30 31];
 leap_cumdoys = cumsum(leap_doys); leap_cumdoys = [0 leap_cumdoys(1:11)];
 norm_cumdoys = cumsum(norm_doys); norm_cumdoys = [0 norm_cumdoys(1:11)];
 for i = 1:length(mats)
-    DEMmat_dates(i,:) = mats(i).name(4:11);
+    DEMmat_dates(i,:) = mats(i).name(matfile_daterefs);
     if mod(str2num(DEMmat_dates(1:4)),4) ~= 0
         DEM_decidate(i,:) = str2num(DEMmat_dates(i,1:4)) + (norm_cumdoys(str2num(DEMmat_dates(i,5:6)))+str2num(DEMmat_dates(i,7:8)))./sum(norm_doys);
     else
@@ -55,18 +60,18 @@ for i = 1:length(mats)
 end
 filled_DEMs = dir([glacier_abbrev,'*melange-DEMfilled.mat']);
 for i = 1:length(filled_DEMs)
-    filledDEM_dates(i,:) = filled_DEMs(i).name(4:11);
+    filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
 end
 
 %identify existing melange iceberg distribution datasets
-cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; eval(cd_to_glacier);
+cd([output_path,'/',glacier_abbrev,'/']);
 melange_mats = dir([glacier_abbrev,'*_melange-distribution.mat']); melange_dates = ''; %manual iceberg sizes
 for i = 1:length(melange_mats)
-    melange_dates(i,:) = melange_mats(i).name(4:11);
+    melange_dates(i,:) = melange_mats(i).name(matfile_daterefs);
 end
 iceberg_mats = dir([glacier_abbrev,'*_iceberg-data.mat']); iceberg_dates = ''; %automated iceberg sizes
 for i = 1:length(iceberg_mats)
-    iceberg_dates(i,:) = iceberg_mats(i).name(4:11);
+    iceberg_dates(i,:) = iceberg_mats(i).name(matfile_daterefs);
 end
 
 alphabet = 'abcdefghijklmnopqrstuvwxyz';
@@ -77,8 +82,8 @@ close all; drawnow;
 for p = 1:length(mats)
 
     %specify output location and file names
-    eval(cd_to_output);
-    DEM_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.mat']; save_DEM = ['save(''',DEM_name,''',''Z'',''-v7.3'')']; %raw & intermediate elevation data
+    cd([root_path,'/',glacier_abbrev,'/DEMs/']);
+    DEM_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.mat']; 
     outputberg_name = [glacier_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];
     %identify the original & filled DEMs
     if ~isempty(filled_DEMs)
@@ -89,35 +94,34 @@ for p = 1:length(mats)
         filledflag = zeros(size(DEMmat_dates,1),1);
     end
     
-    %loop through DEMs WITHOUT manual aspect ratios & extract elevation
-    %distributions (already did this step for the dates with manual data)
+    %loop through DEMs & extract elevation distributions
     if isempty(strmatch(string(DEMmat_dates(p,:)),string(melange_dates))) == 1
         disp(['date ',num2str(p),' of ',num2str(length(mats)),' = ',DEMmat_dates(p,:)]);
         %load the gap-filled DEM if already generated or the raw DEM if new
         if sum(filledflag)>0
             disp('loading gap-filled DEM');
-            cd([output_path,'/',glacier_abbrev,'/']);
+            cd([root_path,'/',glacier_abbrev,'/DEMs/']);
             load(filled_DEMs(filledflag==1).name); %load the gap-filled DEM
             clear filledflag;
         end
         %check that filled DEM contains all the necessary data
         if exist('M') ~=1
             disp('loading raw DEM');
-            cd([root_path,'/',glacier_abbrev]);
+            cd([root_path,'/',glacier_abbrev,'/DEMs/']);
             load(DEM_name); %load the masked orthometric melange elevations in Z structure
             disp('DEM loaded');
             
             %fill DEM gaps
             [Z,data_mask,gap_mask] = sl_correction(Z,WV_sigma); % perform sea level correction
-            eval(save_DEM); %SAVE
+%             save(DEM_name,'Z','-v7.3'); %SAVE
             M.DEM.x = Z.x; M.DEM.y = Z.y; M.DEM.z = Z.z.adjusted; Z.z = rmfield(Z.z,'adjusted'); %only save necessary data to the elevation distribution data file
-            eval(save_DEM); %SAVE
+            save(DEM_name,'Z','-v7.3'); %SAVE
             
             %save fjord masks
             M.mask.fjord = Z.fjord.DEM_mask;
             M.mask.blunders = Z.melange.blunder_mask+gap_mask; M.mask.blunders(M.mask.blunders>1) = 1;
             M.mask.DEM = data_mask; clear data_mask;
-            save_filledDEM = ['save(''',outputberg_name,''',''M'',''-v7.3'')']; eval(save_filledDEM);
+            save(outputberg_name,'M','-v7.3');
             clear Z Y;
             
             %fill-in NaNs in the melange DEM
@@ -134,35 +138,28 @@ for p = 1:length(mats)
             M.DEM.z_filled(M.mask.blunders==1) = NaN; M.DEM.z_filled = single(M.DEM.z_filled);
             M.DEM.z_filled(M.DEM.z_filled<0) = 0;
             M.DEM = rmfield(M.DEM,'z'); %M.DEM.z(M.DEM.z<0) = 0;
-            eval(save_filledDEM); %SAVE
+            save(outputberg_name,'M','-v7.3'); %SAVE
         end
         
-        %if there is an "iceberg-data" matfile, which is leftover from an
-        %old processing pipeline, add it to the filled DEM then delete
-        for j = 1:size(iceberg_dates,1)
-            if contains(string(DEMmat_dates(p,:)),iceberg_dates(j,:))
-                load(iceberg_mats(j).name);
-                save_filledDEM = ['save(''',outputberg_name,''',''M'',''m'',''-v7.3'')']; eval(save_filledDEM);
-                %move to an old file folder instead of deleting
-                if exist('old-icebergs') == 0
-                    mkdir('old-icebergs')
-                end
-                movefile(iceberg_mats(j).name,['old-icebergs/',iceberg_mats(j).name]);
-                
-                %                 recycle('on'); %send to recycling, not permanently delete
-                %                 delete_file = ['delete(''',iceberg_mats(j).name,''')']; eval(delete_file);
-            end
-        end
-%         if exist('m','var')
-%             save_icebergs = ['save(''',outputberg_name,''',''bergs'',''m'',''-v7.3'')']; %iceberg size info
-%             disp('saving');
-%         else
-%             save_icebergs = ['save(''',outputberg_name,''',''bergs'',''-v7.3'')']; %iceberg size info
-%             disp('saving');
+%         %if there is an "iceberg-data" matfile, which is leftover from an
+%         %old processing pipeline, add it to the filled DEM then delete
+%         for j = 1:size(iceberg_dates,1)
+%             if contains(string(DEMmat_dates(p,:)),iceberg_dates(j,:))
+%                 load(iceberg_mats(j).name);
+%                 save(outputberg_name,'M','m','-v7.3');
+%                 %move to an old file folder instead of deleting
+%                 if exist('old-icebergs') == 0
+%                     mkdir('old-icebergs')
+%                 end
+%                 movefile(iceberg_mats(j).name,['old-icebergs/',iceberg_mats(j).name]);
+%                 
+%                 %                 recycle('on'); %send to recycling, not permanently delete
+%                 %                 delete_file = ['delete(''',iceberg_mats(j).name,''')']; eval(delete_file);
+%             end
 %         end
         
         %check if icebergs have already been automatically delineated
-%         if isempty(strmatch(string(DEMmat_dates(p,:)),string(filledDEM_dates))) == 1            
+        if isempty(strmatch(string(DEMmat_dates(p,:)),string(filledDEM_dates))) == 1            
 
             %extract melange elevations
             melange = M.DEM.z_filled;
@@ -202,18 +199,26 @@ for p = 1:length(mats)
                 whalf berg_count termbuff_* m *grid *_sub zmin*;
             close all;
             disp('Advancing');
-%         end
+        end
         
     else
         disp('Iceberg data already extracted');
     end
 end
 disp("Done creating hole-less melange DEMs");
+
+%% DELETE DEMS WITH HOLES TO REDUCE SPACE USE
+cd([root_path,'/',glacier_abbrev,'/DEMs/']);
+for p = 1:length(mats)
+    recycle('on'); %send to recycling, not permanently delete
+    delete(mats(p).name);
+end
+
 %% UPDATE FILES AND PLOT ICEBERG SIZE DISTRIBUTIONS
-cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
+cd([root_path,'/',glacier_abbrev,'/DEMs/']);
 DEM_mats = dir([glacier_abbrev,'*_melange-DEMfilled.mat']); DEM_dates = ''; %DEMs
 for i = 1:length(DEM_mats)
-    DEM_dates(i,:) = DEM_mats(i).name(4:11);
+    DEM_dates(i,:) = DEM_mats(i).name(matfile_daterefs);
 end
 close all; drawnow;
 
@@ -221,14 +226,11 @@ close all; drawnow;
 %note: this could be merged with the loop above to increase efficiency
 disp('Extracting iceberg size distributions...');
 for p = 1:length(DEM_mats)
-    cd_to_output = ['cd ',output_path,'/',glacier_abbrev,'/']; eval(cd_to_output);
-    
     %load the data
     disp(['date ',num2str(p),' of ',num2str(length(DEM_mats)),' = ',DEM_dates(p,:)]);
-    DEM_name = [glacier_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat']; load(DEM_name);
+    DEM_name = [glacier_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat']; 
     outputberg_name = [glacier_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat'];
-%     bergs_name = [glacier_abbrev,'-',DEM_dates(p,:),'_iceberg-data.mat']; load_bergs = ['load ',bergs_name]; eval(load_bergs);
-%     outputberg_name = [glacier_abbrev,'-',DEM_dates(p,:),'_iceberg-data.mat']; save_icebergs = ['save(''',outputberg_name,''',''bergs'',''m'',''-v7.3'')']; %iceberg size info
+    load([root_path,'/',glacier_abbrev,'/DEMs/',DEM_name]);
     disp('Data loaded.');
         
     %extract the distribution of elevations from the melange
@@ -249,7 +251,7 @@ for p = 1:length(DEM_mats)
 %     pixel_nos(max_bin+1) = sum(pixel_nos(max_bin+1:end)); pixel_nos(max_bin+2:end) = NaN; %merge fractions of bergs <0.1berg
     berg_nos = pixel_nos./berg_pixels;
     m.melange.Asurfs = Asurfs; m.melange.bergs = berg_nos; m.melange.binwidth = dA; %add to iceberg size dataset
-    dlmwrite([glacier_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
+    dlmwrite([output_path,'/',glacier_abbrev,'/',glacier_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
     clear berg_* *_nos Asurf* dA;
     
     %size distribution using the minimum aspect ratio: yields a smaller range of surface areas for icebergs
@@ -277,7 +279,7 @@ for p = 1:length(DEM_mats)
 %         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''-v7.3'')']; %iceberg size info
 %         disp('saving');
 %     end
-    save(outputberg_name,'M','m','-v7.3'); %iceberg size info
+    save([root_path,'/',glacier_abbrev,'/DEMs/',outputberg_name],'M','m','-v7.3'); %iceberg size info
     
     %plot a 3-panel figure with (a) the melange DEM, 
     %(b) melange elevation histogram, and (c) the
@@ -313,7 +315,7 @@ for p = 1:length(DEM_mats)
     xlabel('Iceberg surface area (m^2)','fontsize',16); ylabel('Iceberg count','fontsize',16);
     text(min(xlims)+0.00003*(max(xlims)-min(xlims)),min(ylims)+0.28*(max(ylims)-min(ylims)),'c) iceberg size distribution','fontsize',16); drawnow; clear xlims ylims;
     drawnow;
-    saveas(gcf,[glacier_abbrev,'-',num2str(DEM_dates(p,:)),'_melange-distribution_subplots.png'],'png');
+    saveas(gcf,[output_path,'/',glacier_abbrev,'/',glacier_abbrev,'-',num2str(DEM_dates(p,:)),'_melange-distribution_subplots.png'],'png');
     disp('Saved subplots & textfile of size distributions ');
     
     %compile info for all dates
@@ -365,6 +367,6 @@ for j = 1:(max(DEMyrs)-min(DEMyrs)+1)
     %enlarge subplots
     set(gca,'position',[axpos(1) axpos(2) 1.1*axpos(3) 1.1*axpos(4)]);
 end
-saveas(sizedist_fig,[glacier_abbrev,'_iceberg-size-distribution-timeseries-subplots.png'],'png');
+saveas(sizedist_fig,[output_path,'/',glacier_abbrev,'/',glacier_abbrev,'_iceberg-size-distribution-timeseries-subplots.png'],'png');
 end
 

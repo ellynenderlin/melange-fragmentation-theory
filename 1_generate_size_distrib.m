@@ -6,14 +6,15 @@
 %           Boise State University
 %           Date: 04/19/2021
 
-clear all; close all;
-addpath('/Users/icebergs/general-code/');
-addpath('/Users/icebergs/general-code/cmocean/'); % add general functions to path)
+clearvars; close all;
+addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
+addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/DEMsizes_matlab-python');
 
 % set paths and glacier to analyze manually:
-glacier_abbrev = 'HH'; % SET GLACIER ID HERE
-basepath='/Users/icebergs/iceberg-fragmentation/';
-addpath([basepath,'DEMsizes_matlab-python']);
+glacier_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_path = basepath; output_path = basepath;
 cd([root_path,glacier_abbrev]);
 
