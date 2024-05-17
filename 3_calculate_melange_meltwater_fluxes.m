@@ -9,8 +9,7 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
 
 %specify directories for required files ([root_dir,'/',site_abbrevs(i)])
-% root_dir = '/Volumes/CALVING/Greenland_icebergs/iceberg-fragmentation/'; %include trailing / in file name
-root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/';
+root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
 cd(root_dir);
 
 %create a month naming matrix to convert 3-letter months to numeric months
@@ -18,12 +17,18 @@ month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov'
 years = 2011:1:2020; start_yr = years(1); end_yr = years(end);
 
 %2-letter region flagging (based on alphabetical order of site folders)
-site_abbrevs = ['AG';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
-site_names = [{'Alison'},{'Helheim'},{'Ullip Sermia'},{'Salliarutsip Sermia'},{'Illulip Sermia'},...
-    {'Sermeq Kujalleq'},{'Koge Bugt'},{'Kangerlussuaq'},{'Kong Oscar'},{'Magga Dan'},...
-    {'Nigertiip Apusiia'},{'Kangilliup Sermia'},{'Umiammakku Sermia'},{'Upernavik North'},{'Upernavik South'},{'Zachariae Isstrom'}];
-region_flag = ['NW';'SE';'NW';'CW';'NW';'CW';'SE';'SE';'NW';'CE';'SE';'CW';'CW';'NW';'NW';'NE'];
-site_geog_order = [3;12;1;7;4;10;11;14;2;15;13;9;8;5;6;16]; %geographic order, counterclockwise from NW
+site_abbrevs = ['ASG'];
+site_names = [{'Alison'}];
+region_flag = ['NW'];
+site_geog_order = [1]; %geographic order, counterclockwise from NW
+% site_abbrevs = ['AG';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
+% site_names = [{'Alison'},{'Helheim'},{'Ullip Sermia'},{'Salliarutsip Sermia'},{'Illulip Sermia'},...
+%     {'Sermeq Kujalleq'},{'Koge Bugt'},{'Kangerlussuaq'},{'Kong Oscar'},{'Magga Dan'},...
+%     {'Nigertiip Apusiia'},{'Kangilliup Sermia'},{'Umiammakku Sermia'},{'Upernavik North'},{'Upernavik South'},{'Zachariae Isstrom'}];
+% region_flag = ['NW';'SE';'NW';'CW';'NW';'CW';'SE';'SE';'NW';'CE';'SE';'CW';'CW';'NW';'NW';'NE'];
+% site_geog_order = [3;12;1;7;4;10;11;14;2;15;13;9;8;5;6;16]; %geographic order, counterclockwise from NW
+
+
 %NOTE: data are added to F structure according to index specified by
 %site_geog_order and plot locations and letters below are for those sorted data
 %create a vector specifying subplot locations according to geography
@@ -53,6 +58,13 @@ disp('Initialized iceberg meltwater flux code');
 %  TESTING FOR A SINGLE SITE... NEED TO AUTOMATE
 
 %navigate to site folder and load data
-cd AG
-load('AG-melange-masks.mat');
-load('AG-20110325_iceberg-data.mat');
+for p = 1:length(site_abbrevs);
+    cd([root_dir,site_abbrevs(p,:)]);
+    load('ASG-melange-masks.mat');
+    load('ASG-20110325_melange-DEMfilled.mat');
+    dists = readtable('ASG-20110325-iceberg-distribution.txt');
+    cd meltrates
+    melts = readtable('ASG_20110325-20110411_iceberg_meltinfo.csv');
+    
+end
+
