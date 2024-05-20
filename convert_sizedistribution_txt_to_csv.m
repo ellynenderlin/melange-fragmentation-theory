@@ -1,8 +1,8 @@
-%%% Convert size distribution textfiles to csvs 
-clearvars; close all;
+function convert_sizedistribution_txt_to_csv(root_dir)
+%%% Convert size distribution textfiles to csvs
 
 %navigate to overarching directory containing site sub-directories
-root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
+% root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 cd(root_dir);
 
 %specify the column headers for the txt & csv files
@@ -34,9 +34,9 @@ for j = 1:size(sites,1)
                     berg_dA = [txt(:,3)];
                 end
                 berg_nos = [berg_nos, txt(:,1)];
-%                 berg_dates = [berg_dates; repmat(convert_to_decimaldate(berg_dists(k).name(5:12)),size(txt(:,1)))];
-                berg_dates = [berg_dates, string(berg_dists(k).name(5:12))];
-                berg_dateformat = [berg_dateformat, "YYYYMMDD"];
+                %                 berg_dates = [berg_dates; repmat(convert_to_decimaldate(berg_dists(k).name(5:12)),size(txt(:,1)))];
+                berg_dates = [berg_dates, string([berg_dists(k).name(5:8),'/',berg_dists(k).name(9:10),'/',berg_dists(k).name(11:12)])];
+                berg_dateformat = [berg_dateformat, "YYYY/MM/DD"];
                 
                 %re-export the date-specific size distributions as a csv
                 T=table(txt(:,1),txt(:,2),txt(:,3));
@@ -49,7 +49,7 @@ for j = 1:size(sites,1)
             clear berg_dists;
             
             %export the data compiled for the site as a single table
-%             berg_nos(berg_nos == 0) = NaN;
+            %             berg_nos(berg_nos == 0) = NaN;
             T=array2table([berg_A,berg_dA,berg_nos]);
             site_column_names = ["SurfaceArea_mean", "SurfaceArea_range",berg_dates];
             site_column_units = ["m^2", "m^2", berg_dateformat];
@@ -61,4 +61,6 @@ for j = 1:size(sites,1)
         %move to the next site
         cd ..
     end
+end
+
 end

@@ -6,10 +6,12 @@
 clearvars; close all;
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
-    '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/LSQ_LUT_PIECEWISE');
 
 %specify directories for required files ([root_dir,'/',site_abbrevs(i)])
-root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
+% root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
+root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 cd(root_dir);
 
 %create a month naming matrix to convert 3-letter months to numeric months
@@ -54,17 +56,74 @@ day_cmap = [accum_cmap(103:end-10,:); ablat_cmap(11:end,:); accum_cmap(11:102,:)
 
 
 disp('Initialized iceberg meltwater flux code');
-%% Section 1: Load iceberg size distributions & melange masks
-%  TESTING FOR A SINGLE SITE... NEED TO AUTOMATE
+%% Section 1: Convert date-specific size distribution textfiles to a concatenated csv
+disp('Converting iceberg size distribution textfiles for each date to date-specific csvs & a single csv');
+convert_sizedistribution_txt_to_csv(root_dir);
+
+disp('Melange size distributions for each site saved in *-melange-distributions.csv files');
+%% Section 2: Load iceberg size distributions & melange masks
+%  TESTING FOR A SINGLE SITE WITH SPARSE DATA... NEED TO AUTOMATE
 
 %navigate to site folder and load data
-for p = 1:length(site_abbrevs);
+for p = 1:size(site_abbrevs,1);
     cd([root_dir,site_abbrevs(p,:)]);
-    load('ASG-melange-masks.mat');
-    load('ASG-20110325_melange-DEMfilled.mat');
-    dists = readtable('ASG-20110325-iceberg-distribution.txt');
-    cd meltrates
-    melts = readtable('ASG_20110325-20110411_iceberg_meltinfo.csv');
+    load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
+    dists = readtable([site_abbrevs(p,:),'-melange-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
+    
+    %use iceberg size distributions to estimate the submerged area of the
+    %melange in each season (DJF, MAM, JJA, SON)
+    dist_hdrs = dists.Properties.VariableNames;
+    berg_A = dists.SurfaceArea_mean; berg_dA = dists.SurfaceArea_range;
+    for j = 1:length(dist_hdrs)-2
+        berg_datestr(j,:) = char(dist_hdrs(j+2));
+        berg_yr(j,:) = str2num(berg_datestr(j,1:4));
+        berg_mo(j,:) = str2num(berg_datestr(j,6:7));
+        berg_decidate(j,:) = convert_to_decimaldate([berg_datestr(j,1:4),berg_datestr(j,6:7),berg_datestr(j,9:10)]);
+    end
+    DJF_nos = nanmedian(table2array(dists(:,find(berg_mo==12 | berg_mo == 1 | berg_mo == 2)+2)),2);
+    MAM_nos = nanmedian(table2array(dists(:,find(berg_mo==3 | berg_mo == 4 | berg_mo == 5)+2)),2);
+    JJA_nos = nanmedian(table2array(dists(:,find(berg_mo==6 | berg_mo == 7 | berg_mo == 8)+2)),2);
+    SON_nos = nanmedian(table2array(dists(:,find(berg_mo==9 | berg_mo == 10 | berg_mo == 11)+2)),2);
+    
+    
+    %loop through loading DEMs???
+%     load([root_dir,site_abbrevs(p,:),'/DEMs/ASG-20110325_melange-DEMfilled.mat']);
+    
+    %load all meltrates & concatenate
+    meltdates = []; draft = []; subA = []; dVdt = [];
+    meltfiles = dir([root_dir,site_abbrevs(p,:),'/meltrates/updated/*.csv']);
+    for j = 1:length(meltfiles);
+        melts = readtable([meltfiles(j).folder,'/',meltfiles(j).name]);
+        draft = [draft; melts.MedianDraft_mean]; 
+        subA = [subA; melts.SubmergedArea_mean]; 
+        dVdt = [dVdt; melts.VolumeChangeRate];
+        meltdates = [meltdates; [repmat(string(meltfiles(j).name(length(site_abbrevs(p,:))+2:length(site_abbrevs(p,:))+9)),size(melts.MedianDraft_mean)),...
+            repmat(string(meltfiles(j).name(length(site_abbrevs(p,:))+11:length(site_abbrevs(p,:))+18)),size(melts.MedianDraft_mean))]];
+        clear melts;
+    end
+    meltrate = dVdt./subA;
+    
+    %visually check that the data look reasonable
+    [unique_dates,refs,inds] = unique(meltdates,'rows');
+    figure; cmap = cmocean('matter',size(refs,1)); 
+    for k = 1:length(inds); colors(k,:) = cmap(inds(k),:); end
+    scatter(draft,meltrate,24,colors,'filled'); hold on; grid on;
+    
+    %fit a complex curve to the meltrate vs draft data to parameterize melt
+    draft_vector = [0:1:max(draft)];
+    ft = fittype('poly4'); %try a 4th order polynomial to capture expected melt variability with draft
+    opts = fitoptions('Method','LinearLeastSquares' );
+    opts.Lower = [-Inf -Inf -Inf -Inf 0]; opts.Upper = [Inf Inf Inf Inf 0]; %force intercept through 0,0
+    [fitresult,gof] = fit(draft,meltrate,ft,opts); meltcurve = feval(fitresult,draft_vector);
+    plot(draft_vector,meltcurve,'-k'); hold on; %add fit curve to scatterplot of data
+    %find the local maximum for deep icebergs and fix that value for all deeper icebergs
+    TF = islocalmax(meltcurve); 
+    draft_meltmax = draft_vector(find(TF==1,1,'last'));
+    meltrate_meltmax = meltcurve(find(TF==1,1,'last'));
+    meltcurve(find(TF==1,1,'last'):end) = meltcurve(find(TF==1,1,'last'));
+    plot(draft_vector,meltcurve,'--k','linewidth',2); hold on; %add adjusted fit curve to scatterplot of data
+    
+    
     
 end
 
