@@ -62,10 +62,12 @@ convert_sizedistribution_txt_to_csv(root_dir);
 
 disp('Melange size distributions for each site saved in *-melange-distributions.csv files');
 %% Section 2: Load iceberg size distributions & melange masks
+close all;
 %  TESTING FOR A SINGLE SITE WITH SPARSE DATA... NEED TO AUTOMATE
 
 %navigate to site folder and load data
 for p = 1:size(site_abbrevs,1);
+    disp(site_abbrevs(p,:));
     cd([root_dir,site_abbrevs(p,:)]);
     load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
     dists = readtable([site_abbrevs(p,:),'-melange-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
@@ -73,57 +75,102 @@ for p = 1:size(site_abbrevs,1);
     %use iceberg size distributions to estimate the submerged area of the
     %melange in each season (DJF, MAM, JJA, SON)
     dist_hdrs = dists.Properties.VariableNames;
-    berg_A = dists.SurfaceArea_mean; berg_dA = dists.SurfaceArea_range;
+    berg_A = dists.SurfaceArea_mean; berg_dA = dists.SurfaceArea_range; %circular surface areas (m^2)
     for j = 1:length(dist_hdrs)-2
         berg_datestr(j,:) = char(dist_hdrs(j+2));
         berg_yr(j,:) = str2num(berg_datestr(j,1:4));
         berg_mo(j,:) = str2num(berg_datestr(j,6:7));
         berg_decidate(j,:) = convert_to_decimaldate([berg_datestr(j,1:4),berg_datestr(j,6:7),berg_datestr(j,9:10)]);
     end
-    DJF_nos = nanmedian(table2array(dists(:,find(berg_mo==12 | berg_mo == 1 | berg_mo == 2)+2)),2);
-    MAM_nos = nanmedian(table2array(dists(:,find(berg_mo==3 | berg_mo == 4 | berg_mo == 5)+2)),2);
-    JJA_nos = nanmedian(table2array(dists(:,find(berg_mo==6 | berg_mo == 7 | berg_mo == 8)+2)),2);
-    SON_nos = nanmedian(table2array(dists(:,find(berg_mo==9 | berg_mo == 10 | berg_mo == 11)+2)),2);
-    
+    berg_draft = (900/1026)*sqrt(berg_A/pi());
+    %create a table of iceberg distribution numbers & normalize by area
+    berg_nos = table2array(dists(:,3:end));
+    berg_fracs = berg_nos./(nansum(berg_nos.*berg_A,1));
+    DJF_fracs = nanmedian(berg_fracs(:,find(berg_mo==12 | berg_mo == 1 | berg_mo == 2)),2);
+    MAM_fracs = nanmedian(berg_fracs(:,find(berg_mo==3 | berg_mo == 4 | berg_mo == 5)),2);
+    JJA_fracs = nanmedian(berg_fracs(:,find(berg_mo==6 | berg_mo == 7 | berg_mo == 8)),2);
+    SON_fracs = nanmedian(berg_fracs(:,find(berg_mo==9 | berg_mo == 10 | berg_mo == 11)),2);
+    figure; set(gcf,'position',[50 50 600 600]);
+    for j = 1:size(berg_fracs,2)
+        pl(1) = loglog(berg_A(~isnan(berg_fracs(:,j))),berg_fracs(~isnan(berg_fracs(:,j)),j),'-','color','k'); hold on;
+    end
+    pl(2) = loglog(berg_A,DJF_fracs(:,1),'-b','linewidth',2); hold on;
+    pl(3) = loglog(berg_A,MAM_fracs(:,1),'-g','linewidth',2); hold on;
+    pl(4) = loglog(berg_A,JJA_fracs(:,1),'-m','linewidth',2); hold on;
+    pl(5) = loglog(berg_A,SON_fracs(:,1),'-r','linewidth',2); hold on;
+    grid on; set(gca,'fontsize',16);
+    leg=legend(pl,'all','DJF','MAM','JJA','SON');
+    xlabel('Iceberg surface area (m^2)','fontsize',16);
+    ylabel('Count normalized by total area','fontsize',16);
     
     %loop through loading DEMs???
 %     load([root_dir,site_abbrevs(p,:),'/DEMs/ASG-20110325_melange-DEMfilled.mat']);
     
     %load all meltrates & concatenate
     meltdates = []; draft = []; subA = []; dVdt = [];
-    meltfiles = dir([root_dir,site_abbrevs(p,:),'/meltrates/updated/*.csv']);
+    meltfiles = dir([root_dir,site_abbrevs(p,:),'/meltrates/*.csv']);
     for j = 1:length(meltfiles);
         melts = readtable([meltfiles(j).folder,'/',meltfiles(j).name]);
-        draft = [draft; melts.MedianDraft_mean]; 
-        subA = [subA; melts.SubmergedArea_mean]; 
-        dVdt = [dVdt; melts.VolumeChangeRate];
+        draft = [draft; melts.MedianDraft_mean];  %m b.s.l.
+        subA = [subA; melts.SubmergedArea_mean]; %m^2
+        dVdt = [dVdt; melts.VolumeChangeRate]; %m^3/d
         meltdates = [meltdates; [repmat(string(meltfiles(j).name(length(site_abbrevs(p,:))+2:length(site_abbrevs(p,:))+9)),size(melts.MedianDraft_mean)),...
             repmat(string(meltfiles(j).name(length(site_abbrevs(p,:))+11:length(site_abbrevs(p,:))+18)),size(melts.MedianDraft_mean))]];
         clear melts;
     end
-    meltrate = dVdt./subA;
+    meltrate = dVdt./subA; %m/d
     
     %visually check that the data look reasonable
     [unique_dates,refs,inds] = unique(meltdates,'rows');
-    figure; cmap = cmocean('matter',size(refs,1)); 
+    figure; set(gcf,'position',[650 50 600 600]);
+    cmap = cmocean('matter',size(refs,1)); 
     for k = 1:length(inds); colors(k,:) = cmap(inds(k),:); end
     scatter(draft,meltrate,24,colors,'filled'); hold on; grid on;
     
     %fit a complex curve to the meltrate vs draft data to parameterize melt
-    draft_vector = [0:1:max(draft)];
+    draft_vector = [0:1:ceil(max(berg_draft))];
     ft = fittype('poly4'); %try a 4th order polynomial to capture expected melt variability with draft
     opts = fitoptions('Method','LinearLeastSquares' );
     opts.Lower = [-Inf -Inf -Inf -Inf 0]; opts.Upper = [Inf Inf Inf Inf 0]; %force intercept through 0,0
     [fitresult,gof] = fit(draft,meltrate,ft,opts); meltcurve = feval(fitresult,draft_vector);
-    plot(draft_vector,meltcurve,'-k'); hold on; %add fit curve to scatterplot of data
+    plot(draft_vector(1:round(max(draft))+1),meltcurve(1:round(max(draft))+1),'-k'); hold on; %add fit curve to scatterplot of data
     %find the local maximum for deep icebergs and fix that value for all deeper icebergs
-    TF = islocalmax(meltcurve); 
+    TF = islocalmax(meltcurve(1:round(max(draft))+1)); %only find maximum over the oberved melt draft range 
+    TF(round(max(draft))+2:length(draft_vector)) = 0;
     draft_meltmax = draft_vector(find(TF==1,1,'last'));
     meltrate_meltmax = meltcurve(find(TF==1,1,'last'));
     meltcurve(find(TF==1,1,'last'):end) = meltcurve(find(TF==1,1,'last'));
-    plot(draft_vector,meltcurve,'--k','linewidth',2); hold on; %add adjusted fit curve to scatterplot of data
+    plot(draft_vector(1:round(max(draft))+1),meltcurve(1:round(max(draft))+1),'--k','linewidth',2); hold on; %add adjusted fit curve to scatterplot of data
+    set(gca,'fontsize',16);
+    xlabel('Iceberg draft (m b.s.l.)','fontsize',16);
+    ylabel('Melt rate (m/d)','fontsize',16);
+    
+    %estimate submerged area (read in GEEDiT melange margin delineations to get surface extents?)
+    %TEMP FIX: use the median surface extent from the size distributions
+    SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
+    DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*SA);
+    MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*SA);
+    JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*SA);
+    SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*SA);
+    
+    %multiply the surface area of each draft bin by the estimated best-fit 
+    %melt rate for that draft
+    berg_meltrate = interp1(draft_vector,meltcurve,berg_draft); berg_meltrate(end) = berg_meltrate(end-1);
+    %binned meltwater flux (m^3/d)
+    DJF_meltflux = berg_meltrate.*DJF_subA; 
+    MAM_meltflux = berg_meltrate.*MAM_subA;
+    JJA_meltflux = berg_meltrate.*JJA_subA;
+    SON_meltflux = berg_meltrate.*SON_subA;
+    
+    %report seasonal meltwater fluxes in m^3/s
+    fprintf('DJF typical meltwater flux = %4.0f m^3/s \n',nansum(DJF_meltflux)./86400);
+    fprintf('MAM typical meltwater flux = %4.0f m^3/s \n',nansum(MAM_meltflux)./86400);
+    fprintf('JJA typical meltwater flux = %4.0f m^3/s \n',nansum(JJA_meltflux)./86400);
+    fprintf('SON typical meltwater flux = %4.0f m^3/s \n',nansum(SON_meltflux)./86400);
+    
+    %export the data to a csv table
     
     
-    
+    disp('... moving on to the next site');
 end
 
