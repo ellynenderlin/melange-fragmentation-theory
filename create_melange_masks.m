@@ -1063,8 +1063,7 @@ for p = 1:length(melange_mats)
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
         cd([output_path,'/',glacier_abbrev,'/']);
         save([glacier_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
-        cd([root_path,'/',glacier_abbrev,'/DEMs/']);
-        save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
+        save([root_path,'/',glacier_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
         saveas(gcf,[glacier_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         disp(['Saved ',DEM_name]);
         clear Z melpoly* out_* *in Z*grid;
@@ -1072,7 +1071,7 @@ for p = 1:length(melange_mats)
     close all; drawnow; clear newtif;
 end
 
-disp('Done converting geotiffs to mat-files');
+disp('Done converting geotiffs to mat-files... move on to next function!');
 
 
 
