@@ -4,14 +4,17 @@
 
 %% Section 0: Initialize (run every time)
 clearvars; close all;
+%add path for repo
+addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/DEMsizes_matlab-python');
+%add paths for any supporting codes
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/LSQ_LUT_PIECEWISE');
 
 %specify directories for required files ([root_dir,'/',site_abbrevs(i)])
-% root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
-root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
+root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
+% root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 cd(root_dir);
 
 %create a month naming matrix to convert 3-letter months to numeric months
@@ -70,11 +73,13 @@ for p = 1:size(site_abbrevs,1);
     cd([root_dir,site_abbrevs(p,:)]);
     
     %create a dummy matrix to hold the melange extent flag
-    melext(p).flag = []; %fill in withs 1 when full melange in DEM, 0 otherwise
+    melext(p).flag = []; %fill in with 2 when full melange in DEM, 1 when most, 0 otherwise
     
     %navigate to site folder and load data
     cd([root_dir,site_abbrevs(p,:)]);
     load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
+    for k = 1:length(melmask.dated); melA(k) = polyarea(melmask.dated(k).x,melmask.dated(k).y); end
+    disp(['Typical fjord area (including open water): ',num2str(round(nanmean(melA))),'m^2']);
     
     %identify where the date is in the file name
     %account for different date location in file name depending on length of site abbreviation
@@ -89,16 +94,19 @@ for p = 1:size(site_abbrevs,1);
     %find DEMs
     melange_mats = dir([root_dir,site_abbrevs(p,:),'/DEMs/*_melange-DEMfilled.mat']);
     for i = 1:length(melange_mats); melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs); end
+    disp([num2str(size(melange_mats,1)),' DEMs from ',melangemat_dates(1,1:4),'-',melangemat_dates(end,1:4)]);
     
     %load each DEM & flag it
     for k = 1:length(melange_mats)
+        disp(num2str(k));
         load([root_dir,site_abbrevs(p,:),'/DEMs/',melange_mats(k).name]);
         
         %extract melange elevations
         melange = M.DEM.z_filled;
         melange(isnan(M.DEM.z_filled)) = 0;
         melange(melange<0) = 0;
-        melange(M.mask.DEM==0) = NaN;
+        melange(M.mask.DEM==0) = NaN; melange(M.mask.blunders==1) = NaN; 
+        disp([num2str(sum(~isnan(melange(melange>0)))*4),' m^2 with >0m elevations']);
         
         %plot the melange DEM
         close(gcf);
@@ -117,7 +125,7 @@ for p = 1:size(site_abbrevs,1);
         title([melangemat_dates(k,1:4),'/',melangemat_dates(k,5:6),'/',melangemat_dates(k,7:8)],'fontsize',16); grid on; drawnow;
         
         %fill in the extent matrix
-        extent = questdlg('Does the melange extent look complete (no flat ends)?',...
+        extent = questdlg('Does the melange extent look complete?',...
             'Extent Check','Yes','Most','No','No');
         switch extent
             case 'Yes'
@@ -132,11 +140,12 @@ for p = 1:size(site_abbrevs,1);
     end
     clear melange_mats melangemat_dates;
 end
-save([root_dir,site_abbrevs(p,:),'/DEMs/',site_abbrevs(p,:),'-melange-extent-flag.mat'],'melext','-v7.3');
+save([root_dir,'melange-extent-flags.mat'],'melext','-v7.3');
 
 %% Section 3: Load iceberg size distributions & melange masks
 close all;
 disp('Bringing datasets together to estimate melange melt fluxes');
+load([root_dir,'melange-extent-flags.mat']); %load the melange extent flags as needed
 %  TESTING FOR A SINGLE SITE WITH SPARSE DATA... NEED TO CHECK AUTOMATION
 
 %navigate to site folder and load data
@@ -145,7 +154,6 @@ for p = 1:size(site_abbrevs,1);
     cd([root_dir,site_abbrevs(p,:)]);
 %     load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
     dists = readtable([site_abbrevs(p,:),'-melange-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
-    load([site_abbrevs(p,:),'-melange-extent-flag.mat']); %load the melange extent flags as needed
     
     %use iceberg size distributions to estimate the submerged area of the
     %melange in each season (DJF, MAM, JJA, SON)
@@ -226,10 +234,10 @@ for p = 1:size(site_abbrevs,1);
     ylabel('Melt rate (m/d)','fontsize',16);
     
     %estimate "typical" surface & submarged areas for each season
-    DJF_SA = nanmedian(nansum(berg_nos(:,DJF(find(melext(DJF)>=1))).*berg_A,1))
-    MAM_SA = nanmedian(nansum(berg_nos(:,MAM(find(melext(MAM)>=1))).*berg_A,1))
-    JJA_SA = nanmedian(nansum(berg_nos(:,JJA(find(melext(JJA)>=1))).*berg_A,1))
-    SON_SA = nanmedian(nansum(berg_nos(:,SON(find(melext(SON)>=1))).*berg_A,1))
+    DJF_SA = nanmedian(nansum(berg_nos(:,DJF(find(melext(p).flag(DJF)>=1))).*berg_A,1))
+    MAM_SA = nanmedian(nansum(berg_nos(:,MAM(find(melext(p).flag(MAM)>=1))).*berg_A,1))
+    JJA_SA = nanmedian(nansum(berg_nos(:,JJA(find(melext(p).flag(JJA)>=1))).*berg_A,1))
+    SON_SA = nanmedian(nansum(berg_nos(:,SON(find(melext(p).flag(SON)>=1))).*berg_A,1))
 %     SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
     DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA);
     MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA);
@@ -252,8 +260,15 @@ for p = 1:size(site_abbrevs,1);
     fprintf('SON typical meltwater flux = %4.0f m^3/s \n',nansum(SON_meltflux)./86400);
     
     %export the data to a csv table
+    T=table(['DJF';'MAM';'JJA';'SON'],[DJF_SA; MAM_SA; JJA_SA; SON_SA],...
+        [nansum(DJF_subA); nansum(MAM_subA); nansum(JJA_subA); nansum(SON_subA)],...
+        [nansum(DJF_meltflux)./86400; nansum(MAM_meltflux)./86400; nansum(JJA_meltflux)./86400; nansum(SON_meltflux)./86400]);
+    column_names = ["Months", "SurfaceArea", "SubmergedArea","MeltwaterFlux"];
+    column_units = ["MMM", "m^2", "m^2","m^3/s"];
+    T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
+    writetable(T,[root_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-area-meltflux-season-summary.csv']);
     
-    
+    clear dist* berg_* unique_dates refs inds melt* draft* DJF* MAM* JJA* SON* subA dVdt TF pl T;
     disp('... moving on to the next site');
 end
 
