@@ -226,10 +226,10 @@ for p = 1:size(site_abbrevs,1);
     ylabel('Melt rate (m/d)','fontsize',16);
     
     %estimate "typical" surface & submarged areas for each season
-    DJF_SA = nanmedian(nansum(berg_nos(:,DJF).*berg_A,1))
-    MAM_SA = nanmedian(nansum(berg_nos(:,MAM).*berg_A,1))
-    JJA_SA = nanmedian(nansum(berg_nos(:,JJA).*berg_A,1))
-    SON_SA = nanmedian(nansum(berg_nos(:,SON).*berg_A,1))
+    DJF_SA = nanmedian(nansum(berg_nos(:,DJF(find(melext(DJF)>=1))).*berg_A,1))
+    MAM_SA = nanmedian(nansum(berg_nos(:,MAM(find(melext(MAM)>=1))).*berg_A,1))
+    JJA_SA = nanmedian(nansum(berg_nos(:,JJA(find(melext(JJA)>=1))).*berg_A,1))
+    SON_SA = nanmedian(nansum(berg_nos(:,SON(find(melext(SON)>=1))).*berg_A,1))
 %     SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
     DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA);
     MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA);
