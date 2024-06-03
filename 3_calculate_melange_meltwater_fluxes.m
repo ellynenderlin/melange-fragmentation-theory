@@ -61,16 +61,91 @@ disp('Converting iceberg size distribution textfiles for each date to date-speci
 convert_sizedistribution_txt_to_csv(root_dir);
 
 disp('Melange size distributions for each site saved in *-melange-distributions.csv files');
-%% Section 2: Load iceberg size distributions & melange masks
+%% Section 2: Flag melange maps as partial or full for surface area estimates
 close all;
-%  TESTING FOR A SINGLE SITE WITH SPARSE DATA... NEED TO AUTOMATE
+disp('Checking DEMs to flag if they cover all or most of the melange');
+
+for p = 1:size(site_abbrevs,1);
+    disp(site_abbrevs(p,:));
+    cd([root_dir,site_abbrevs(p,:)]);
+    
+    %create a dummy matrix to hold the melange extent flag
+    melext(p).flag = []; %fill in withs 1 when full melange in DEM, 0 otherwise
+    
+    %navigate to site folder and load data
+    cd([root_dir,site_abbrevs(p,:)]);
+    load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
+    
+    %identify where the date is in the file name
+    %account for different date location in file name depending on length of site abbreviation
+    if length(site_abbrevs(p,:)) == 3
+        matfile_daterefs = [5:12];
+    elseif length(site_abbrevs(p,:)) == 2
+        matfile_daterefs = [4:11];
+    else
+        error('Using a non-standard naming format! Switch to a 2- or 3-letter site abbreviation.');
+    end
+    
+    %find DEMs
+    melange_mats = dir([root_dir,site_abbrevs(p,:),'/DEMs/*_melange-DEMfilled.mat']);
+    for i = 1:length(melange_mats); melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs); end
+    
+    %load each DEM & flag it
+    for k = 1:length(melange_mats)
+        load([root_dir,site_abbrevs(p,:),'/DEMs/',melange_mats(k).name]);
+        
+        %extract melange elevations
+        melange = M.DEM.z_filled;
+        melange(isnan(M.DEM.z_filled)) = 0;
+        melange(melange<0) = 0;
+        melange(M.mask.DEM==0) = NaN;
+        
+        %plot the melange DEM
+        close(gcf);
+        figure; h = histogram(melange(~isnan(melange)),min(melange(~isnan(melange))):1:max(melange(~isnan(melange)))); %use the elevation histogram to set colormap range
+        cmax = h.BinEdges(find(cumsum(h.Values)>=0.98*sum(h.Values),1,'first')+1);
+        clear h; close(gcf);
+        figDEM = figure; set(figDEM,'position',[550 100 1000 500]);
+        imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal;
+        melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+        hold on; DEMax = gca;
+        set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
+        cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        title([melangemat_dates(k,1:4),'/',melangemat_dates(k,5:6),'/',melangemat_dates(k,7:8)],'fontsize',16); grid on; drawnow;
+        
+        %fill in the extent matrix
+        extent = questdlg('Does the melange extent look complete (no flat ends)?',...
+            'Extent Check','Yes','Most','No','No');
+        switch extent
+            case 'Yes'
+                melext(p).flag(1,k) = 2;
+            case 'Most'
+                melext(p).flag(1,k) = 1;
+            case 'No'
+                melext(p).flag(1,k) = 0;;
+        end
+        
+        clear M extent melange; close all;
+    end
+    clear melange_mats melangemat_dates;
+end
+save([root_dir,site_abbrevs(p,:),'/DEMs/',site_abbrevs(p,:),'-melange-extent-flag.mat'],'melext','-v7.3');
+
+%% Section 3: Load iceberg size distributions & melange masks
+close all;
+disp('Bringing datasets together to estimate melange melt fluxes');
+%  TESTING FOR A SINGLE SITE WITH SPARSE DATA... NEED TO CHECK AUTOMATION
 
 %navigate to site folder and load data
 for p = 1:size(site_abbrevs,1);
     disp(site_abbrevs(p,:));
     cd([root_dir,site_abbrevs(p,:)]);
-    load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
+%     load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
     dists = readtable([site_abbrevs(p,:),'-melange-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
+    load([site_abbrevs(p,:),'-melange-extent-flag.mat']); %load the melange extent flags as needed
     
     %use iceberg size distributions to estimate the submerged area of the
     %melange in each season (DJF, MAM, JJA, SON)
@@ -86,10 +161,18 @@ for p = 1:size(site_abbrevs,1);
     %create a table of iceberg distribution numbers & normalize by area
     berg_nos = table2array(dists(:,3:end));
     berg_fracs = berg_nos./(nansum(berg_nos.*berg_A,1));
-    DJF_fracs = nanmedian(berg_fracs(:,find(berg_mo==12 | berg_mo == 1 | berg_mo == 2)),2);
-    MAM_fracs = nanmedian(berg_fracs(:,find(berg_mo==3 | berg_mo == 4 | berg_mo == 5)),2);
-    JJA_fracs = nanmedian(berg_fracs(:,find(berg_mo==6 | berg_mo == 7 | berg_mo == 8)),2);
-    SON_fracs = nanmedian(berg_fracs(:,find(berg_mo==9 | berg_mo == 10 | berg_mo == 11)),2);
+    
+    %identify the seasons for the observations
+    DJF = find(berg_mo==12 | berg_mo == 1 | berg_mo == 2);
+    MAM = find(berg_mo==3 | berg_mo == 4 | berg_mo == 5);
+    JJA = find(berg_mo==6 | berg_mo == 7 | berg_mo == 8);
+    SON = find(berg_mo==9 | berg_mo == 10 | berg_mo == 11);
+    
+    %solve for median fractional distributions & plot
+    DJF_fracs = nanmedian(berg_fracs(:,DJF),2);
+    MAM_fracs = nanmedian(berg_fracs(:,MAM),2);
+    JJA_fracs = nanmedian(berg_fracs(:,JJA),2);
+    SON_fracs = nanmedian(berg_fracs(:,SON),2);
     figure; set(gcf,'position',[50 50 600 600]);
     for j = 1:size(berg_fracs,2)
         pl(1) = loglog(berg_A(~isnan(berg_fracs(:,j))),berg_fracs(~isnan(berg_fracs(:,j)),j),'-','color','k'); hold on;
@@ -102,9 +185,6 @@ for p = 1:size(site_abbrevs,1);
     leg=legend(pl,'all','DJF','MAM','JJA','SON');
     xlabel('Iceberg surface area (m^2)','fontsize',16);
     ylabel('Count normalized by total area','fontsize',16);
-    
-    %loop through loading DEMs???
-%     load([root_dir,site_abbrevs(p,:),'/DEMs/ASG-20110325_melange-DEMfilled.mat']);
     
     %load all meltrates & concatenate
     meltdates = []; draft = []; subA = []; dVdt = [];
@@ -120,7 +200,7 @@ for p = 1:size(site_abbrevs,1);
     end
     meltrate = dVdt./subA; %m/d
     
-    %visually check that the data look reasonable
+    %visually check that the meltrate data look reasonable
     [unique_dates,refs,inds] = unique(meltdates,'rows');
     figure; set(gcf,'position',[650 50 600 600]);
     cmap = cmocean('matter',size(refs,1)); 
@@ -145,13 +225,16 @@ for p = 1:size(site_abbrevs,1);
     xlabel('Iceberg draft (m b.s.l.)','fontsize',16);
     ylabel('Melt rate (m/d)','fontsize',16);
     
-    %estimate submerged area (read in GEEDiT melange margin delineations to get surface extents?)
-    %TEMP FIX: use the median surface extent from the size distributions
-    SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
-    DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*SA);
-    MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*SA);
-    JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*SA);
-    SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*SA);
+    %estimate "typical" surface & submarged areas for each season
+    DJF_SA = nanmedian(nansum(berg_nos(:,DJF).*berg_A,1))
+    MAM_SA = nanmedian(nansum(berg_nos(:,MAM).*berg_A,1))
+    JJA_SA = nanmedian(nansum(berg_nos(:,JJA).*berg_A,1))
+    SON_SA = nanmedian(nansum(berg_nos(:,SON).*berg_A,1))
+%     SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
+    DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA);
+    MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA);
+    JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*JJA_SA);
+    SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*SON_SA);
     
     %multiply the surface area of each draft bin by the estimated best-fit 
     %melt rate for that draft
