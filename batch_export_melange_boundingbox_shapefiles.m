@@ -1,12 +1,9 @@
+function batch_export_melange_boundingbox_shapefiles(root_dir,EPSG_file)
 % export melange mask shapefiles
-clearvars; close all;
-
-%root directory for all glacier folders
-root_dir = '/Users/ellynenderlin/Research/NSF_Greenland-Calving/fragmentation-curves/';
-EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/EPSG3413.prj';
+close all;
 
 %identify the site folders
-cd_to_root = ['cd ',root_dir]; eval(cd_to_root);
+cd(root_dir);
 sites = dir; sitenames = [];
 for i = 1:length(sites)
     if ~contains(sites(i).name,'.')
@@ -17,22 +14,28 @@ end
 %loop through the folders & extract info
 disp('Exporting melange bounding boxes...');
 for i = 1:length(sitenames)
-    cd_to_site = ['cd ',sitenames(i,:),'/']; eval(cd_to_site);
+    cd([sitenames(i,:),'/']);
 
     %load the matfile containing the melange masks
-    load_file = ['load ',sitenames(i,:),'-melange-masks.mat']; eval(load_file);
+    melangefile = dir('*-melange-masks.mat');
+    load(melangefile(1).name);
     S.Geometry = 'Polygon';
     S.BoundingBox = [max(melmask.uncropped.x) min(melmask.uncropped.y);
         min(melmask.uncropped.x) max(melmask.uncropped.y)];
     S.X = melmask.uncropped.x; S.Y = melmask.uncropped.y;
     S.Name = sitenames(i,:);
     S.Projection = 'EPSG:3413';
-    shapewrite(S,[sitenames(i,:),'-melange-outline.shp']); 
-    copyfile(EPSG_file,[root_dir,sitenames(i,:),'/',sitenames(i,:),'-melange-outline.prj']);
+    
+    %save in shapefiles directory
+    if exist('shapefiles') == 0
+        mkdir('shapefiles')
+    end
+    shapewrite(S,[root_dir,sitenames(i,:),'/shapefiles/',melangefile(1).name(1:end-10),'-outline.shp']); 
+    copyfile(EPSG_file,[root_dir,sitenames(i,:),'/shapefiles/',melangefile(1).name(1:end-10),'-outline.prj']);
     
     %clear and continue loop
     clear S;
     cd ..
 end
     
-    
+end

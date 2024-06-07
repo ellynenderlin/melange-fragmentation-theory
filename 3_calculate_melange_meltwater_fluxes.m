@@ -16,6 +16,7 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
 % root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 cd(root_dir);
+EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/EPSG3413.prj'; %generic EPSG3413 projection file
 
 %create a month naming matrix to convert 3-letter months to numeric months
 month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov';'Dec'};
@@ -64,7 +65,18 @@ disp('Converting iceberg size distribution textfiles for each date to date-speci
 convert_sizedistribution_txt_to_csv(root_dir);
 
 disp('Melange size distributions for each site saved in *-melange-distributions.csv files');
-%% Section 2: Flag melange maps as partial or full for surface area estimates
+
+%% Section 2: Export generic melange masks as shapefiles
+disp('Export uncropped melange masks as shapefiles');
+batch_export_melange_boundingbox_shapefiles(root_dir,EPSG_file);
+
+%% Section 3: Estimate melange extent  
+%Use velocity time series at points along the fjord (GRAB USING ITS_LIVE), 
+%time-stamped melange masks, & the uncropped melange shapefile exported in
+%Section 2
+
+
+%% Section 4: Flag melange maps as partial or full for surface area estimates
 close all;
 disp('Checking DEMs to flag if they cover all or most of the melange');
 
