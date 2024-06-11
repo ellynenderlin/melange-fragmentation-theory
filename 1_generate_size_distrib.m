@@ -13,21 +13,21 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/DEMsizes_matlab-python');
 
 % set paths and glacier to analyze manually:
-glacier_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
-root_path = basepath; output_path = basepath;
-cd([root_path,glacier_abbrev]);
+root_dir = basepath; output_dir = basepath;
+cd([root_dir,site_abbrev]);
 
 %% a) Create the melange masks using a series of manual steps
 disp('Create custom melange masks... the last step (masking) should ideally run overnight');
-create_melange_masks(root_path,glacier_abbrev,output_path) 
+create_melange_masks(root_dir,site_abbrev,output_dir) 
 
 %% b) Extract the automated iceberg distributions from the DEM
-extract_automated_iceberg_DEM_distributions(root_path,glacier_abbrev,output_path)
+extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,output_dir)
 
 %% c) Automatically fit fragmentation curves to the size distributions
 close all;
 disp('Fit & plot size distributions... don''t close any figures while this runs');
-model_size_distrib(root_path,glacier_abbrev)
+model_size_distrib(root_dir,site_abbrev)
 
 disp('Move on to ''2_manually_adjust_fits.ipynb'' Jupyter Notebook to correct wonky fragmentation fits');

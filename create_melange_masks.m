@@ -1,4 +1,4 @@
-function create_melange_masks(root_path,site_abbrev,output_path)
+function create_melange_masks(root_dir,site_abbrev,output_dir)
 %------------------------------------
 % Description: Intersect the melange masks used to crop digital elevation
 % models with manual terminus delineations to create a time series of
@@ -27,7 +27,7 @@ elev_cmap = cmocean('thermal',1001); elev_cmap(1,:) = [1 1 1];
 %coordinates and renamed with *B8PS.TIF ending)
 
 % find and load files
-cd([output_path,'/',site_abbrev,'/']);
+cd([output_dir,'/',site_abbrev,'/']);
 melmask_file = dir([site_abbrev,'*-melange-masks.mat']);
 if ~isempty(melmask_file)
     disp('Loading the melange masks...');
@@ -36,7 +36,7 @@ else
     disp('Create a generic fjord mask that extends over the glacier a few kilometers using a Landsat image');
 
     %load the panchromatic Landsat scene & create a glacier/fjord mask
-    cd([root_path,'/',site_abbrev]);
+    cd([root_dir,'/',site_abbrev]);
     L8dir = dir('LC08*'); cd(L8dir(1).name);
     L8bands = dir('L*.TIF');
     for i = 1:length(L8bands)
@@ -60,7 +60,7 @@ else
 
     % plot the DEM footprints
     disp('plot DEM footprints:')
-    cd([root_path,'/',site_abbrev,'/DEMs/']);
+    cd([root_dir,'/',site_abbrev,'/DEMs/']);
     tifs = dir('*dem.tif'); %melange DEMs provided by PGC
     for i = 1:length(tifs)
         if contains(tifs(i).name,'SETSM_')
@@ -75,7 +75,7 @@ else
     for i = 1:length(melange_mats); melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs); end
     for p = 1:sizeDEMs(1)
         disp(DEMtif_dates(p,:));
-        cd([root_path,'/',site_abbrev,'/']);
+        cd([root_dir,'/',site_abbrev,'/']);
 
         %load the .tif if the .mat DEM doesn't exist
         if isempty(strmatch(DEMtif_dates(p,:),melangemat_dates))
@@ -101,7 +101,7 @@ else
     disp('Trace fjord walls to create a fjord mask, including several km of glacier');
     [~,fjord_maskx,fjord_masky] = roipoly;
     close(gcf); drawnow;
-    cd([output_path,'/',site_abbrev,'/']);
+    cd([output_dir,'/',site_abbrev,'/']);
     melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
     save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
 end
@@ -111,7 +111,7 @@ disp('...moving on');
 %% identify tifs & convert to mat-files if the DEM overlies the melange
 disp('Convert geotiffs to mat-files as necessary');
 melangemat_dates = ''; DEMmat_dates = ''; DEMtif_dates = '';
-cd([root_path,'/',site_abbrev,'/DEMs/']);
+cd([root_dir,'/',site_abbrev,'/DEMs/']);
 
 %existing melange DEMs
 melange_mats = dir([site_abbrev,'*_melange-DEM*.mat']); %include "raw" and filled versions if both were saved
@@ -144,7 +144,7 @@ end
 for p = 1:length(DEMmat_dates)
     disp(['reformating DEM #',num2str(p),' of ',num2str(length(DEMmat_dates))]);
     disp(DEMmat_dates(p,:));
-    cd([root_path,'/',site_abbrev,'/DEMs/']);
+    cd([root_dir,'/',site_abbrev,'/DEMs/']);
     DEM_name = [site_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.mat'];
 
     %load the .tif if the .mat DEM doesn't exist
@@ -200,7 +200,7 @@ for p = 1:length(DEMmat_dates)
 
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
-        cd([root_path,'/',site_abbrev,'/DEMs/']);
+        cd([root_dir,'/',site_abbrev,'/DEMs/']);
         save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
         disp(['Saved DEM geotiff from ',DEMmat_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
@@ -214,7 +214,7 @@ end
 for p = 1:length(tifs)
     disp(['reformating DEM tif #',num2str(p),' of ',num2str(length(tifs))]);
     disp(DEMtif_dates(p,:));
-    cd([root_path,'/',site_abbrev,'/DEMs/']);
+    cd([root_dir,'/',site_abbrev,'/DEMs/']);
     DEM_name = [site_abbrev,'-',DEMtif_dates(p,:),'_melange-DEM.mat'];
 
     if isempty(strmatch(DEMtif_dates(p,:),melangemat_dates))
@@ -278,7 +278,7 @@ for p = 1:length(tifs)
 
         %save the file if it overlaps the melange at the terminus
         close(gcf); drawnow;
-        cd([root_path,'/',site_abbrev,'/DEMs/']);
+        cd([root_dir,'/',site_abbrev,'/DEMs/']);
         save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
         disp(['Saved DEM geotiff from ',DEMtif_dates(p,:),' to mat-file']);
         clear Z melpoly* outline_* out_* in Z*grid;
@@ -291,7 +291,7 @@ disp('Done with DEM matfile creation');
 
 
 %% adjust the melange mask to account for coregistration differences btw Landsat & the DEMs
-cd([root_path,'/',site_abbrev,'/DEMs/']);
+cd([root_dir,'/',site_abbrev,'/DEMs/']);
 clear melange_mats;
 
 %re-identify DEM matfiles, focusing on only the new "raw" DEM matfiles
@@ -306,7 +306,7 @@ answer = questdlg('Was the fjord mask just created for the first time & has not 
 switch answer
     case '1) Yes!'
         disp('Now modify the fjord mask using the DEMs');
-        cd([root_path,'/',site_abbrev]);
+        cd([root_dir,'/',site_abbrev]);
         melmask_file = dir('*-melange-masks.mat');
 
         %load the panchromatic Landsat scene & create a glacier/fjord mask
@@ -321,7 +321,7 @@ switch answer
                 clear I S;
             end
         end
-        cd([root_path,'/',site_abbrev]);
+        cd([root_dir,'/',site_abbrev]);
 
         melange_xlims = [min(melmask.uncropped.x)-2000 max(melmask.uncropped.x)+2000]; melange_ylims = [min(melmask.uncropped.y)-2000 max(melmask.uncropped.y)+2000];
         %crop image to limits
@@ -348,7 +348,7 @@ switch answer
         for p = 1:length(melange_mats)
             disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
             %     disp(melangemat_dates(p,:));
-            cd([root_path,'/',site_abbrev,'/DEMs/']);
+            cd([root_dir,'/',site_abbrev,'/DEMs/']);
             DEM_name = melange_mats(p).name;
             load(DEM_name);
 
@@ -370,7 +370,7 @@ switch answer
         close(gcf); drawnow;
 
         %save the edited melange mask
-        cd([output_path,'/',site_abbrev,'/']);
+        cd([output_dir,'/',site_abbrev,'/']);
         melmask = rmfield(melmask,'uncropped');
         melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
         save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
@@ -382,7 +382,7 @@ clear answer;
 
 
 %% custom modify the melange mask for each DEM (remove glacier & DEM blunders)
-cd([output_path,'/',site_abbrev,'/']);
+cd([output_dir,'/',site_abbrev,'/']);
 if ~exist('melmask')
     load([site_abbrev,'-melange-masks.mat']);
     disp('Fjord mask reloaded...');
@@ -392,7 +392,7 @@ end
 %(this is redundant with the last subsection if you run the code straight
 %through but is necessary if you have an error or otherwise break in this
 %section and some new DEMs have been deleted)
-cd([root_path,'/',site_abbrev,'/DEMs/']);
+cd([root_dir,'/',site_abbrev,'/DEMs/']);
 clear melange_mats;
 melangemat_dates = ''; melange_mats = dir([site_abbrev,'*_melange-DEM.mat']); %identify the new melange DEMs
 for i = 1:length(melange_mats)
@@ -423,13 +423,13 @@ end
 disp('IMPORTANT: When masking, you may need to click the hand icon on the figure just above the map & click and drag to pan!');
 
 %trace the termini & mask-out blunders in all the DEMs
-cd([root_path,'/',site_abbrev,'/DEMs/']);
+cd([root_dir,'/',site_abbrev,'/DEMs/']);
 for p = 1:length(melange_mats)
     %load the DEM
     disp(['DEM #',num2str(p),' of ',num2str(size(melangemat_dates,1))]);
     disp(melangemat_dates(p,:));
     DEM_name = melange_mats(p).name;
-    load([root_path,'/',site_abbrev,'/DEMs/',DEM_name]);
+    load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
     
     %plot the DEM
     figure1 = figure; set(gcf,'position',[50 50 1600 600]);
@@ -603,7 +603,7 @@ for p = 1:length(melange_mats)
                 [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
                 
                 %save the mask for each time step
-                cd([output_path,'/',site_abbrev,'/']);
+                cd([output_dir,'/',site_abbrev,'/']);
                 if contains(melmask.dated(1).datestring,'start')
                     melmask.dated(1).datestring = melangemat_dates(p,:); melmask.dated(1).x = []; melmask.dated(1).y = [];
                 else
@@ -620,13 +620,13 @@ for p = 1:length(melange_mats)
                     end
                     melmask.dated(maskref).datestring = melangemat_dates(p,:); melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
                 end
-                save([output_path,'/',site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
-                save([root_path,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
+                save([output_dir,'/',site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+                save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
             case '2) No!'
                 disp('Deleting files...');
-                recycle('off'); delete([root_path,'/',site_abbrev,'/DEMs/',DEM_name]); %permanently delete the DEM matfile
-                DEM_sourcefiles = dir([root_path,'/',site_abbrev,'/DEMs/*',melangemat_dates(p,:),'*.t*']);
-                recycle('on'); for l = 1:length(DEM_sourcefiles); delete([root_path,'/',site_abbrev,'/DEMs/',DEM_sourcefiles(l).name]); end
+                recycle('off'); delete([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]); %permanently delete the DEM matfile
+                DEM_sourcefiles = dir([root_dir,'/',site_abbrev,'/DEMs/*',melangemat_dates(p,:),'*.t*']);
+                recycle('on'); for l = 1:length(DEM_sourcefiles); delete([root_dir,'/',site_abbrev,'/DEMs/',DEM_sourcefiles(l).name]); end
                 clear DEM_sourcefiles;
         end
         clear answer;
@@ -729,7 +729,7 @@ for p = 1:length(melange_mats)
                 Z.melange.blunder_mask(Z.melange.blunder_mask>1) = 1;
                 
                 %resave the blunder mask
-                save([root_path,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
+                save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
                 
                 %crop the melange mask using the terminus trace
                 out_intercept = []; out_interceptx = []; out_intercepty = [];
@@ -797,8 +797,8 @@ for p = 1:length(melange_mats)
                     [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
                     
                     %save the mask for each time step
-                    save([output_path,'/',site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
-                    save([root_path,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
+                    save([output_dir,'/',site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+                    save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
                     disp('new terminus trace saved');
                 else
                     %identify the melange mask index you should use to save the data
@@ -816,9 +816,9 @@ for p = 1:length(melange_mats)
                 
             case '2) No!'
                 disp('Deleting files...');
-                recycle('off'); delete([root_path,'/',site_abbrev,'/DEMs/',DEM_name]); %permanently delete the DEM matfile
-                DEM_sourcefiles = dir([root_path,'/',site_abbrev,'/DEMs/*',melangemat_dates(p,:),'*.t*']);
-                recycle('on'); for l = 1:length(DEM_sourcefiles); delete([root_path,'/',site_abbrev,'/DEMs/',DEM_sourcefiles(l).name]); end
+                recycle('off'); delete([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]); %permanently delete the DEM matfile
+                DEM_sourcefiles = dir([root_dir,'/',site_abbrev,'/DEMs/*',melangemat_dates(p,:),'*.t*']);
+                recycle('on'); for l = 1:length(DEM_sourcefiles); delete([root_dir,'/',site_abbrev,'/DEMs/',DEM_sourcefiles(l).name]); end
                 clear DEM_sourcefiles;
         end
         clear Z melpoly* out_* in Z*grid term_flag trace_*;
@@ -835,27 +835,27 @@ close all;
 %% move all the geotiffs to a separate folder for organizational purposes (NO LONGER USED BECAUSE DEMS ARE ALREADY IN A "DEMs" FOLDER)
 % 
 % %create a DEMs directory as necessary
-% if not(isfolder([root_path,'/',site_abbrev,'/DEMs/']))
-%     mkdir([root_path,'/',site_abbrev,'/DEMs/']) % make models folder if it doesn't exist
+% if not(isfolder([root_dir,'/',site_abbrev,'/DEMs/']))
+%     mkdir([root_dir,'/',site_abbrev,'/DEMs/']) % make models folder if it doesn't exist
 %     disp('DEMs folder created.');
 % end
 % 
 % %move the files
 % dems = dir('*dem.tif'); orthos = dir('*ortho.tif'); metas = dir('*meta.txt');
 % for p = 1:length(dems)
-%    movefile(tifs(p).name,[root_path,'/',site_abbrev,'/DEMs/']);
+%    movefile(tifs(p).name,[root_dir,'/',site_abbrev,'/DEMs/']);
 % end
 % for p = 1:length(orthos)
-%    movefile(orthos(p).name,[root_path,'/',site_abbrev,'/DEMs/']);
+%    movefile(orthos(p).name,[root_dir,'/',site_abbrev,'/DEMs/']);
 % end
 % for p = 1:length(metas)
-%    movefile(metas(p).name,[root_path,'/',site_abbrev,'/DEMs/']);
+%    movefile(metas(p).name,[root_dir,'/',site_abbrev,'/DEMs/']);
 % end
 
 
 %% apply the fjord mask w/ moving terminus boundary
 disp('Applying mask to each DEM as necessary... this takes a LONG LONG time (>1 hr/DEM)');
-cd([root_path,'/',site_abbrev,'/DEMs/']);
+cd([root_dir,'/',site_abbrev,'/DEMs/']);
 
 %identify the melange DEMs (some DEMs mave have been removed in the last step due to poor coverage)
 clear melangemat_dates;
@@ -868,7 +868,7 @@ clear melmask_dates;
 for j = 1:length(melmask.dated); melmask_dates(j,:) = melmask.dated(j).datestring; end
 
 % %find new DEM geotiffs (may have moved if you ran the code before and it froze part-way)
-% if isfolder([root_path,'/',site_abbrev,'/DEMs/']) %if part of the code was run once & DEMs have been moved
+% if isfolder([root_dir,'/',site_abbrev,'/DEMs/']) %if part of the code was run once & DEMs have been moved
     tifs = dir('*_dem.tif');
     for i = 1:length(tifs)
         if contains(tifs(i).name,'SETSM_')
@@ -895,7 +895,7 @@ end
 for p = 1:length(melange_mats)
     disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
     disp(melangemat_dates(p,:));
-    cd([root_path,'/',site_abbrev,'/DEMs/']);
+    cd([root_dir,'/',site_abbrev,'/DEMs/']);
     DEM_name = melange_mats(p).name; load(DEM_name);
 
     %plot the masked DEM
@@ -1061,9 +1061,9 @@ for p = 1:length(melange_mats)
         %save the mask for each time step
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
-        cd([output_path,'/',site_abbrev,'/']);
+        cd([output_dir,'/',site_abbrev,'/']);
         save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
-        save([root_path,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
+        save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
         saveas(gcf,[site_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         disp(['Saved ',DEM_name]);
         clear Z melpoly* out_* *in Z*grid;

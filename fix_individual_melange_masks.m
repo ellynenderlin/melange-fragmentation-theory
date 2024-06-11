@@ -81,6 +81,7 @@ in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
 M.mask.fjord = zeros(size(M.DEM.z_filled));
 M.mask.fjord(in) = 1;
 M.mask.fjord = round(M.mask.fjord); M.mask.fjord = logical(M.mask.fjord);
+M.DEM.z_filled(M.mask.fjord~=1) = NaN;
 save([root_dir,site_abbrev,'/DEMs/',site_abbrev,'-',melmask.dated(p).datestring,'_melange-DEMfilled.mat'],'M','m','-v7.3');
 
 

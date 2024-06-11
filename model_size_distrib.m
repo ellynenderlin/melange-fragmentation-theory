@@ -7,28 +7,35 @@
 %           Department of Geosciences
 %           Boise State University
 %           Date: 04/07/2021
-function model_size_distrib(basepath,glacier_abbrev)
+function model_size_distrib(basepath,site_abbrev)
 % clear all;
 % addpath('/Users/ellynenderlin/mfiles/general/') % add general functions to path - change path
 
+if length(site_abbrev) == 3
+    matfile_daterefs = [5:12]; yrref = [5:8]; moref = [9:10];
+elseif length(site_abbrev) == 2
+    matfile_daterefs = [4:11]; yrref = [4:7]; moref = [8:9];
+else
+    error('Using a non-standard naming format! Switch to a 2- or 3-letter site abbreviation.');
+end
+
 % set paths
 % basepath='/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/';
-root_path = basepath; output_path = basepath;
-cd_to_glacier = ['cd ''',root_path,'/',glacier_abbrev,'''']; 
-eval(cd_to_glacier);
-disp(['Analyzing ',glacier_abbrev,'...']);
+root_dir = basepath; output_dir = basepath;
+cd([root_dir,site_abbrev]);
+disp(['Analyzing ',site_abbrev,'...']);
 
 %% 0) grab the data
 iceberg_dates = '';
-% if length(dir([glacier_abbrev,'*_iceberg-data.mat'])) > 0
-%     DEM_mats = dir([glacier_abbrev,'*_iceberg-data.mat']); % DEMs
-% elseif length(dir([glacier_abbrev,'*_melange-DEMfilled.mat'])) > 0
-    DEM_mats = dir([glacier_abbrev,'*_melange-DEMfilled.mat']); % DEMs
+% if length(dir([site_abbrev,'*_iceberg-data.mat'])) > 0
+%     DEM_mats = dir([site_abbrev,'*_iceberg-data.mat']); % DEMs
+% elseif length(dir([site_abbrev,'*_melange-DEMfilled.mat'])) > 0
+    DEM_mats = dir([root_dir,'/',site_abbrev,'/DEMs/',site_abbrev,'*_melange-DEMfilled.mat']); % DEMs
 % end
 
 for p = 1:numel(DEM_mats)
-    fnames(p,:) = DEM_mats(p).name;
-    iceberg_dates(p,:) = DEM_mats(p).name(4:11);
+    fpath = DEM_mats(p).folder; fnames(p,:) = DEM_mats(p).name;
+    iceberg_dates(p,:) = DEM_mats(p).name(matfile_daterefs);
 end
 disp('Data identified');
 
@@ -47,7 +54,7 @@ season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
 for p = 1:nfiles
     % load the data
     name = fnames(p,:); 
-    load(name,'m');
+    load([fpath,'/',name],'m');
     disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
     v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)'); 
     n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; % clear m;
@@ -57,10 +64,11 @@ for p = 1:nfiles
     
     % plot
     figure(p); 
-    loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fnames(p,8:9)),:)); 
+    loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fnames(p,moref)),:)); 
     grid on; set(gca,'FontSize',16); title(name(1:11)); %ylim([0.01,10^8]); 
     xlabel('surface area [m^2]'); ylabel('count');
     drawnow; disp('Plot generated.'); 
+    clear v1 n1 dv1;
 end
 
 % %% 2A) Model-fitting with manual user input
@@ -80,7 +88,7 @@ end
 %         
 %         % plot
 %         figure(p);
-%         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fnames(p,8:9)),:)); hold on;
+%         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fnames(p,moref)),:)); hold on;
 %         grid on; set(gca,'FontSize',16); title(name(1:11)); %ylim([0.01,10^8]);
 %         xlabel('surface area [m^2]'); ylabel('count');
 %         drawnow; disp('Plot generated.');
@@ -112,8 +120,8 @@ end
 %         n_mod = EBC_model(c,v1); % grab model
 %         
 %         % add to plot
-%         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
-%         loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
+%         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
+%         loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on;
 %         xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
 %         title('Iceberg size distribution'); grid on;
 %     end
@@ -123,7 +131,7 @@ end
 disp('Fitting the models...');
 % INITIALIZE
 nfiles = size(fnames,1); % grab number of files
-for p = 1:nfiles; yrs(p) = str2num(fnames(p,4:7)); end % grab years
+for p = 1:nfiles; yrs(p) = str2num(fnames(p,yrref)); end % grab years
 m = 0; bergs = [];
 params = zeros(nfiles, 8); % matrix to hold filename and resulting parameters 
 % c1, c2, c3, c4, alpha from E-BC, and c5, c6 from sub. melt power law 
@@ -151,7 +159,7 @@ for p = 1:nfiles
 %     if p > 21 % TOGGLE TO SELECT A SINGLE FILE FOR TESTING
         figure(p); set(gcf, 'Position', [500 500 1000 400]); % generate figure
         name = fnames(p,:); 
-        load(name,'m');
+        load([fpath,'/',name],'m');
         disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
         v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)'); 
         n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; clear m;
@@ -164,8 +172,8 @@ for p = 1:nfiles
         n_mod = EBC_model([c1,c2,alpha,c3,c4],v1); % grab model 
 
         subplot(1,2,1); % plot result
-        loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
-        loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
+        loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
+        loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on;
         xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
         title('Iceberg size distribution'); grid on;
         
@@ -175,7 +183,7 @@ for p = 1:nfiles
             subset = 6:length(v1); % set subset of the distribution to fit 
             [error_d, c1_d, c2_d] = powerlaw_fit(v1(subset),n1(subset),norm_type,[max(n1) 0],[max(n1)*dplawthresh 1e12]); % fit with bounds, keep close to the first value
             nmod_dummy = powerlaw_model([c1_d, c2_d],v1);
-            loglog(v1, nmod_dummy, '--', 'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); % plot the dummy power law
+            loglog(v1, nmod_dummy, '--', 'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); % plot the dummy power law
             res = n1 - nmod_dummy; % calculate residuals from dummy power law
         else % otherwise, use Eq. 1
             res = n1 - n_mod; % calculate residuals from E-BC model (data - model)
@@ -235,17 +243,17 @@ for p = 1:nfiles
 
                 % plot over 2nd subplot
                 subplot(1,2,1); % old result
-                loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
-                loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); hold on; % original model
+                loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
+                loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on; % original model
                 if use_dummy == 1
-                    loglog(v1, nmod_dummy, '--', 'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); %  dummy power law
+                    loglog(v1, nmod_dummy, '--', 'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); %  dummy power law
                 end
                 xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
                 title('Iceberg size distribution'); grid on;
                 subplot(1,2,2); % new result
-                loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
+                loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
                 loglog(v1(1:8), nmod_sm,'k--','LineWidth',1); hold on; grid on;
-                loglog(v1_EBC,nmod_EBC,'LineWidth',2,'Color',season_cmap(str2num(name(8:9)),:)); hold on;
+                loglog(v1_EBC,nmod_EBC,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on;
                 xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
                 title('submarine melt considered');
                 legend('data','submarine melt','E-BC frag. model');
@@ -257,17 +265,17 @@ for p = 1:nfiles
         end
         
         % save the figure
-        if not(isfolder([basepath,'/',glacier_abbrev,'/models/']))
-            mkdir([basepath,'/',glacier_abbrev,'/models/']) % make models folder if it doesn't exist
+        if not(isfolder([root_dir,site_abbrev,'/models/']))
+            mkdir([root_dir,site_abbrev,'/models/']) % make models folder if it doesn't exist
             disp('Models folder created.');
         end
-        saveas(gcf,[basepath,glacier_abbrev,'/models/',name(1:11),'_model.png']) % save into models folder
+        saveas(gcf,[root_dir,site_abbrev,'/models/',name(1:11),'_model.png']) % save into models folder
         
         % save the parameters
-        params(p,:) = [str2num(name(4:11)), c1, c2, alpha, c3, c4, c5, c6];
+        params(p,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4, c5, c6];
         
         % clear variables
-        clearvars -except nfiles fnames season_cmap nthresh basepath root_path glacier_abbrev output_path use_dummy taperthresh dplawthresh params norm_type normalize_exp
+        clearvars -except nfiles fpath fnames season_cmap nthresh basepath root_dir site_abbrev output_dir use_dummy taperthresh dplawthresh params norm_type normalize_exp
         
 %     end % TOGGLE TO SELECT A SINGLE FILE FOR TESTING
 end
@@ -275,7 +283,7 @@ end
 % export parameters to a csv file
 dt = string(datetime('now')); dt = strrep(dt,' ','_');
 dt = strrep(dt,':',''); dtstring = extractBefore(dt(1),17); % grab datetime
-delete_csvs = ['delete ',strcat(basepath,glacier_abbrev,'/models/',glacier_abbrev,'_parameters_*.csv')]; eval(delete_csvs);
-writematrix(params,strcat(basepath,glacier_abbrev,'/models/',glacier_abbrev,'_parameters_',dtstring,'.csv'));
+delete_csvs = ['delete ',strcat(root_dir,site_abbrev,'/models/',site_abbrev,'_parameters_*.csv')]; eval(delete_csvs);
+writematrix(params,strcat(root_dir,site_abbrev,'/models/',site_abbrev,'_parameters_',dtstring,'.csv'));
 
 end
