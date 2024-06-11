@@ -14,7 +14,6 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 
 %specify directories for required files ([root_dir,'/',site_abbrevs(i)])
 root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
-% root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 cd(root_dir);
 EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/EPSG3413.prj'; %generic EPSG3413 projection file
 
@@ -61,20 +60,45 @@ day_cmap = [accum_cmap(103:end-10,:); ablat_cmap(11:end,:); accum_cmap(11:102,:)
 
 disp('Initialized iceberg meltwater flux code');
 %% Section 1: Convert date-specific size distribution textfiles to a concatenated csv
-disp('Converting iceberg size distribution textfiles for each date to date-specific csvs & a single csv');
+disp('Converting iceberg size distribution textfiles for each date to date-specific csvs & a single csv...');
 convert_sizedistribution_txt_to_csv(root_dir);
 
 disp('Melange size distributions for each site saved in *-melange-distributions.csv files');
 
 %% Section 2: Export generic melange masks as shapefiles
-disp('Export uncropped melange masks as shapefiles');
+disp('Exporting uncropped melange masks as shapefiles...');
 batch_export_melange_boundingbox_shapefiles(root_dir,EPSG_file);
+disp('Shapefiles created.');
 
 %% Section 3: Estimate melange extent  
 %Use velocity time series at points along the fjord (GRAB USING ITS_LIVE), 
-%time-stamped melange masks, & the uncropped melange shapefile exported in
-%Section 2
-
+%time-stamped melange masks, & the uncropped melange shapefile exported in Section 2
+disp('Estimating melange extent from ITS_LIVE velocity time series...');
+for p = 1:size(site_abbrevs,1);
+    disp(site_abbrevs(p,:));
+    cd([root_dir,site_abbrevs(p,:)]);
+    
+    %if the velocities directory exists, go into it and check for files
+    if exist('velocities') == 7
+        cd('velocities/');
+        vels = dir('*.csv');
+        
+        %specify the path and filename for fjord outline shapefile (created in Section 2 in this code)
+        outline_dir = [root_dir,site_abbrevs(p,:)]; outline_file = [site_abbrevs(p,:),'-melange-masks.mat']; 
+        
+        %loop through the velocity data and add melange areas based on
+        %dates with velocity (indicating coherent melange) to the melmask
+        %structure
+        if ~isempty(vels)
+            [melmask] = analyze_melange_velocity_coherence(site_abbrevs(p,:),root_dir,outline_dir,outline_file)
+        else
+            disp('No velocity csv files... grab time series from points using ITS_LIVE portal & add to velocities directory');
+        end
+        clear outline_*;
+    else
+        disp('No velocities directory and csv files... grab time series from points using ITS_LIVE portal');
+    end
+end
 
 %% Section 4: Flag melange maps as partial or full for surface area estimates
 close all;
@@ -154,11 +178,15 @@ for p = 1:size(site_abbrevs,1);
 end
 save([root_dir,'melange-extent-flags.mat'],'melext','-v7.3');
 
-%% Section 3: Load iceberg size distributions & melange masks
+%% Section 5: Load iceberg size distributions & melange extent estimates
 close all;
 disp('Bringing datasets together to estimate melange melt fluxes');
 load([root_dir,'melange-extent-flags.mat']); %load the melange extent flags as needed
-%  TESTING FOR A SINGLE SITE WITH SPARSE DATA... NEED TO CHECK AUTOMATION
+%  TESTING FOR A SINGLE SITE... NEED TO CHECK AUTOMATION
+
+%specify which dataset you want to use to estimate melange surface areas
+Asource = questdlg('Specify if you want to use the velocity coherence or DEM melange extents.',...
+    'Melange Extent Data','Vel','DEM','Vel');
 
 %navigate to site folder and load data
 for p = 1:size(site_abbrevs,1);
@@ -245,12 +273,24 @@ for p = 1:size(site_abbrevs,1);
     xlabel('Iceberg draft (m b.s.l.)','fontsize',16);
     ylabel('Melt rate (m/d)','fontsize',16);
     
-    %estimate "typical" surface & submarged areas for each season
-    DJF_SA = nanmedian(nansum(berg_nos(:,DJF(find(melext(p).flag(DJF)>=1))).*berg_A,1))
-    MAM_SA = nanmedian(nansum(berg_nos(:,MAM(find(melext(p).flag(MAM)>=1))).*berg_A,1))
-    JJA_SA = nanmedian(nansum(berg_nos(:,JJA(find(melext(p).flag(JJA)>=1))).*berg_A,1))
-    SON_SA = nanmedian(nansum(berg_nos(:,SON(find(melext(p).flag(SON)>=1))).*berg_A,1))
-%     SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
+    %estimate "typical" surface & submerged areas for each season
+    switch Asource
+        case 'Vel'
+            for k = 1:length(DJF); melpoly = polyshape(melmask.dated(DJF(k)).x,melmask.dated(DJF(k)).y); SA(k) = area(melpoly); clear melpoly; end
+            DJF_SA = nanmedian(SA); clear SA;
+            for k = 1:length(MAM); melpoly = polyshape(melmask.dated(MAM(k)).x,melmask.dated(MAM(k)).y); SA(k) = area(melpoly); clear melpoly; end
+            MAM_SA = nanmedian(SA); clear SA;
+            for k = 1:length(JJA); melpoly = polyshape(melmask.dated(JJA(k)).x,melmask.dated(JJA(k)).y); SA(k) = area(melpoly); clear melpoly; end
+            JJA_SA = nanmedian(SA); clear SA;
+            for k = 1:length(SON); melpoly = polyshape(melmask.dated(SON(k)).x,melmask.dated(SON(k)).y); SA(k) = area(melpoly); clear melpoly; end
+            SON_SA = nanmedian(SA); clear SA;
+        case 'DEM'
+            DJF_SA = nanmedian(nansum(berg_nos(:,DJF(find(melext(p).flag(DJF)>=1))).*berg_A,1))
+            MAM_SA = nanmedian(nansum(berg_nos(:,MAM(find(melext(p).flag(MAM)>=1))).*berg_A,1))
+            JJA_SA = nanmedian(nansum(berg_nos(:,JJA(find(melext(p).flag(JJA)>=1))).*berg_A,1))
+            SON_SA = nanmedian(nansum(berg_nos(:,SON(find(melext(p).flag(SON)>=1))).*berg_A,1))
+    end
+    %     SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
     DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA);
     MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA);
     JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*JJA_SA);

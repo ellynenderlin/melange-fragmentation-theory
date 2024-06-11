@@ -1,15 +1,18 @@
+function [melmask] = analyze_melange_velocity_coherence(site_abbrev,root_dir,outline_dir,outline_file)
+
 %%% Examine melange velocity time series to determine when and where there
 %%% is coherent melange.
-clearvars; close all;
-addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
-    '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
+close all; %clearvars; 
+% addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
+%     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
 
 %specify directories & files
-site_abbrev = 'ASG'; %3-letter abbrevation
-root_dir = ['/Volumes/Jokulhaup_5T/Greenland-melange/',site_abbrev,'/']; %overarching directory for sites
-vel_dir = [root_dir,'velocities/']; %site-specific directory holding ITS_LIVE time series csvs for each point
-outline_dir = root_dir; outline_file = [site_abbrev,'-melange-masks.mat'];
-cd(root_dir);
+% site_abbrev = 'ASG'; %3-letter abbrevation
+% root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/';
+site_dir = [root_dir,site_abbrev,'/']; %overarching directory for sites
+vel_dir = [site_dir,'velocities/']; %site-specific directory holding ITS_LIVE time series csvs for each point
+% outline_dir = site_dir; outline_file = [site_abbrev,'-melange-masks.mat'];
+cd(site_dir);
 
 %specify years of interest (from Sentinel 2 launch to near-present)
 vel_years = [2016:1:2022]; %ITS_LIVE coverage only through 2022 as of June 1st, 2024
@@ -120,6 +123,7 @@ boxchart((mel_loss_decidate)'); hold on;
 disp('Check that the break-up dates (fraction of year) in the boxplot seem reasonable before moving on');
 
 %% convert typical melange extent for each season to an area estimate using the velocity time series & melange shapefile
+close all;
 if exist('V') ~= 1; load([vel_dir,site_abbrev,'-melange-velocities.mat']); end
 
 % %load the melange shapefile that was used to download DEMs
@@ -135,6 +139,7 @@ for j = 1:length(V); point_flag(j) = inpolygon(V(j).x(1),V(j).y(1),S.X,S.Y); end
 figure; 
 plot([S.X;S.X(1)],[S.Y;S.Y(1)],'-k','linewidth',2); axis xy equal; hold on;
 for j = 1:length(V); if point_flag(j) == 1; plot(V(j).x(1),V(j).y(1),'xr'); hold on; end; end
+drawnow;
 
 %draw long perpendicular bisectors from each velocity point
 for j = 1:length(V)
@@ -150,25 +155,25 @@ for j = 1:length(V)
     line_x(j,:) = [V(j).x(1)+line_length*sind(line_angle(j,:)), V(j).x(1)-line_length*sind(line_angle(j,:))];
 end
 
-%crop the perpendicular bisectors to the melange outline: MIGHT NOT NEED
-%THIS STEP!
-for j = 1:length(V)
-    if point_flag(j) == 1
-        [xi,yi] = polyxpoly([V(j).x(1) line_x(j,1)],[V(j).y(1) line_y(j,1)],S.X,S.Y);
-        dists = sqrt((xi-V(j).x(1)).^2 + (yi-V(j).y(1)).^2);
-        line_xi(j,1) = xi(find(dists==min(dists))); line_yi(j,1) = yi(find(dists==min(dists))); 
-        clear xi yi dists;
-        
-        [xi,yi] = polyxpoly([V(j).x(1) line_x(j,2)],[V(j).y(1) line_y(j,2)],S.X,S.Y);
-        dists = sqrt((xi-V(j).x(1)).^2 + (yi-V(j).y(1)).^2);
-        line_xi(j,2) = xi(find(dists==min(dists))); line_yi(j,2) = yi(find(dists==min(dists))); 
-        clear xi yidists;
-        plot(line_xi(j,:),line_yi(j,:),'--b','linewidth',2); hold on;
-    else
-        line_xi(j,:) = [NaN,NaN]; line_yi(j,:) = [NaN,NaN];
-    end
-    
-end
+% %crop the perpendicular bisectors to the melange outline: MIGHT NOT NEED
+% %THIS STEP!
+% for j = 1:length(V)
+%     if point_flag(j) == 1
+%         [xi,yi] = polyxpoly([V(j).x(1) line_x(j,1)],[V(j).y(1) line_y(j,1)],S.X,S.Y);
+%         dists = sqrt((xi-V(j).x(1)).^2 + (yi-V(j).y(1)).^2);
+%         line_xi(j,1) = xi(find(dists==min(dists))); line_yi(j,1) = yi(find(dists==min(dists))); 
+%         clear xi yi dists;
+%         
+%         [xi,yi] = polyxpoly([V(j).x(1) line_x(j,2)],[V(j).y(1) line_y(j,2)],S.X,S.Y);
+%         dists = sqrt((xi-V(j).x(1)).^2 + (yi-V(j).y(1)).^2);
+%         line_xi(j,2) = xi(find(dists==min(dists))); line_yi(j,2) = yi(find(dists==min(dists))); 
+%         clear xi yidists;
+%         plot(line_xi(j,:),line_yi(j,:),'--b','linewidth',2); hold on;
+%     else
+%         line_xi(j,:) = [NaN,NaN]; line_yi(j,:) = [NaN,NaN];
+%     end
+%     
+% end
 
 %use the median of the end image date used to create velocities over the
 %specified time period to identify when melange breaks up
@@ -189,35 +194,45 @@ end
 %and the manually-delineated terminus to crop the melange shapefile and
 %solve for the melange surface area
 clear S; date_cmap = colormap(jet(length(melmask.dated)));
-%FAILED ON J=9 BECAUSE THE MELMASK.DATED POLYGON ISN'T A POLYGON OUTLINING
-%THE MELANGE BUT IS JUST THE TERMINUS DELINEATION
 for j = 1:length(melmask.dated)
     %load the melange mask that has been cropped to the terminus
     S.X = melmask.dated(j).x; S.Y = melmask.dated(j).y;
     
     %find the corresponding seaward extent for the month
     sea_ref = mel_loss_ref(str2num(melmask.dated(j).datestring(5:6))); %seaward extent reference based on velocities
+    disp(['j = ',num2str(j),' & vel ref = ',num2str(sea_ref)]);
     if sea_ref ~= 1
-        out_intercept = []; out_interceptx = []; out_intercepty = [];
-        for i = 1:length(S.X)-1
-            [xi,yi] = polyxpoly(S.X(i:i+1),S.Y(i:i+1),line_x(sea_ref,:),line_y(sea_ref,:)); %find the intersections of the terminus trace with the melange outline
-            if ~isempty(xi)
-                out_intercept = [out_intercept i]; out_interceptx = [out_interceptx xi]; out_intercepty = [out_intercepty yi];
+        %check that the melange bisector point is not behind the terminus
+        in = inpolygon(mean(line_x(sea_ref,:)),mean(line_y(sea_ref,:)),melmask.dated(j).x,melmask.dated(j).y);
+        if sum(in) == 0
+            melmask.dated(j).x_mel = melmask.dated(j).x; melmask.dated(j).y_mel =melmask.dated(j).y;
+            disp(['No coherent melange for ',melmask.dated(j).datestring,' according to velocities']);
+        else
+            %find where the melange bisector intersects the fjord mask
+            out_intercept = []; out_interceptx = []; out_intercepty = [];
+            for i = 1:length(S.X)-1
+                [xi,yi] = polyxpoly(S.X(i:i+1),S.Y(i:i+1),line_x(sea_ref,:),line_y(sea_ref,:)); %find the intersections of the terminus trace with the melange outline
+                if ~isempty(xi)
+                    out_intercept = [out_intercept i]; out_interceptx = [out_interceptx xi]; out_intercepty = [out_intercepty yi];
+                end
+                clear xi yi;
             end
-            clear xi yi;
+            
+            %create a new melange polygon cropped on both ends
+            melmask.dated(j).x_mel = [out_interceptx(find(out_intercept==min(out_intercept))); S.X(min(out_intercept)+1:max(out_intercept)-1); out_interceptx(find(out_intercept==max(out_intercept)));out_interceptx(find(out_intercept==min(out_intercept)))];
+            melmask.dated(j).y_mel = [out_intercepty(find(out_intercept==min(out_intercept))); S.Y(min(out_intercept)+1:max(out_intercept)-1); out_intercepty(find(out_intercept==max(out_intercept)));out_intercepty(find(out_intercept==min(out_intercept)))];
+
+            clear out_intercept*;
         end
-        %create a new melange polygon cropped on both ends
-        melmask.dated(j).x_mel = [out_interceptx(find(out_intercept==min(out_intercept))); S.X(out_intercept(1)+1:out_intercept(end)-1); out_interceptx(find(out_intercept==max(out_intercept)));out_interceptx(find(out_intercept==min(out_intercept)))];
-        melmask.dated(j).y_mel = [out_intercepty(find(out_intercept==min(out_intercept))); S.Y(out_intercept(1)+1:out_intercept(end)-1); out_intercepty(find(out_intercept==max(out_intercept)));out_intercepty(find(out_intercept==min(out_intercept)))];
-        clear out_intercept*;
     else
-        melmask.dated(j).x_mel = melmask.uncropped.x;
-        melmask.dated(j).y_mel = melmask.uncropped.y;
+        melmask.dated(j).x_mel = melmask.dated(j).x;
+        melmask.dated(j).y_mel = melmask.dated(j).y;
     end
-    plot(melmask.dated(j).x_mel,melmask.dated(j).y_mel,'-','color',date_cmap(j,:),'linewidth',1); axis xy equal; hold on;
+    plot(melmask.dated(j).x_mel,melmask.dated(j).y_mel,'-','color',date_cmap(j,:),'linewidth',2); axis xy equal; hold on;
     
     clear S sea_ref;
 end
 
 
 save([outline_dir,outline_file],'melmask','-v7.3');
+end
