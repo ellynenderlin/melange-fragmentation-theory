@@ -275,7 +275,7 @@ for p = 1:nfiles
         params(p,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4, c5, c6];
         
         % clear variables
-        clearvars -except nfiles fpath fnames season_cmap nthresh basepath root_dir site_abbrev output_dir use_dummy taperthresh dplawthresh params norm_type normalize_exp
+        clearvars -except nfiles fpath fnames season_cmap matfile_daterefs yrref moref nthresh basepath root_dir site_abbrev output_dir use_dummy taperthresh dplawthresh params norm_type normalize_exp
         
 %     end % TOGGLE TO SELECT A SINGLE FILE FOR TESTING
 end
