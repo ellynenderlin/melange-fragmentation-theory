@@ -13,9 +13,10 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/LSQ_LUT_PIECEWISE');
 
 %specify directories for required files ([root_dir,'/',site_abbrevs(i)])
-root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/'; %include trailing / in file name
+basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
+root_dir = basepath; output_dir = basepath;
 cd(root_dir);
-EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/EPSG3413.prj'; %generic EPSG3413 projection file
+EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/general-code/EPSG3413.prj'; %generic EPSG3413 projection file (available in group GitHub general-code)
 
 %create a month naming matrix to convert 3-letter months to numeric months
 month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov';'Dec'};
@@ -63,57 +64,27 @@ disp('Initialized iceberg meltwater flux code');
 disp('Converting iceberg size distribution textfiles for each date to date-specific csvs & a single csv...');
 convert_sizedistribution_txt_to_csv(root_dir);
 
-disp('Melange size distributions for each site saved in *-melange-distributions.csv files');
+disp('Melange size distributions for each site saved in *iceberg-distributions.csv files');
 
 %% Section 2: Export generic melange masks as shapefiles
 disp('Exporting uncropped melange masks as shapefiles...');
 batch_export_melange_boundingbox_shapefiles(root_dir,EPSG_file);
-disp('Shapefiles created.');
+disp('DEM-based melange mask shapefiles created.');
 
-%% Section 3: Estimate melange extent  
-%Use velocity time series at points along the fjord (GRAB USING ITS_LIVE), 
-%time-stamped melange masks, & the uncropped melange shapefile exported in Section 2
-disp('Estimating melange extent from ITS_LIVE velocity time series...');
-for p = 1:size(site_abbrevs,1);
-    disp(site_abbrevs(p,:));
-    cd([root_dir,site_abbrevs(p,:)]);
-    
-    %if the velocities directory exists, go into it and check for files
-    if exist('velocities') == 7
-        cd('velocities/');
-        vels = dir('*.csv');
-        
-        %specify the path and filename for fjord outline shapefile (created in Section 2 in this code)
-        outline_dir = [root_dir,site_abbrevs(p,:)]; outline_file = [site_abbrevs(p,:),'-melange-masks.mat']; 
-        
-        %loop through the velocity data and add melange areas based on
-        %dates with velocity (indicating coherent melange) to the melmask
-        %structure
-        if ~isempty(vels)
-            [melmask] = analyze_melange_velocity_coherence(site_abbrevs(p,:),root_dir,outline_dir,outline_file)
-        else
-            disp('No velocity csv files... grab time series from points using ITS_LIVE portal & add to velocities directory');
-        end
-        clear outline_*;
-    else
-        disp('No velocities directory and csv files... grab time series from points using ITS_LIVE portal');
-    end
-end
+disp('Create monthly delineations of the melange edge in GEEDiT');
+disp(' & export as a shapefile to the "shapefiles" directory before running the next subsection');
 
-%% Section 4: Flag melange maps as partial or full for surface area estimates
+%% Section 3: Manually estimate melange extent
 close all;
-disp('Checking DEMs to flag if they cover all or most of the melange');
+disp('Create/compile manual melange extent estimates...');
 
+%loop through each site
 for p = 1:size(site_abbrevs,1);
     disp(site_abbrevs(p,:));
-    cd([root_dir,site_abbrevs(p,:)]);
     
-    %create a dummy matrix to hold the melange extent flag
-    melext(p).flag = []; %fill in with 2 when full melange in DEM, 1 when most, 0 otherwise
-    
-    %navigate to site folder and load data
+    %navigate to site folder and load melange mask data
     cd([root_dir,site_abbrevs(p,:)]);
-    load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
+    load([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
     for k = 1:length(melmask.dated); melA(k) = polyarea(melmask.dated(k).x,melmask.dated(k).y); end
     disp(['Typical fjord area (including open water): ',num2str(round(nanmean(melA))),'m^2']);
     
@@ -132,7 +103,7 @@ for p = 1:size(site_abbrevs,1);
     for i = 1:length(melange_mats); melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs); end
     disp([num2str(size(melange_mats,1)),' DEMs from ',melangemat_dates(1,1:4),'-',melangemat_dates(end,1:4)]);
     
-    %load each DEM & flag it
+    %load each DEM & flag it (fill in with 2 when full melange in DEM, 1 when most, 0 otherwise)
     for k = 1:length(melange_mats)
         disp(num2str(k));
         load([root_dir,site_abbrevs(p,:),'/DEMs/',melange_mats(k).name]);
@@ -141,7 +112,7 @@ for p = 1:size(site_abbrevs,1);
         melange = M.DEM.z_filled;
         melange(isnan(M.DEM.z_filled)) = 0;
         melange(melange<0) = 0;
-        melange(M.mask.DEM==0) = NaN; melange(M.mask.blunders==1) = NaN; 
+        melange(M.mask.DEM==0) = NaN; melange(M.mask.blunders==1) = NaN;
         disp([num2str(sum(~isnan(melange(melange>0)))*4),' m^2 with >0m elevations']);
         
         %plot the melange DEM
@@ -165,35 +136,106 @@ for p = 1:size(site_abbrevs,1);
             'Extent Check','Yes','Most','No','No');
         switch extent
             case 'Yes'
-                melext(p).flag(1,k) = 2;
+                melmask.dated(k).DEMext_flag = 2;
             case 'Most'
-                melext(p).flag(1,k) = 1;
+                melmask.dated(k).DEMext_flag = 1;
             case 'No'
-                melext(p).flag(1,k) = 0;;
+                melmask.dated(k).DEMext_flag = 0;;
         end
         
         clear M extent melange; close all;
     end
-    clear melange_mats melangemat_dates;
+    clear melange_mats melangemat_dates melange;
+    save([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-masks.mat'],'melmask','-v7.3');
+    
+    
+    %bring in manually-delineated melange extents from GEEDiT for comparison
+    %(if they exist)
+    cd([root_dir,site_abbrevs(p,:),'/shapefiles/']);
+    sfile = dir('*melange-delineations*.shp'); %find the melange shapefile & load it (must have "melange-delineations" in name)
+    if ~isempty(sfile) %if the directory containing GEEDiT shapefiles exists, grab the data
+        disp('Incorporating manual image-based delineations into melange extent estimates');
+        S = shaperead(sfile(1).name);
+        for k = 1:size(S,1)
+            if length(S(k).Date) == 10
+                melext(k).date = [S(k).Date(1:4),S(k).Date(6:7),S(k).Date(9:10)];
+                ext_decidate(k,:) = convert_to_decimaldate(melext(k).date);
+            else
+                error('Unfamiliar date formatting from GEEDiT');
+            end
+            melext(k).lat = S(k).Y; melext(k).lon = S(k).X;
+            [melext(k).x,melext(k).y] = wgs2ps(melext(k).lon,melext(k).lat);
+        end
+        clear S;
+        save([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-delineations.mat'],'melext','-v7.3');
+        
+        %crop the time-stamped melange outlines using the delineations
+%         figure;
+        for k = 1:length(melmask.dated);
+            %idenfity the delineation with the closest time stamp
+            DEM_decidate(k,:) = convert_to_decimaldate(melmask.dated(k).datestring);
+            date_diff = DEM_decidate(k,:) - ext_decidate;
+            if min(abs(date_diff)) > 1; %if there is more than a year between the most recent terminus delineation & DEM
+                clear date_diff; date_diff = (DEM_decidate(k,:)-floor(DEM_decidate(k,:))) - (ext_decidate-floor(ext_decidate));
+                [sorted_dates,inds] = sort(abs(date_diff));
+                date_ref = inds(1:2); %select the two dates that are seasonally closest
+                clear sorted_dates inds;
+            else
+                date_ref = find(abs(date_diff)==min(abs(date_diff)),1,'first');
+            end
+            
+            %calculate the area of each polygon that approximates the 
+            for j = 1:length(date_ref)
+                out_intercept = []; out_interceptx = []; out_intercepty = [];
+                for i = 1:length(melmask.dated(k).x)-1
+                    [xi,yi] = polyxpoly(melmask.dated(k).x(i:i+1),melmask.dated(k).y(i:i+1),melext(date_ref(j)).x,melext(date_ref(j)).y); %find the intersections of the terminus trace with the melange outline
+                    if ~isempty(xi)
+                        out_intercept = [out_intercept i]; out_interceptx = [out_interceptx xi]; out_intercepty = [out_intercepty yi];
+                    end
+                    clear xi yi;
+                end
+                
+                %create a new melange polygon cropped on both ends
+                x_mel = [out_interceptx(find(out_intercept==min(out_intercept))); melmask.dated(k).x(min(out_intercept)+1:max(out_intercept)-1); out_interceptx(find(out_intercept==max(out_intercept)));out_interceptx(find(out_intercept==min(out_intercept)))];
+                y_mel = [out_intercepty(find(out_intercept==min(out_intercept))); melmask.dated(k).y(min(out_intercept)+1:max(out_intercept)-1); out_intercepty(find(out_intercept==max(out_intercept)));out_intercepty(find(out_intercept==min(out_intercept)))];
+                melpoly = polyshape(x_mel,y_mel); SA(j) = area(melpoly);
+                clear x_mel y_mel melpoly;
+            end
+            clear date_diff date_ref;
+            melmask.dated(k).IMext_area = median(SA); melmask.dated(k).IMext_areaMAD = mad(SA,1); clear SA;
+%             plot(DEM_decidate(k,:),melmask.dated(k).IMext_area,'xk'); hold on; drawnow;
+            clear *intercept*;
+        end
+        save([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-masks.mat'],'melmask','-v7.3');
+    else
+        disp('Delineate seaward melange edge every month from 2016-present in GEEDiT!');
+    end
+    clear sfile;
+    disp('Surface areas from manual delineations added to melmask structure');
+    
 end
-save([root_dir,'melange-extent-flags.mat'],'melext','-v7.3');
+clear melmask melext;
+disp('Move on to the last section!');
 
-%% Section 5: Load iceberg size distributions & melange extent estimates
+%% Section 4: Load iceberg size distributions & melange extent estimates
 close all;
 disp('Bringing datasets together to estimate melange melt fluxes');
-load([root_dir,'melange-extent-flags.mat']); %load the melange extent flags as needed
 %  TESTING FOR A SINGLE SITE... NEED TO CHECK AUTOMATION
 
+%seasonal colormap
+season_cmap = [233,163,201; 161,215,106; 77,146,33; 197,27,125]./255; %green-pink from colorbrewer
+
 %specify which dataset you want to use to estimate melange surface areas
-Asource = questdlg('Specify if you want to use the velocity coherence or DEM melange extents.',...
-    'Melange Extent Data','Vel','DEM','Vel');
+Asource = questdlg('Specify if you want to use the velocity coherence, manual melange extents, or both.',...
+    'Melange Extent Data','Manual','Velocity','Both','Manual');
 
 %navigate to site folder and load data
 for p = 1:size(site_abbrevs,1);
     disp(site_abbrevs(p,:));
     cd([root_dir,site_abbrevs(p,:)]);
-%     load([site_abbrevs(p,:),'-melange-masks.mat']); %load all the melange DEM masks
-    dists = readtable([site_abbrevs(p,:),'-melange-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
+    dists = readtable([site_abbrevs(p,:),'-iceberg-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
+    load([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-masks.mat']); %load all dated melange datasets
+    load([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-delineations.mat']); %load manual melange delineations
     
     %use iceberg size distributions to estimate the submerged area of the
     %melange in each season (DJF, MAM, JJA, SON)
@@ -209,6 +251,7 @@ for p = 1:size(site_abbrevs,1);
     %create a table of iceberg distribution numbers & normalize by area
     berg_nos = table2array(dists(:,3:end));
     berg_fracs = berg_nos./(nansum(berg_nos.*berg_A,1));
+    clear dists;
     
     %identify the seasons for the observations
     DJF = find(berg_mo==12 | berg_mo == 1 | berg_mo == 2);
@@ -223,12 +266,12 @@ for p = 1:size(site_abbrevs,1);
     SON_fracs = nanmedian(berg_fracs(:,SON),2);
     figure; set(gcf,'position',[50 50 600 600]);
     for j = 1:size(berg_fracs,2)
-        pl(1) = loglog(berg_A(~isnan(berg_fracs(:,j))),berg_fracs(~isnan(berg_fracs(:,j)),j),'-','color','k'); hold on;
+        pl(1) = loglog(berg_A(~isnan(berg_fracs(:,j))),berg_fracs(~isnan(berg_fracs(:,j)),j),'-','color',[0.5 0.5 0.5]); hold on;
     end
-    pl(2) = loglog(berg_A,DJF_fracs(:,1),'-b','linewidth',2); hold on;
-    pl(3) = loglog(berg_A,MAM_fracs(:,1),'-g','linewidth',2); hold on;
-    pl(4) = loglog(berg_A,JJA_fracs(:,1),'-m','linewidth',2); hold on;
-    pl(5) = loglog(berg_A,SON_fracs(:,1),'-r','linewidth',2); hold on;
+    pl(2) = loglog(berg_A,DJF_fracs(:,1),'-','linewidth',2,'color',season_cmap(1,:)); hold on;
+    pl(3) = loglog(berg_A,MAM_fracs(:,1),'-','linewidth',2,'color',season_cmap(2,:)); hold on;
+    pl(4) = loglog(berg_A,JJA_fracs(:,1),'-','linewidth',2,'color',season_cmap(3,:)); hold on;
+    pl(5) = loglog(berg_A,SON_fracs(:,1),'-','linewidth',2,'color',season_cmap(4,:)); hold on;
     grid on; set(gca,'fontsize',16);
     leg=legend(pl,'all','DJF','MAM','JJA','SON');
     xlabel('Iceberg surface area (m^2)','fontsize',16);
@@ -275,26 +318,152 @@ for p = 1:size(site_abbrevs,1);
     
     %estimate "typical" surface & submerged areas for each season
     switch Asource
-        case 'Vel'
-            for k = 1:length(DJF); melpoly = polyshape(melmask.dated(DJF(k)).x,melmask.dated(DJF(k)).y); SA(k) = area(melpoly); clear melpoly; end
-            DJF_SA = nanmedian(SA); clear SA;
-            for k = 1:length(MAM); melpoly = polyshape(melmask.dated(MAM(k)).x,melmask.dated(MAM(k)).y); SA(k) = area(melpoly); clear melpoly; end
-            MAM_SA = nanmedian(SA); clear SA;
-            for k = 1:length(JJA); melpoly = polyshape(melmask.dated(JJA(k)).x,melmask.dated(JJA(k)).y); SA(k) = area(melpoly); clear melpoly; end
-            JJA_SA = nanmedian(SA); clear SA;
-            for k = 1:length(SON); melpoly = polyshape(melmask.dated(SON(k)).x,melmask.dated(SON(k)).y); SA(k) = area(melpoly); clear melpoly; end
-            SON_SA = nanmedian(SA); clear SA;
-        case 'DEM'
-            DJF_SA = nanmedian(nansum(berg_nos(:,DJF(find(melext(p).flag(DJF)>=1))).*berg_A,1))
-            MAM_SA = nanmedian(nansum(berg_nos(:,MAM(find(melext(p).flag(MAM)>=1))).*berg_A,1))
-            JJA_SA = nanmedian(nansum(berg_nos(:,JJA(find(melext(p).flag(JJA)>=1))).*berg_A,1))
-            SON_SA = nanmedian(nansum(berg_nos(:,SON(find(melext(p).flag(SON)>=1))).*berg_A,1))
+        case 'Manual'
+            %area estimates
+            disp('DEM and image-based area estimates');
+            %DEM-based
+            for k = 1:length(melmask.dated); DEMext_flag(k) = melmask.dated(k).DEMext_flag; end
+            DJF_SA(1) = nanmedian(nansum(berg_nos(:,DJF(find(DEMext_flag(DJF)>=1))).*berg_A,1));
+            DJF_SAmad(1) = mad(nansum(berg_nos(:,DJF(find(DEMext_flag(DJF)>=1))).*berg_A,1),1);
+            MAM_SA(1) = nanmedian(nansum(berg_nos(:,MAM(find(DEMext_flag(MAM)>=1))).*berg_A,1));
+            MAM_SAmad(1) = mad(nansum(berg_nos(:,MAM(find(DEMext_flag(MAM)>=1))).*berg_A,1),1);
+            JJA_SA(1) = nanmedian(nansum(berg_nos(:,JJA(find(DEMext_flag(JJA)>=1))).*berg_A,1));
+            JJA_SAmad(1) = mad(nansum(berg_nos(:,JJA(find(DEMext_flag(JJA)>=1))).*berg_A,1),1);
+            SON_SA(1) = nanmedian(nansum(berg_nos(:,SON(find(DEMext_flag(SON)>=1))).*berg_A,1));
+            SON_SAmad(1) = mad(nansum(berg_nos(:,SON(find(DEMext_flag(SON)>=1))).*berg_A,1),1);
+            %image-delineated extents if available
+            if isfield(melmask.dated(k),'IMext_area')
+                for k = 1:length(melmask.dated); SA(k) = melmask.dated(k).IMext_area; SAmad(k) = melmask.dated(k).IMext_areaMAD; end
+                DJF_SA(2) = nanmedian(SA(DJF)); DJF_SAmad(2) = max([SAmad,mad(SA(DJF),1)]); 
+                MAM_SA(2) = nanmedian(SA(MAM)); MAM_SAmad(2) = max([SAmad,mad(SA(MAM),1)]); 
+                JJA_SA(2) = nanmedian(SA(JJA)); JJA_SAmad(2) = max([SAmad,mad(SA(JJA),1)]); 
+                SON_SA(2) = nanmedian(SA(SON)); SON_SAmad(2) = max([SAmad,mad(SA(SON),1)]); 
+                clear SA SAmad:
+            end
+            clear DEMext_flag;
+            %velocity-based
+            DJF_SA(3) = NaN; MAM_SA(3) = NaN; JJA_SA(3) = NaN; SON_SA(3) = NaN; 
+            
+            %calculate the average submerged area from the DEMs & manual
+            %delineations (DEMs may include sea ice, manual delineations
+            %are subjective when the ice coverage is sparse)
+            DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*nanmean(DJF_SA(1:2)));
+            MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*nanmean(MAM_SA(1:2)));
+            JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*nanmean(JJA_SA(1:2)));
+            SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*nanmean(SON_SA(1:2)));
+            
+            %report seasonal surface areas in km^2
+            fprintf('DJF median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(DJF_SA(1:2))./10^6,max(DJF_SAmad(1:2))./10^6);
+            fprintf('MAM median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(MAM_SA(1:2))./10^6,max(MAM_SAmad(1:2))./10^6);
+            fprintf('JJA median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(JJA_SA(1:2))./10^6,max(JJA_SAmad(1:2))./10^6);
+            fprintf('SON median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(SON_SA(1:2))./10^6,max(SON_SAmad(1:2))./10^6);
+            
+        case 'Velocity'
+            %Use velocity time series at points along the fjord (from ITS_LIVE),
+            %time-stamped melange masks, & the uncropped melange shapefile exported in Section 2
+            disp('Estimating melange extent from ITS_LIVE velocity time series...');
+            %if the velocities directory exists, go into it and check for files
+            if exist('velocities') == 7
+                cd('velocities/');
+                vels = dir('*.csv');
+                
+                %specify the path and filename for uncropped fjord outline & dated melange outlines
+                outline_dir = [output_dir,site_abbrevs(p,:),'/']; outline_file = [site_abbrevs(p,:),'-melange-masks.mat'];
+                
+                %loop through the velocity data and add melange areas based on
+                %dates with velocity (indicating coherent melange) to the melmask
+                %structure
+                if ~isempty(vels)
+                    [melmask,velSA,velSAmad] = analyze_melange_velocity_coherence(site_abbrevs(p,:),root_dir,outline_dir,outline_file,melmask);
+                    DJF_SA(3) = velSA(1); MAM_SA(3) = velSA(2); JJA_SA(3) = velSA(3); SON_SA(3) = velSA(4);
+                    DJF_SAmad(3) = velSAmad(1); MAM_SAmad(3) = velSAmad(2); JJA_SAmad(3) = velSAmad(3); SON_SAmad(3) = velSAmad(4);
+                else
+%                     DJF_SA(3) = NaN; MAM_SA(3) = NaN; JJA_SA(3) = NaN; SON_SA(3) = NaN;
+%                     DJF_SAmad(3) = NaN; MAM_SAmad(3) = NaN; JJA_SAmad(3) = NaN; SON_SAmad(3) = NaN;
+                    error('No velocity csv files... grab time series from points using ITS_LIVE portal & add to velocities directory');
+                end
+                clear outline_* vels;
+            else
+                error('No velocities directory and csv files... grab time series from points using ITS_LIVE portal');
+            end
+
+            %calculate the average submerged area from the velocity coherence extents
+            DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA(3));
+            MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA(3));
+            JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*JJA_SA(3));
+            SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*SON_SA(3));
+            
+            %report seasonal surface areas in km^2
+            fprintf('DJF median (MAD) extent = %3.0f (%3.0f) km^2 \n',DJF_SA(3)./10^6,DJF_SAmad(3)./10^6);
+            fprintf('MAM median (MAD) extent = %3.0f (%3.0f) km^2 \n',MAM_SA(3)./10^6,MAM_SAmad(3)./10^6);
+            fprintf('JJA median (MAD) extent = %3.0f (%3.0f) km^2 \n',JJA_SA(3)./10^6,JJA_SAmad(3)./10^6);
+            fprintf('SON median (MAD) extent = %3.0f (%3.0f) km^2 \n',SON_SA(3)./10^6,SON_SAmad(3)./10^6);
+            
+        case 'Both'
+            %area estimates
+            disp('Velocity, DEM, & image-based area estimates');
+            %DEM-based
+            for k = 1:length(melmask.dated); DEMext_flag(k) = melmask.dated(k).DEMext_flag; end
+            DJF_SA(1) = nanmedian(nansum(berg_nos(:,DJF(find(DEMext_flag(DJF)>=1))).*berg_A,1));
+            DJF_SAmad(1) = mad(nansum(berg_nos(:,DJF(find(DEMext_flag(DJF)>=1))).*berg_A,1),1);
+            MAM_SA(1) = nanmedian(nansum(berg_nos(:,MAM(find(DEMext_flag(MAM)>=1))).*berg_A,1));
+            MAM_SAmad(1) = mad(nansum(berg_nos(:,MAM(find(DEMext_flag(MAM)>=1))).*berg_A,1),1);
+            JJA_SA(1) = nanmedian(nansum(berg_nos(:,JJA(find(DEMext_flag(JJA)>=1))).*berg_A,1));
+            JJA_SAmad(1) = mad(nansum(berg_nos(:,JJA(find(DEMext_flag(JJA)>=1))).*berg_A,1),1);
+            SON_SA(1) = nanmedian(nansum(berg_nos(:,SON(find(DEMext_flag(SON)>=1))).*berg_A,1));
+            SON_SAmad(1) = mad(nansum(berg_nos(:,SON(find(DEMext_flag(SON)>=1))).*berg_A,1),1);
+            %image-delineated extents if available
+            if isfield(melmask.dated(k),'IMext_area')
+                for k = 1:length(melmask.dated); SA(k) = melmask.dated(k).IMext_area; SAmad(k) = melmask.dated(k).IMext_areaMAD; end
+                DJF_SA(2) = nanmedian(SA(DJF)); DJF_SAmad(2) = max([SAmad,mad(SA(DJF),1)]); 
+                MAM_SA(2) = nanmedian(SA(MAM)); MAM_SAmad(2) = max([SAmad,mad(SA(MAM),1)]); 
+                JJA_SA(2) = nanmedian(SA(JJA)); JJA_SAmad(2) = max([SAmad,mad(SA(JJA),1)]); 
+                SON_SA(2) = nanmedian(SA(SON)); SON_SAmad(2) = max([SAmad,mad(SA(SON),1)]); 
+                clear SA SAmad:
+            end
+            clear DEMext_flag;
+            %velocity-based
+            disp('Estimating melange extent from ITS_LIVE velocity time series...');
+            %if the velocities directory exists, go into it and check for files
+            if exist('velocities') == 7
+                cd('velocities/');
+                vels = dir('*.csv');
+                
+                %specify the path and filename for uncropped fjord outline & dated melange outlines
+                outline_dir = [output_dir,site_abbrevs(p,:),'/']; outline_file = [site_abbrevs(p,:),'-melange-masks.mat'];
+                
+                %loop through the velocity data and add melange areas based on
+                %dates with velocity (indicating coherent melange) to the melmask
+                %structure
+                if ~isempty(vels)
+                    [melmask,velSA,velSAmad] = analyze_melange_velocity_coherence(site_abbrevs(p,:),root_dir,outline_dir,outline_file,melmask);
+                    DJF_SA(3) = velSA(1); MAM_SA(3) = velSA(2); JJA_SA(3) = velSA(3); SON_SA(3) = velSA(4);
+                    DJF_SAmad(3) = velSAmad(1); MAM_SAmad(3) = velSAmad(2); JJA_SAmad(3) = velSAmad(3); SON_SAmad(3) = velSAmad(4);
+                else
+%                     DJF_SA(3) = NaN; MAM_SA(3) = NaN; JJA_SA(3) = NaN; SON_SA(3) = NaN;
+%                     DJF_SAmad(3) = NaN; MAM_SAmad(3) = NaN; JJA_SAmad(3) = NaN; SON_SAmad(3) = NaN;
+                    error('No velocity csv files... grab time series from points using ITS_LIVE portal & add to velocities directory');
+                end
+                clear outline_* vels;
+            else
+                error('No velocities directory and csv files... grab time series from points using ITS_LIVE portal');
+            end
+            
+            %calculate the average submerged area from the DEMs & manual
+            %delineations (DEMs may include sea ice, manual delineations
+            %are subjective when the ice coverage is sparse)
+            DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*nanmean(DJF_SA(1:2)));
+            MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*nanmean(MAM_SA(1:2)));
+            JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*nanmean(JJA_SA(1:2)));
+            SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*nanmean(SON_SA(1:2)));
+            
+            %report seasonal surface areas in km^2
+            fprintf('DJF median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(DJF_SA(1:2))./10^6,max(DJF_SAmad(1:2))./10^6);
+            fprintf('MAM median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(MAM_SA(1:2))./10^6,max(MAM_SAmad(1:2))./10^6);
+            fprintf('JJA median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(JJA_SA(1:2))./10^6,max(JJA_SAmad(1:2))./10^6);
+            fprintf('SON median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(SON_SA(1:2))./10^6,max(SON_SAmad(1:2))./10^6);
+            
     end
-    %     SA = nanmedian(nansum(berg_nos.*berg_A,1)); %m^2
-    DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA);
-    MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA);
-    JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*JJA_SA);
-    SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*SON_SA);
     
     %multiply the surface area of each draft bin by the estimated best-fit 
     %melt rate for that draft
@@ -306,10 +475,10 @@ for p = 1:size(site_abbrevs,1);
     SON_meltflux = berg_meltrate.*SON_subA;
     
     %report seasonal meltwater fluxes in m^3/s
-    fprintf('DJF typical meltwater flux = %4.0f m^3/s \n',nansum(DJF_meltflux)./86400);
-    fprintf('MAM typical meltwater flux = %4.0f m^3/s \n',nansum(MAM_meltflux)./86400);
-    fprintf('JJA typical meltwater flux = %4.0f m^3/s \n',nansum(JJA_meltflux)./86400);
-    fprintf('SON typical meltwater flux = %4.0f m^3/s \n',nansum(SON_meltflux)./86400);
+    fprintf('DJF typical meltwater flux = %3.0f m^3/s \n',nansum(DJF_meltflux)./86400);
+    fprintf('MAM typical meltwater flux = %3.0f m^3/s \n',nansum(MAM_meltflux)./86400);
+    fprintf('JJA typical meltwater flux = %3.0f m^3/s \n',nansum(JJA_meltflux)./86400);
+    fprintf('SON typical meltwater flux = %3.0f m^3/s \n',nansum(SON_meltflux)./86400);
     
     %export the data to a csv table
     T=table(['DJF';'MAM';'JJA';'SON'],[DJF_SA; MAM_SA; JJA_SA; SON_SA],...
@@ -320,7 +489,7 @@ for p = 1:size(site_abbrevs,1);
     T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
     writetable(T,[root_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-area-meltflux-season-summary.csv']);
     
-    clear dist* berg_* unique_dates refs inds melt* draft* DJF* MAM* JJA* SON* subA dVdt TF pl T;
+    clear dist* berg_* unique_dates refs inds melt* draft* DJF* MAM* JJA* SON* *SA *subA dVdt ft gof opts TF pl T melmask melext;
     disp('... moving on to the next site');
 end
 

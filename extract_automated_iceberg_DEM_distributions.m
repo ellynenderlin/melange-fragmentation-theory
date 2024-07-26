@@ -367,7 +367,7 @@ for j = 1:(max(DEMyrs)-min(DEMyrs)+1)
     %enlarge subplots
     set(gca,'position',[axpos(1) axpos(2) 1.1*axpos(3) 1.1*axpos(4)]);
 end
-saveas(sizedist_fig,[output_dir,'/',site_abbrev,'/',site_abbrev,'_iceberg-size-distribution-timeseries-subplots.png'],'png');
+saveas(sizedist_fig,[output_dir,'/',site_abbrev,'/',site_abbrev,'-iceberg-size-distribution-timeseries-subplots.png'],'png');
 
 end
 
