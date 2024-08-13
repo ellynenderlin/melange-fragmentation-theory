@@ -348,9 +348,13 @@ for p = 1:size(site_abbrevs,1);
             %delineations (DEMs may include sea ice, manual delineations
             %are subjective when the ice coverage is sparse)
             DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*nanmean(DJF_SA(1:2)));
+            DJF_subA_range = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*[(nanmean(DJF_SA(1:2))-max(DJF_SAmad(1:2))), (nanmean(DJF_SA(1:2))+max(DJF_SAmad(1:2)))]);
             MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*nanmean(MAM_SA(1:2)));
+            MAM_subA_range = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*[(nanmean(MAM_SA(1:2))-max(MAM_SAmad(1:2))), (nanmean(MAM_SA(1:2))+max(MAM_SAmad(1:2)))]);
             JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*nanmean(JJA_SA(1:2)));
+            JJA_subA_range = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*[(nanmean(JJA_SA(1:2))-max(JJA_SAmad(1:2))), (nanmean(JJA_SA(1:2))+max(JJA_SAmad(1:2)))]);
             SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*nanmean(SON_SA(1:2)));
+            SON_subA_range = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*[(nanmean(SON_SA(1:2))-max(SON_SAmad(1:2))), (nanmean(SON_SA(1:2))+max(SON_SAmad(1:2)))]);
             
             %report seasonal surface areas in km^2
             fprintf('DJF median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(DJF_SA(1:2))./10^6,max(DJF_SAmad(1:2))./10^6);
@@ -389,9 +393,13 @@ for p = 1:size(site_abbrevs,1);
 
             %calculate the average submerged area from the velocity coherence extents
             DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*DJF_SA(3));
+            DJF_subA_range = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*[(DJF_SA(3)-DJF_SAmad(3)), (DJF_SA(3)+DJF_SAmad(3))]);
             MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*MAM_SA(3));
+            MAM_subA_range = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*[(MAM_SA(3)-MAM_SAmad(3)), (MAM_SA(3)+MAM_SAmad(3))]);
             JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*JJA_SA(3));
+            JJA_subA_range = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*[(JJA_SA(3)-JJA_SAmad(3)), (JJA_SA(3)+JJA_SAmad(3))]);
             SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*SON_SA(3));
+            SON_subA_range = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*[(SON_SA(3)-SON_SAmad(3)), (SON_SA(3)+SON_SAmad(3))]);
             
             %report seasonal surface areas in km^2
             fprintf('DJF median (MAD) extent = %3.0f (%3.0f) km^2 \n',DJF_SA(3)./10^6,DJF_SAmad(3)./10^6);
@@ -453,9 +461,13 @@ for p = 1:size(site_abbrevs,1);
             %delineations (DEMs may include sea ice, manual delineations
             %are subjective when the ice coverage is sparse)
             DJF_subA = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*nanmean(DJF_SA(1:2)));
+            DJF_subA_range = ((2*(900/1026)+1).*berg_A).*(DJF_fracs.*[(nanmean(DJF_SA(1:2))-max(DJF_SAmad(1:2))), (nanmean(DJF_SA(1:2))+max(DJF_SAmad(1:2)))]);
             MAM_subA = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*nanmean(MAM_SA(1:2)));
+            MAM_subA_range = ((2*(900/1026)+1).*berg_A).*(MAM_fracs.*[(nanmean(MAM_SA(1:2))-max(MAM_SAmad(1:2))), (nanmean(MAM_SA(1:2))+max(MAM_SAmad(1:2)))]);
             JJA_subA = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*nanmean(JJA_SA(1:2)));
+            JJA_subA_range = ((2*(900/1026)+1).*berg_A).*(JJA_fracs.*[(nanmean(JJA_SA(1:2))-max(JJA_SAmad(1:2))), (nanmean(JJA_SA(1:2))+max(JJA_SAmad(1:2)))]);
             SON_subA = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*nanmean(SON_SA(1:2)));
+            SON_subA_range = ((2*(900/1026)+1).*berg_A).*(SON_fracs.*[(nanmean(SON_SA(1:2))-max(SON_SAmad(1:2))), (nanmean(SON_SA(1:2))+max(SON_SAmad(1:2)))]);
             
             %report seasonal surface areas in km^2
             fprintf('DJF median (MAD) extent = %3.0f (%3.0f) km^2 \n',nanmean(DJF_SA(1:2))./10^6,max(DJF_SAmad(1:2))./10^6);
@@ -469,16 +481,16 @@ for p = 1:size(site_abbrevs,1);
     %melt rate for that draft
     berg_meltrate = interp1(draft_vector,meltcurve,berg_draft); berg_meltrate(end) = berg_meltrate(end-1);
     %binned meltwater flux (m^3/d)
-    DJF_meltflux = berg_meltrate.*DJF_subA; 
-    MAM_meltflux = berg_meltrate.*MAM_subA;
-    JJA_meltflux = berg_meltrate.*JJA_subA;
-    SON_meltflux = berg_meltrate.*SON_subA;
+    DJF_meltflux = berg_meltrate.*DJF_subA; DJF_meltflux_range = berg_meltrate.*DJF_subA_range; 
+    MAM_meltflux = berg_meltrate.*MAM_subA; MAM_meltflux_range = berg_meltrate.*MAM_subA_range; 
+    JJA_meltflux = berg_meltrate.*JJA_subA; JJA_meltflux_range = berg_meltrate.*JJA_subA_range; 
+    SON_meltflux = berg_meltrate.*SON_subA; SON_meltflux_range = berg_meltrate.*SON_subA_range; 
     
     %report seasonal meltwater fluxes in m^3/s
-    fprintf('DJF typical meltwater flux = %3.0f m^3/s \n',nansum(DJF_meltflux)./86400);
-    fprintf('MAM typical meltwater flux = %3.0f m^3/s \n',nansum(MAM_meltflux)./86400);
-    fprintf('JJA typical meltwater flux = %3.0f m^3/s \n',nansum(JJA_meltflux)./86400);
-    fprintf('SON typical meltwater flux = %3.0f m^3/s \n',nansum(SON_meltflux)./86400);
+    fprintf('DJF typical meltwater flux = %3.0f (%3.0f, %3.0f) m^3/s \n',nansum(DJF_meltflux)./86400,min(nansum(DJF_meltflux_range)./86400),max(nansum(DJF_meltflux_range)./86400));
+    fprintf('MAM typical meltwater flux = %3.0f (%3.0f, %3.0f) m^3/s \n',nansum(MAM_meltflux)./86400,min(nansum(MAM_meltflux_range)./86400),max(nansum(MAM_meltflux_range)./86400));
+    fprintf('JJA typical meltwater flux = %3.0f (%3.0f, %3.0f) m^3/s \n',nansum(JJA_meltflux)./86400,min(nansum(JJA_meltflux_range)./86400),max(nansum(JJA_meltflux_range)./86400));
+    fprintf('SON typical meltwater flux = %3.0f (%3.0f, %3.0f) m^3/s \n',nansum(SON_meltflux)./86400,min(nansum(SON_meltflux_range)./86400),max(nansum(SON_meltflux_range)./86400));
     
     %export the data to a csv table
     T=table(['DJF';'MAM';'JJA';'SON'],[DJF_SA; MAM_SA; JJA_SA; SON_SA],...
