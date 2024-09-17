@@ -233,56 +233,68 @@ for p = 1:length(tifs)
         end
         Y.z = double(I); Y.z(Y.z==-9999) = NaN;
         clear I S;
-
-        %plot a figure
-        figure; set(gcf,'position',[50 50 1600 600]);
-        subplot(1,2,1);
-        imagesc(Y.x,Y.y,Y.z); axis xy equal; colormap(gca,elev_cmap); hold on;
-
-        %crop the DEM
-        if sign(Y.x(1)-Y.x(end)) == -1
-            xmin = find(Y.x<=min(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
-            xmax = find(Y.x>=max(melange_xlims),1,'first'); if isempty(xmax); xmax=length(Y.x); end
+        
+        %check that the melange shapefile overlies at least part of the DEM
+        disp('...checking that the melange mask overlies elevation data');
+        [YXgrid,YYgrid] = meshgrid(Y.x,Y.y);
+        in = inpolygon(YXgrid,YYgrid,melmask.uncropped.x,melmask.uncropped.y);
+        if isempty(in) || sum(in(~isnan(in))) == 0
+            disp('... no elevations, deleting files!')
+            DEM_sourcefiles = dir([root_dir,'/',site_abbrev,'/DEMs/*',DEMtif_dates(p,:),'*.t*']);
+            recycle('on'); for l = 1:length(DEM_sourcefiles); delete([root_dir,'/',site_abbrev,'/DEMs/',DEM_sourcefiles(l).name]); end
+            clear DEM_sourcefiles;
         else
-            xmin = find(Y.x>=max(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
-            xmax = find(Y.x<=min(melange_xlims),1,'first'); if isempty(xmax); xmax=length(Y.x); end
-        end
-        if sign(Y.y(1)-Y.y(end)) == -1
-            ymin = find(Y.y<=min(melange_ylims),1,'last');
-            ymax = find(Y.y>=max(melange_ylims),1,'first');
-        else
-            ymin = find(Y.y>=max(melange_ylims),1,'last');  if isempty(ymin); ymin=1; end
-            ymax = find(Y.y<=min(melange_ylims),1,'first'); if isempty(ymax); ymax=length(Y.y); end
-        end
-        Z.x = single(Y.x(xmin:xmax)); Z.y = single(Y.y(ymin:ymax));
-        Z.z.raw = single(Y.z(ymin:ymax,xmin:xmax)); Z.z.raw(Z.z.raw>3000) = NaN;
-        [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
-        subplot(1,2,2);
-        imagesc(Z.x,Z.y,Z.z.raw); axis xy equal; colormap(gca,elev_cmap); hold on;
-        clear Y;
-
-        %calculate geoid heights to convert from ellipsoidal heights to orthometric elevations
-        disp('calculating the geoid heights for the DEM...')
-        warning off;
-        geoid_spacing = 100;
-        for j = 1:geoid_spacing:size(ZXgrid,1)
-            for i = 1:geoid_spacing:size(ZXgrid,2)
-                [Zlon(ceil(j/geoid_spacing),ceil(i/geoid_spacing)),Zlat(ceil(j/geoid_spacing),ceil(i/geoid_spacing))] = ps2wgs(ZXgrid(j,i),ZYgrid(j,i));
-                G(ceil(j/geoid_spacing),ceil(i/geoid_spacing)) = geoidheight(Zlat(ceil(j/geoid_spacing),ceil(i/geoid_spacing)),Zlon(ceil(j/geoid_spacing),ceil(i/geoid_spacing)));
+            %plot a figure
+            figure; set(gcf,'position',[50 50 1600 600]);
+            subplot(1,2,1);
+            imagesc(Y.x,Y.y,Y.z); axis xy equal; colormap(gca,elev_cmap); hold on;
+            
+            %crop the DEM
+            if sign(Y.x(1)-Y.x(end)) == -1
+                xmin = find(Y.x<=min(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
+                xmax = find(Y.x>=max(melange_xlims),1,'first'); if isempty(xmax); xmax=length(Y.x); end
+            else
+                xmin = find(Y.x>=max(melange_xlims),1,'last'); if isempty(xmin); xmin=1; end
+                xmax = find(Y.x<=min(melange_xlims),1,'first'); if isempty(xmax); xmax=length(Y.x); end
             end
+            if sign(Y.y(1)-Y.y(end)) == -1
+                ymax = find(Y.y<=min(melange_ylims),1,'last');
+                ymin = find(Y.y>=max(melange_ylims),1,'first');
+            else
+                ymin = find(Y.y>=max(melange_ylims),1,'last');  if isempty(ymin); ymin=1; end
+                ymax = find(Y.y<=min(melange_ylims),1,'first'); if isempty(ymax); ymax=length(Y.y); end
+            end
+            Z.x = single(Y.x(xmin:xmax)); Z.y = single(Y.y(ymin:ymax));
+            Z.z.raw = single(Y.z(ymin:ymax,xmin:xmax)); Z.z.raw(Z.z.raw>3000) = NaN;
+            [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
+            subplot(1,2,2);
+            imagesc(Z.x,Z.y,Z.z.raw); axis xy equal; colormap(gca,elev_cmap); hold on;
+            clear Y;
+            
+            %calculate geoid heights to convert from ellipsoidal heights to orthometric elevations
+            disp('calculating the geoid heights for the DEM...')
+            warning off;
+            geoid_spacing = 100;
+            for j = 1:geoid_spacing:size(ZXgrid,1)
+                for i = 1:geoid_spacing:size(ZXgrid,2)
+                    [Zlon(ceil(j/geoid_spacing),ceil(i/geoid_spacing)),Zlat(ceil(j/geoid_spacing),ceil(i/geoid_spacing))] = ps2wgs(ZXgrid(j,i),ZYgrid(j,i));
+                    G(ceil(j/geoid_spacing),ceil(i/geoid_spacing)) = geoidheight(Zlat(ceil(j/geoid_spacing),ceil(i/geoid_spacing)),Zlon(ceil(j/geoid_spacing),ceil(i/geoid_spacing)));
+                end
+            end
+            Z.z.geoid = single(interp2(ZXgrid(1:geoid_spacing:size(ZXgrid,1),1:geoid_spacing:size(ZXgrid,2)),ZYgrid(1:geoid_spacing:size(ZXgrid,1),1:geoid_spacing:size(ZXgrid,2)),G,ZXgrid,ZYgrid,'linear'));
+            disp('converting from ellipsoidal heights to orthometric elevations...');
+            Z.z.ortho = Z.z.raw - Z.z.geoid; Z.z = rmfield(Z.z,'raw');
+            clear Zlat Zlon G;
+            
+            %save the file if it overlaps the melange at the terminus
+            close(gcf); drawnow;
+            cd([root_dir,'/',site_abbrev,'/DEMs/']);
+            save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
+            disp(['Saved DEM geotiff from ',DEMtif_dates(p,:),' to mat-file']);
+            clear Z melpoly* outline_* out_* in Z*grid;
+            close all; drawnow;
         end
-        Z.z.geoid = single(interp2(ZXgrid(1:geoid_spacing:size(ZXgrid,1),1:geoid_spacing:size(ZXgrid,2)),ZYgrid(1:geoid_spacing:size(ZXgrid,1),1:geoid_spacing:size(ZXgrid,2)),G,ZXgrid,ZYgrid,'linear'));
-        disp('converting from ellipsoidal heights to orthometric elevations...');
-        Z.z.ortho = Z.z.raw - Z.z.geoid; Z.z = rmfield(Z.z,'raw');
-        clear Zlat Zlon G;
-
-        %save the file if it overlaps the melange at the terminus
-        close(gcf); drawnow;
-        cd([root_dir,'/',site_abbrev,'/DEMs/']);
-        save(DEM_name,'Z','-v7.3'); %raw & intermediate elevation data
-        disp(['Saved DEM geotiff from ',DEMtif_dates(p,:),' to mat-file']);
-        clear Z melpoly* outline_* out_* in Z*grid;
-        close all; drawnow;
+        clear Y*grid in;
     else
         disp('... already converted to correct format');
     end

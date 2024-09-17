@@ -1,10 +1,10 @@
 % This script runs all the functions written to perform the analysis of
 % melange iceberg distributions for outlet glaciers in Greenland.
 
-% Author:   Jukes Liu
+% Author:   Ellyn Enderlin & Jukes Liu
 %           Department of Geosciences
 %           Boise State University
-%           Date: 04/19/2021
+%           Date: 13/09/2024
 
 clearvars; close all;
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
@@ -13,7 +13,7 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/melange-fragmentation-code');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'KOG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_dir = basepath; output_dir = basepath;
 cd([root_dir,site_abbrev]);

@@ -16,16 +16,16 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_dir = basepath; output_dir = basepath;
 cd(root_dir);
-EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/general-code/EPSG3413.prj'; %generic EPSG3413 projection file (available in group GitHub general-code)
+EPSG_file = '/Users/ellynenderlin/Research/miscellaneous/EPSG3413.prj'; %generic EPSG3413 projection file (available in group GitHub general-code)
 
 %create a month naming matrix to convert 3-letter months to numeric months
 month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov';'Dec'};
 years = 2011:1:2020; start_yr = years(1); end_yr = years(end);
 
 %2-letter region flagging (based on alphabetical order of site folders)
-site_abbrevs = ['ASG'];
-site_names = [{'Alison'}];
-region_flag = ['NW'];
+site_abbrevs = ['KBG'];
+site_names = [{'Koge Bugt'}];
+region_flag = ['SE'];
 site_geog_order = [1]; %geographic order, counterclockwise from NW
 % site_abbrevs = ['AG';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
 % site_names = [{'Alison'},{'Helheim'},{'Ullip Sermia'},{'Salliarutsip Sermia'},{'Illulip Sermia'},...
