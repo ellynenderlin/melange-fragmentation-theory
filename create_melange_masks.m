@@ -506,7 +506,7 @@ for p = 1:length(melange_mats)
         clear spurious* anom* blunders;
         
         %zoom in on the DEM
-        set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+        set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
         drawnow;
         
         %check that the DEM covers a few kilometers of the melange, otherwise
@@ -550,7 +550,7 @@ for p = 1:length(melange_mats)
                             blunders = ~anom_zmask;
                             spurious_vals = spurious_vals + blunders;
                             q = q+1;
-                            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                            set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
                             drawnow;
                         case '2) No!'
                             spurious_vals(spurious_vals>0) = 1;
@@ -592,7 +592,7 @@ for p = 1:length(melange_mats)
                             blunders = ~anom_zmask;
                             spurious_vals = spurious_vals + blunders;
                             q = q+1;
-                            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                            set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
                             drawnow;
                         case '2) No!'
                             spurious_vals(spurious_vals>0) = 1;
@@ -606,9 +606,22 @@ for p = 1:length(melange_mats)
                 
                 %readjust elevation color scaling
                 colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
-                set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
                 
                 %trace the terminus, making sure to intersect the edges of the melange mask
+                termzoom_question = questdlg('Zoom in on the terminus?',...
+                            'Terminus Zoom Option','1) Yes!','2) No!','1) Yes!');
+                figure(figure1);
+                switch termzoom_question
+                    case '1) Yes!'
+                        disp('Click on UL & LR corners of a box bounding the terminus to zoom in');
+                        [a] = ginput(2);
+                        set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                        drawnow; clear a;
+                    case '2) No!'
+                        %do nothing!
+                end
+                clear termzoom_question;
                 disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
                 disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
                 [term_x,term_y,~] = improfile;
@@ -646,7 +659,7 @@ for p = 1:length(melange_mats)
         
     else %if the terminus was previously traced, check it to make sure it looks OK
         %zoom in on the DEM
-        set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+        set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
         drawnow;
         
         %confirm it looks good (covers the melange, doesn't look like cloud splotches in elevation
@@ -686,7 +699,7 @@ for p = 1:length(melange_mats)
                             blunders = ~anom_zmask;
                             spurious_vals = spurious_vals + blunders;
                             q = q+1;
-                            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                            set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
                             drawnow;
                         case '2) No!'
                             spurious_vals(spurious_vals>0) = 1;
@@ -728,7 +741,7 @@ for p = 1:length(melange_mats)
                             blunders = ~anom_zmask;
                             spurious_vals = spurious_vals + blunders;
                             q = q+1;
-                            set(gca,'xlim',[max([min(melmask.uncropped.x); min(Z.x')]) min([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[max([min(melmask.uncropped.y); min(Z.y')]) min([max(melmask.uncropped.y); max(Z.y')])]);
+                            set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
                             drawnow;
                         case '2) No!'
                             spurious_vals(spurious_vals>0) = 1;
@@ -789,11 +802,24 @@ for p = 1:length(melange_mats)
                 end
                 if retrace_flag == 1 || term_flag == 1 %retrace if manually or automatically flagged as bad
                     %trace the terminus, making sure to intersect the edges of the melange mask
+                    termzoom_question = questdlg('Zoom in on the terminus?',...
+                        'Terminus Zoom Option','1) Yes!','2) No!','1) Yes!');
+                    figure(figure1);
+                    switch termzoom_question
+                        case '1) Yes!'
+                            disp('Click on UL & LR corners of a box bounding the terminus to zoom in');
+                            [a] = ginput(2);
+                            set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                            drawnow; clear a;
+                        case '2) No!'
+                            %do nothing!
+                    end
+                    clear termzoom_question;
                     disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
                     disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
                     Z.term.x = []; Z.term.y = [];
-                    %identify the melange mask index you should use to save the data
                     
+                    %identify the melange mask index you should use to save the data
                     maskref = find(contains(string(melmask_dates),melangemat_dates(p,:))==1);
                     if isempty(maskref)
                         if contains(melmask.dated(1).datestring,'start')
@@ -803,7 +829,6 @@ for p = 1:length(melange_mats)
                             melmask.dated(maskref).datestring = melangemat_dates(p,:);
                         end
                     end
-                    
                     melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
                     [term_x,term_y,~] = improfile;
                     [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
@@ -1021,7 +1046,7 @@ for p = 1:length(melange_mats)
             imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal;
             colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar; hold on;
             plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-            set(gca,'xlim',[max(min(melange_xlims),min(Z.x)) min(max(melange_xlims),max(Z.x))],'ylim',[max(min(melange_ylims),min(Z.y)) min(max(melange_ylims),max(Z.y))]);
+            set(gca,'xlim',[nanmean(min(melange_xlims),min(Z.x)) nanmean(max(melange_xlims),max(Z.x))],'ylim',[nanmean(min(melange_ylims),min(Z.y)) namean(max(melange_ylims),max(Z.y))]);
             drawnow;
             disp('retrace the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
             Z.term.x = []; Z.term.y = [];

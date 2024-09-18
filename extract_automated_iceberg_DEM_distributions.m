@@ -59,8 +59,12 @@ for i = 1:length(mats)
     end
 end
 filled_DEMs = dir([site_abbrev,'*melange-DEMfilled.mat']);
-for i = 1:length(filled_DEMs)
-    filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
+if isempty(filled_DEMs)
+    filledDEM_dates = [];
+else
+    for i = 1:length(filled_DEMs)
+        filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
+    end
 end
 
 %identify existing melange iceberg distribution datasets
@@ -158,8 +162,8 @@ for p = 1:length(mats)
 %             end
 %         end
         
-        %check if icebergs have already been automatically delineated
-        if isempty(strmatch(string(DEMmat_dates(p,:)),string(filledDEM_dates))) == 1            
+        %create a melange map to double-check data
+        if isempty(filledDEM_dates) || isempty(strmatch(string(DEMmat_dates(p,:)),string(filledDEM_dates))) == 1            
 
             %extract melange elevations
             melange = M.DEM.z_filled;
@@ -192,21 +196,31 @@ for p = 1:length(mats)
 %             delete([site_abbrev,'-',DEMmat_dates(p,:),'_melange-distribution.mat'])
             
           %clear a bunch of variables & close all figures
-            clear Z *_mask G M ib term* x_* y_* xi yi Zl* zjord* E...
+            clear Z *_mask G ib term* x_* y_* xi yi Zl* zjord* E...
                 a ans bergH bergL bergW berg_W berg_length cmax fig*...
                 fjord_nans fjord_filled in on infill_iters max_dim mel_*lims save_*...
                 spurious_vals stats sub* z_adjusted z_mad z_median zfjord_filled...
                 whalf berg_count termbuff_* m *grid *_sub zmin*;
-            close all;
-            disp('Advancing');
+%             close all;
+            
+            %update list of filled DEM dates
+            filled_DEMs = dir([site_abbrev,'*melange-DEMfilled.mat']);
+            for i = 1:length(filled_DEMs)
+                filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
+            end
+            disp('Advancing...');
+        else
+            disp('Already checked the filled melange map. Not plotting again. Advancing...');
         end
         
     else
         disp('Iceberg data already extracted');
     end
+    clear M;
 end
 disp("Done creating hole-less melange DEMs");
 
+close all;
 %% DELETE DEMS WITH HOLES TO REDUCE SPACE USE
 cd([root_dir,'/',site_abbrev,'/DEMs/']);
 for p = 1:length(mats)
@@ -233,90 +247,90 @@ for p = 1:length(DEM_mats)
     load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
     disp('Data loaded.');
         
-%     %extract the distribution of elevations from the melange
-%     melange = M.DEM.z_filled;
-%     melange(isnan(M.DEM.z_filled)) = 0;
-%     melange(melange<0) = 0; melange(melange>Hmax/(rho_i/(rho_sw-rho_i))) = NaN;
-%     melange(M.mask.DEM==0) = NaN;
-%     figureA = figure; set(gcf,'position',[850 100 500 350]); title([site_abbrev,' ',DEM_dates(p,:),' iceberg size distribution']);
-%     h = histogram(melange(~isnan(melange)),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
-%     bin_zno = double(h.Values); bin_zo = double((h.BinEdges(1:end-1) + h.BinEdges(2:end))/2);
-%     
-%     %convert to iceberg size distributions
-%     berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL.*bin_zo; Asurfs = (1/4)*pi*berg_W.^2; %calculate corresponding surface areas (m^2)
-%     Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.best.autoALL^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1); %calculate the bin widths in surface area units (m^2)
-%     berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
-%     pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
-% %     max_bin = find(berg_nos>0.1,1,'last'); %identify fractions of bergs <0.1berg
-% %     pixel_nos(max_bin+1) = sum(pixel_nos(max_bin+1:end)); pixel_nos(max_bin+2:end) = NaN; %merge fractions of bergs <0.1berg
-%     berg_nos = pixel_nos./berg_pixels;
-%     m.melange.Asurfs = Asurfs; m.melange.bergs = berg_nos; m.melange.binwidth = dA; %add to iceberg size dataset
-%     dlmwrite([output_dir,'/',site_abbrev,'/',site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
-%     clear berg_* *_nos Asurf* dA;
-%     
-%     %size distribution using the minimum aspect ratio: yields a smaller range of surface areas for icebergs
-%     berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(1).*bin_zo; Asurfs = (1/4)*pi*berg_W.^2; 
-%     Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.range.autoALL(1)^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1);
-%     berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(1)))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
-%     pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
-%     berg_nos = pixel_nos./berg_pixels;
-%     m.melange.Asurfs_range(1,:) = Asurfs; m.melange.bergs_range(1,:) = berg_nos; m.melange.binwidth_range(1,:) = dA; %add to iceberg size dataset
-%     clear berg_* *_nos Asurf* dA;
-%     %size distribution using the maximum aspect ratio: yields a larger range of surface areas for icebergs
-%     berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(2).*bin_zo; Asurfs = (1/4)*pi*berg_W.^2;
-%     Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.range.autoALL(2)^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1);
-%     berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(2)))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
-%     pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
-%     berg_nos = pixel_nos./berg_pixels;
-%     m.melange.Asurfs_range(2,:) = Asurfs; m.melange.bergs_range(2,:) = berg_nos; m.melange.binwidth_range(2,:) = dA; %add to iceberg size dataset
-%     clear berg_* *_nos Asurf* dA h; close(figureA); drawnow;
-% %     bergs = m.melange.bergs; % ADDED BY JUKES - CONFIRM THIS IS OKAY  
-% %     outputberg_name = [site_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];        
-% %     if exist('m','var')
-% %         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''m'',''-v7.3'')']; %iceberg size info
-% %         disp('saving');
-% %     else
-% %         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''-v7.3'')']; %iceberg size info
-% %         disp('saving');
-% %     end
-%     save([root_dir,'/',site_abbrev,'/DEMs/',outputberg_name],'M','m','-v7.3'); %iceberg size info
-%     
-%     %plot a 3-panel figure with (a) the melange DEM, 
-%     %(b) melange elevation histogram, and (c) the
-%     %full-melange iceberg size distribution in log-log space
-%     figure; set(gcf,'position',[1000 500 500 1000]);
-%     sub1 = subplot(3,1,1); sub2 = subplot(3,1,2); sub3 = subplot(3,1,3);
-%     subplot(sub1);
-%     imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
-%     melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
-%     set(gca,'clim',[0 16],'fontsize',16); cbar = colorbar('fontsize',16); cbar.Label.String = 'elevation (m a.s.l.)';
-%     set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); 
-%     xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-%     set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-%     xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-%     text(max(melmask.uncropped.x)-0.95*(max(melmask.uncropped.x)-min(melmask.uncropped.x)),min(melmask.uncropped.y)+0.925*(max(melmask.uncropped.y)-min(melmask.uncropped.y)),'a) melange DEM','fontsize',16); drawnow;
-%     drawnow;
-%     subplot(sub2);
-%     h = histogram(melange(~isnan(melange)),min(melange(~isnan(melange))):1:max(melange(~isnan(melange)))); hold on;
-%     xlabel('Melange elevation (m a.s.l.)','fontsize',16); ylabel('Pixel count','fontsize',16);
-%     set(gca,'fontsize',16,'YScale','log'); h.FaceColor = 'b'; h.FaceAlpha = 1; h.LineWidth = 1;
-%     xlims = get(sub2,'xlim'); ylims = get(sub2,'ylim');
-%     text(0.025*max(xlims),min(ylims)+0.28*(max(ylims)-min(ylims)),'b) melange elevation distribution','fontsize',16); drawnow;
-%     clear h; drawnow;
-%     subplot(sub3);
-%     fill([m.melange.Asurfs_range(1,m.melange.bergs_range(1,:)~=0) fliplr(m.melange.Asurfs_range(2,m.melange.bergs_range(2,:)~=0))],...
-%         [m.melange.bergs_range(1,m.melange.bergs_range(1,:)~=0) fliplr(m.melange.bergs_range(2,m.melange.bergs_range(2,:)~=0))],'b','EdgeColor','none','FaceAlpha',0.5); hold on;
-%     plot(m.melange.Asurfs(~isnan(m.melange.bergs)),m.melange.bergs(~isnan(m.melange.bergs)),'xk'); hold on;
-% %     leg = legend('observed distribution','fontsize',18);
-%     set(gca,'fontsize',16,'XScale','log','YScale','log',...
-%         'ytick',[10^-6,10^-4,0.01,1,100,10000,1000000],'yticklabel',[10^-6,10^-4,0.01,1,100,10000,1000000],...
-%         'xtick',[100,1000,10000,100000,1000000],'xticklabel',[100,1000,10000,100000,1000000]); %grid on; 
-%     xlims = get(sub3,'xlim'); ylims = get(sub3,'ylim');
-%     xlabel('Iceberg surface area (m^2)','fontsize',16); ylabel('Iceberg count','fontsize',16);
-%     text(min(xlims)+0.00003*(max(xlims)-min(xlims)),min(ylims)+0.28*(max(ylims)-min(ylims)),'c) iceberg size distribution','fontsize',16); drawnow; clear xlims ylims;
-%     drawnow;
-%     saveas(gcf,[output_dir,'/',site_abbrev,'/',site_abbrev,'-',num2str(DEM_dates(p,:)),'_melange-distribution_subplots.png'],'png');
-%     disp('Saved subplots & textfile of size distributions ');
+    %extract the distribution of elevations from the melange
+    melange = M.DEM.z_filled;
+    melange(isnan(M.DEM.z_filled)) = 0;
+    melange(melange<0) = 0; melange(melange>Hmax/(rho_i/(rho_sw-rho_i))) = NaN;
+    melange(M.mask.DEM==0) = NaN;
+    figureA = figure; set(gcf,'position',[850 100 500 350]); title([site_abbrev,' ',DEM_dates(p,:),' iceberg size distribution']);
+    h = histogram(melange(~isnan(melange)),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
+    bin_zno = double(h.Values); bin_zo = double((h.BinEdges(1:end-1) + h.BinEdges(2:end))/2);
+    
+    %convert to iceberg size distributions
+    berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL.*bin_zo; Asurfs = (1/4)*pi*berg_W.^2; %calculate corresponding surface areas (m^2)
+    Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.best.autoALL^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1); %calculate the bin widths in surface area units (m^2)
+    berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
+    pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
+%     max_bin = find(berg_nos>0.1,1,'last'); %identify fractions of bergs <0.1berg
+%     pixel_nos(max_bin+1) = sum(pixel_nos(max_bin+1:end)); pixel_nos(max_bin+2:end) = NaN; %merge fractions of bergs <0.1berg
+    berg_nos = pixel_nos./berg_pixels;
+    m.melange.Asurfs = Asurfs; m.melange.bergs = berg_nos; m.melange.binwidth = dA; %add to iceberg size dataset
+    dlmwrite([output_dir,'/',site_abbrev,'/',site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
+    clear berg_* *_nos Asurf* dA;
+    
+    %size distribution using the minimum aspect ratio: yields a smaller range of surface areas for icebergs
+    berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(1).*bin_zo; Asurfs = (1/4)*pi*berg_W.^2; 
+    Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.range.autoALL(1)^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1);
+    berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(1)))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
+    pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
+    berg_nos = pixel_nos./berg_pixels;
+    m.melange.Asurfs_range(1,:) = Asurfs; m.melange.bergs_range(1,:) = berg_nos; m.melange.binwidth_range(1,:) = dA; %add to iceberg size dataset
+    clear berg_* *_nos Asurf* dA;
+    %size distribution using the maximum aspect ratio: yields a larger range of surface areas for icebergs
+    berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(2).*bin_zo; Asurfs = (1/4)*pi*berg_W.^2;
+    Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.range.autoALL(2)^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1);
+    berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(2)))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
+    pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
+    berg_nos = pixel_nos./berg_pixels;
+    m.melange.Asurfs_range(2,:) = Asurfs; m.melange.bergs_range(2,:) = berg_nos; m.melange.binwidth_range(2,:) = dA; %add to iceberg size dataset
+    clear berg_* *_nos Asurf* dA h; close(figureA); drawnow;
+%     bergs = m.melange.bergs; % ADDED BY JUKES - CONFIRM THIS IS OKAY  
+%     outputberg_name = [site_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];        
+%     if exist('m','var')
+%         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''m'',''-v7.3'')']; %iceberg size info
+%         disp('saving');
+%     else
+%         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''-v7.3'')']; %iceberg size info
+%         disp('saving');
+%     end
+    save([root_dir,'/',site_abbrev,'/DEMs/',outputberg_name],'M','m','-v7.3'); %iceberg size info
+    
+    %plot a 3-panel figure with (a) the melange DEM, 
+    %(b) melange elevation histogram, and (c) the
+    %full-melange iceberg size distribution in log-log space
+    figure; set(gcf,'position',[1000 500 500 1000]);
+    sub1 = subplot(3,1,1); sub2 = subplot(3,1,2); sub3 = subplot(3,1,3);
+    subplot(sub1);
+    imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
+    melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+    set(gca,'clim',[0 16],'fontsize',16); cbar = colorbar('fontsize',16); cbar.Label.String = 'elevation (m a.s.l.)';
+    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); 
+    xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+    text(max(melmask.uncropped.x)-0.95*(max(melmask.uncropped.x)-min(melmask.uncropped.x)),min(melmask.uncropped.y)+0.925*(max(melmask.uncropped.y)-min(melmask.uncropped.y)),'a) melange DEM','fontsize',16); drawnow;
+    drawnow;
+    subplot(sub2);
+    h = histogram(melange(~isnan(melange)),min(melange(~isnan(melange))):1:max(melange(~isnan(melange)))); hold on;
+    xlabel('Melange elevation (m a.s.l.)','fontsize',16); ylabel('Pixel count','fontsize',16);
+    set(gca,'fontsize',16,'YScale','log'); h.FaceColor = 'b'; h.FaceAlpha = 1; h.LineWidth = 1;
+    xlims = get(sub2,'xlim'); ylims = get(sub2,'ylim');
+    text(0.025*max(xlims),min(ylims)+0.28*(max(ylims)-min(ylims)),'b) melange elevation distribution','fontsize',16); drawnow;
+    clear h; drawnow;
+    subplot(sub3);
+    fill([m.melange.Asurfs_range(1,m.melange.bergs_range(1,:)~=0) fliplr(m.melange.Asurfs_range(2,m.melange.bergs_range(2,:)~=0))],...
+        [m.melange.bergs_range(1,m.melange.bergs_range(1,:)~=0) fliplr(m.melange.bergs_range(2,m.melange.bergs_range(2,:)~=0))],'b','EdgeColor','none','FaceAlpha',0.5); hold on;
+    plot(m.melange.Asurfs(~isnan(m.melange.bergs)),m.melange.bergs(~isnan(m.melange.bergs)),'xk'); hold on;
+%     leg = legend('observed distribution','fontsize',18);
+    set(gca,'fontsize',16,'XScale','log','YScale','log',...
+        'ytick',[10^-6,10^-4,0.01,1,100,10000,1000000],'yticklabel',[10^-6,10^-4,0.01,1,100,10000,1000000],...
+        'xtick',[100,1000,10000,100000,1000000],'xticklabel',[100,1000,10000,100000,1000000]); %grid on; 
+    xlims = get(sub3,'xlim'); ylims = get(sub3,'ylim');
+    xlabel('Iceberg surface area (m^2)','fontsize',16); ylabel('Iceberg count','fontsize',16);
+    text(min(xlims)+0.00003*(max(xlims)-min(xlims)),min(ylims)+0.28*(max(ylims)-min(ylims)),'c) iceberg size distribution','fontsize',16); drawnow; clear xlims ylims;
+    drawnow;
+    saveas(gcf,[output_dir,'/',site_abbrev,'/',site_abbrev,'-',num2str(DEM_dates(p,:)),'_melange-distribution_subplots.png'],'png');
+    disp('Saved subplots & textfile of size distributions ');
     
     %compile info for all dates
     ib(p).Asurf = m.melange.Asurfs; ib(p).bergs = m.melange.bergs; 

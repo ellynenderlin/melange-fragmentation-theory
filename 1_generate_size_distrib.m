@@ -10,7 +10,7 @@ clearvars; close all;
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
-addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/melange-fragmentation-code');
+addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/DEMsizes_matlab-python/');
 
 % set paths and glacier to analyze manually:
 site_abbrev = 'KOG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
