@@ -5,7 +5,7 @@
 %% Section 0: Initialize (run every time)
 clearvars; close all;
 %add path for repo
-addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/DEMsizes_matlab-python');
+addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/iceberg-calving/melange-fragmentation-code');
 %add paths for any supporting codes
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
@@ -23,8 +23,8 @@ month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov'
 years = 2011:1:2020; start_yr = years(1); end_yr = years(end);
 
 %2-letter region flagging (based on alphabetical order of site folders)
-site_abbrevs = ['KBG'];
-site_names = [{'Koge Bugt'}];
+site_abbrevs = ['ASG'];
+site_names = [{'Alison'}];
 region_flag = ['SE'];
 site_geog_order = [1]; %geographic order, counterclockwise from NW
 % site_abbrevs = ['AG';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
@@ -170,12 +170,12 @@ for p = 1:size(site_abbrevs,1);
         save([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-delineations.mat'],'melext','-v7.3');
         
         %crop the time-stamped melange outlines using the delineations
-%         figure;
+        % figure;
         for k = 1:length(melmask.dated);
             %idenfity the delineation with the closest time stamp
             DEM_decidate(k,:) = convert_to_decimaldate(melmask.dated(k).datestring);
             date_diff = DEM_decidate(k,:) - ext_decidate;
-            if min(abs(date_diff)) > 1; %if there is more than a year between the most recent terminus delineation & DEM
+            if min(abs(date_diff)) > 1; %if there is more than a year between the most recent melange delineation & DEM
                 clear date_diff; date_diff = (DEM_decidate(k,:)-floor(DEM_decidate(k,:))) - (ext_decidate-floor(ext_decidate));
                 [sorted_dates,inds] = sort(abs(date_diff));
                 date_ref = inds(1:2); %select the two dates that are seasonally closest
@@ -184,26 +184,27 @@ for p = 1:size(site_abbrevs,1);
                 date_ref = find(abs(date_diff)==min(abs(date_diff)),1,'first');
             end
             
-            %calculate the area of each polygon that approximates the 
-            for j = 1:length(date_ref)
-                out_intercept = []; out_interceptx = []; out_intercepty = [];
-                for i = 1:length(melmask.dated(k).x)-1
-                    [xi,yi] = polyxpoly(melmask.dated(k).x(i:i+1),melmask.dated(k).y(i:i+1),melext(date_ref(j)).x,melext(date_ref(j)).y); %find the intersections of the terminus trace with the melange outline
-                    if ~isempty(xi)
-                        out_intercept = [out_intercept i]; out_interceptx = [out_interceptx xi]; out_intercepty = [out_intercepty yi];
-                    end
-                    clear xi yi;
+            %calculate the area of melange (uses the closest date before
+            %the DEM if there are dates before and after with the same time
+            %separation)
+            out_intercept = []; out_interceptx = []; out_intercepty = [];
+            for i = 1:length(melmask.dated(k).x)-1
+                [xi,yi] = polyxpoly(melmask.dated(k).x(i:i+1),melmask.dated(k).y(i:i+1),melext(min(date_ref)).x,melext(min(date_ref)).y); %find the intersections of the terminus trace with the melange outline
+                if ~isempty(xi)
+                    out_intercept = [out_intercept i]; out_interceptx = [out_interceptx xi]; out_intercepty = [out_intercepty yi];
                 end
-                
-                %create a new melange polygon cropped on both ends
-                x_mel = [out_interceptx(find(out_intercept==min(out_intercept))); melmask.dated(k).x(min(out_intercept)+1:max(out_intercept)-1); out_interceptx(find(out_intercept==max(out_intercept)));out_interceptx(find(out_intercept==min(out_intercept)))];
-                y_mel = [out_intercepty(find(out_intercept==min(out_intercept))); melmask.dated(k).y(min(out_intercept)+1:max(out_intercept)-1); out_intercepty(find(out_intercept==max(out_intercept)));out_intercepty(find(out_intercept==min(out_intercept)))];
-                melpoly = polyshape(x_mel,y_mel); SA(j) = area(melpoly);
-                clear x_mel y_mel melpoly;
+                clear xi yi;
             end
+            
+            %create a new melange polygon cropped on both ends
+            x_mel = [out_interceptx(find(out_intercept==min(out_intercept))); melmask.dated(k).x(min(out_intercept)+1:max(out_intercept)-1); out_interceptx(find(out_intercept==max(out_intercept)));out_interceptx(find(out_intercept==min(out_intercept)))];
+            y_mel = [out_intercepty(find(out_intercept==min(out_intercept))); melmask.dated(k).y(min(out_intercept)+1:max(out_intercept)-1); out_intercepty(find(out_intercept==max(out_intercept)));out_intercepty(find(out_intercept==min(out_intercept)))];
+            melpoly = polyshape(x_mel,y_mel); SA = area(melpoly);
+            clear x_mel y_mel melpoly;
             clear date_diff date_ref;
-            melmask.dated(k).IMext_area = median(SA); melmask.dated(k).IMext_areaMAD = mad(SA,1); clear SA;
-%             plot(DEM_decidate(k,:),melmask.dated(k).IMext_area,'xk'); hold on; drawnow;
+            melmask.dated(k).IMext_area = median(SA); %melmask.dated(k).IMext_areaMAD = mad(SA,1);
+            clear SA;
+            % plot(DEM_decidate(k,:),melmask.dated(k).IMext_area,'xk'); hold on; drawnow;
             clear *intercept*;
         end
         save([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-masks.mat'],'melmask','-v7.3');
