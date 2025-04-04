@@ -609,7 +609,7 @@ for p = 1:length(melange_mats)
                 set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
                 
                 %trace the terminus, making sure to intersect the edges of the melange mask
-                termzoom_question = questdlg('Zoom in on the terminus?',...
+                termzoom_question = questdlg('Zoom in to better trace just seaward of the terminus?',...
                             'Terminus Zoom Option','1) Yes!','2) No!','1) Yes!');
                 figure(figure1);
                 switch termzoom_question
@@ -802,7 +802,7 @@ for p = 1:length(melange_mats)
                 end
                 if retrace_flag == 1 || term_flag == 1 %retrace if manually or automatically flagged as bad
                     %trace the terminus, making sure to intersect the edges of the melange mask
-                    termzoom_question = questdlg('Zoom in on the terminus?',...
+                    termzoom_question = questdlg('Zoom in to better trace just seaward of the terminus?',...
                         'Terminus Zoom Option','1) Yes!','2) No!','1) Yes!');
                     figure(figure1);
                     switch termzoom_question
@@ -895,7 +895,7 @@ disp('Applying mask to each DEM as necessary... this takes a LONG LONG time (>1 
 cd([root_dir,'/',site_abbrev,'/DEMs/']);
 
 %identify the melange DEMs (some DEMs mave have been removed in the last step due to poor coverage)
-clear melangemat_dates;
+clear melange_mats melangemat_dates;
 melange_mats = dir([site_abbrev,'*_melange-DEM.mat']);
 for i = 1:length(melange_mats)
     melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs);
@@ -905,7 +905,7 @@ clear melmask_dates;
 for j = 1:length(melmask.dated); melmask_dates(j,:) = melmask.dated(j).datestring; end
 
 % %find new DEM geotiffs (may have moved if you ran the code before and it froze part-way)
-% if isfolder([root_dir,'/',site_abbrev,'/DEMs/']) %if part of the code was run once & DEMs have been moved
+if isfolder([root_dir,'/',site_abbrev,'/DEMs/']) %if you followed instructions & have a DEMs folder
     tifs = dir('*_dem.tif');
     for i = 1:length(tifs)
         if contains(tifs(i).name,'SETSM_')
@@ -914,14 +914,14 @@ for j = 1:length(melmask.dated); melmask_dates(j,:) = melmask.dated(j).datestrin
             DEMtif_dates(i,:) = tifs(i).name(6:13); %old PGC DEM name format
         end
     end
-% else %otherwise DEMs are in root directory
-%     tifs = dir('*_dem.tif');
-%     for i = 1:length(tifs)
-%         DEMtif_dates(i,:) = tifs(i).name(6:13);
-%     end
-% end
+else %otherwise DEMs are in root directory
+    tifs = dir('*_dem.tif');
+    for i = 1:length(tifs)
+        DEMtif_dates(i,:) = tifs(i).name(6:13);
+    end
+end
 
-%located filled DEMs (created during next step & will be deleted if you
+%locate filled DEMs (created during next step & will be deleted if you
 %decide the old mask was wrong)
 filled_DEMs = dir([site_abbrev,'*melange-DEMfilled.mat']);
 for i = 1:length(filled_DEMs)
@@ -930,7 +930,7 @@ end
 
 %loop through & mask and plot if new or just plot if old
 for p = 1:length(melange_mats)
-    disp(['DEM #',num2str(p),' of ',num2str(length(melangemat_dates))]);
+    disp(['DEM #',num2str(p),' of ',num2str(size(melangemat_dates,1))]);
     disp(melangemat_dates(p,:));
     cd([root_dir,'/',site_abbrev,'/DEMs/']);
     DEM_name = melange_mats(p).name; load(DEM_name);
@@ -1108,18 +1108,55 @@ for p = 1:length(melange_mats)
     close all; drawnow; clear newtif;
 end
 
+%update datestrings of masks to label plots
+check_datestrings = {'full mask'};
+for p = 1:length(melmask.dated)
+   check_datestrings =  [check_datestrings; {melmask.dated(p).datestring}];
+end
+
 %show all the melange outlines cropped to the terminus as a quality check
 %(use fix_individual_melange_masks.m as needed)
-figure;
-plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
+figure; set(gcf,'position',[50 50 800 500]);
+sub1 = subplot(1,2,1); sub2 = subplot(1,2,2);
+subplot(sub1);
+pl(1) = plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
 melmask_cmap = colormap(cool(length(melmask.dated)));
 for p = 1:length(melmask.dated)
-    plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:)); hold on;
+    pl(p+1) = plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:)); hold on;
 end
-leg = legend; set(leg,'location','eastoutside','NumColumns',2);
+leg = legend(pl,check_datestrings); set(leg,'location','southoutside','NumColumns',2);
 drawnow;
 
-disp('Done converting geotiffs to mat-files... move on to next function!');
+%edit individual masks as needed with a retraced terminus 
+retrace = questdlg('Do any older masks need to be redone?',...
+    'Redo Any Mask','1) Ugh, yes.','2) Horray, no!','2) Horray, no!');
+switch retrace
+    case '1) Ugh, yes.'
+        subplot(sub2);
+        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
+        for p = 1:length(filledDEM_dates)
+           subplot(sub2);
+           plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:)); hold on;
+            
+           %fix the mask
+           redo = questdlg('Do you want to fix this mask?',...
+               'Redo This Mask','1) Yes','2) No','2) No');
+           switch redo
+               case '1) Yes'
+                   fix_individual_melange_masks(root_dir,site_abbrev,output_dir,melmask,p);
+                   %replot updated mask outline
+                   plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:),'linewidth',2); hold on;
+                   drawnow;
+               case '2) No'
+                   disp('move on to the next date');
+           end
+           
+        end
+    case '2) Horray, no!'
+        disp('Done converting geotiffs to mat-files... move on to next function!');
+        close all;
+end
+clear retrace
 
 
 

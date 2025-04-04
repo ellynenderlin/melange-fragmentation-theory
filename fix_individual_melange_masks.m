@@ -1,31 +1,32 @@
+function fix_individual_melange_masks(root_dir,site_abbrev,output_dir,melmask,p)
 %%% Use this code to fix one-off strange melange masks that you may suspect
 %%% when analyzing melange distributions or melange velocity coherence
-clearvars; close all;
-
-%make sure the cmocean package and the wgs2ps code are in the path
-addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
-    '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
+% clearvars; close all;
+% 
+% %make sure the cmocean package and the wgs2ps code are in the path
+% addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
+%     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/');
 elev_cmap = cmocean('thermal',1001); elev_cmap(1,:) = [1 1 1];
+% 
+% %specify site
+% site_abbrev = 'ASG'; %3-letter abbrevation
+% root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/';
+% cd([root_dir,site_abbrev,'/']);
 
-%specify site
-site_abbrev = 'ASG'; %3-letter abbrevation
-root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/';
-cd([root_dir,site_abbrev,'/']);
-
-%specify the index for the date of interest
-p=29; %example for ASG 20150903
+% %specify the index for the date of interest
+% p=29; %example for ASG 20150903
 maskref = p;
 
 %load the data
 load([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat']);
-load([root_dir,site_abbrev,'/DEMs/',site_abbrev,'-',melmask.dated(p).datstring,'_melange-DEMfilled.mat']);
+load([root_dir,site_abbrev,'/DEMs/',site_abbrev,'-',melmask.dated(p).datestring,'_melange-DEMfilled.mat']);
 
 %plot the filled DEM created with the old mask
 figure1 = figure; set(gcf,'position',[50 50 1600 600]);
 imagesc(double(M.DEM.x),double(M.DEM.y),double(M.DEM.z_filled)); axis xy equal; hold on;
 colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
 plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-title(DEM_name(1:11));
+title(melmask.dated(p).datestring);
 
 %make sure the starting vertex for the melange mask is placed out in the ocean
 [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
@@ -57,8 +58,32 @@ end
 
 %clear the existing dated melange mask & retrace the terminus
 melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
+termzoom_question = questdlg('Zoom in to better trace just seaward of the terminus?',...
+    'Terminus Zoom Option','1) Yes!','2) No!','1) Yes!');
+figure(figure1);
+switch termzoom_question
+    case '1) Yes!'
+        disp('Click on UL & LR corners of a box bounding the terminus to zoom in');
+        [a] = ginput(2);
+        set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+        drawnow; clear a;
+    case '2) No!'
+        %do nothing!
+end
+clear termzoom_question;
+disp('Trace just seaward along the terminus, intersecting each side of the fjord');
 [term_x,term_y,~] = improfile;
 [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
+
+%find the intercepts with the fjord mask
+out_intercept = []; out_interceptx = []; out_intercepty = [];
+for i = 1:length(outline_x)-1
+    [xi,yi] = polyxpoly(outline_x(i:i+1),outline_y(i:i+1),Z.term.x,Z.term.y); %find the intersections of the terminus trace with the melange outline
+    if ~isempty(xi)
+        out_intercept = [out_intercept i]; out_interceptx = [out_interceptx xi]; out_intercepty = [out_intercepty yi];
+    end
+    clear xi yi;
+end
 
 %recrop the melange mask
 term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
@@ -75,8 +100,9 @@ end
 %remake the fjord mask & save the dated melange outline and fjord mask
 plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on;
 melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
-save([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+save([output_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
 [ZXgrid,ZYgrid] = meshgrid(M.DEM.x,M.DEM.y);
+disp('Recreating the melange mask... this will take ~1 hr!');
 in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
 M.mask.fjord = zeros(size(M.DEM.z_filled));
 M.mask.fjord(in) = 1;
@@ -84,4 +110,4 @@ M.mask.fjord = round(M.mask.fjord); M.mask.fjord = logical(M.mask.fjord);
 M.DEM.z_filled(M.mask.fjord~=1) = NaN;
 save([root_dir,site_abbrev,'/DEMs/',site_abbrev,'-',melmask.dated(p).datestring,'_melange-DEMfilled.mat'],'M','m','-v7.3');
 
-
+end
