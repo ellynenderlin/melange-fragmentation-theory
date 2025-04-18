@@ -27,7 +27,7 @@ elev_cmap = cmocean('thermal',1001); elev_cmap(1,:) = [1 1 1];
 %coordinates and renamed with *B8PS.TIF ending)
 
 % find and load files
-cd([output_dir,'/',site_abbrev,'/']);
+cd(output_dir);
 melmask_file = dir([site_abbrev,'*-melange-masks.mat']);
 if ~isempty(melmask_file)
     disp('Loading the melange masks...');
@@ -101,7 +101,7 @@ else
     disp('Trace fjord walls to create a fjord mask, including several km of glacier');
     [~,fjord_maskx,fjord_masky] = roipoly;
     close(gcf); drawnow;
-    cd([output_dir,'/',site_abbrev,'/']);
+    cd(output_dir);
     melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
     save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
 end
@@ -382,7 +382,7 @@ switch answer
         close(gcf); drawnow;
 
         %save the edited melange mask
-        cd([output_dir,'/',site_abbrev,'/']);
+        cd(output_dir);
         melmask = rmfield(melmask,'uncropped');
         melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
         save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
@@ -394,7 +394,7 @@ clear answer;
 
 
 %% custom modify the melange mask for each DEM (remove glacier & DEM blunders)
-cd([output_dir,'/',site_abbrev,'/']);
+cd(output_dir);
 if ~exist('melmask')
     load([site_abbrev,'-melange-masks.mat']);
     disp('Fjord mask reloaded...');
@@ -628,7 +628,7 @@ for p = 1:length(melange_mats)
                 [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
                 
                 %save the mask for each time step
-                cd([output_dir,'/',site_abbrev,'/']);
+                cd(output_dir);
                 if contains(melmask.dated(1).datestring,'start')
                     melmask.dated(1).datestring = melangemat_dates(p,:); melmask.dated(1).x = []; melmask.dated(1).y = [];
                 else
@@ -645,7 +645,7 @@ for p = 1:length(melange_mats)
                     end
                     melmask.dated(maskref).datestring = melangemat_dates(p,:); melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
                 end
-                save([output_dir,'/',site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+                save([output_dir,site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
                 save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
             case '2) No!'
                 disp('Deleting files...');
@@ -834,7 +834,7 @@ for p = 1:length(melange_mats)
                     [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
                     
                     %save the mask for each time step
-                    save([output_dir,'/',site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+                    save([output_dir,site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
                     save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
                     disp('new terminus trace saved');
                 else
@@ -1098,7 +1098,7 @@ for p = 1:length(melange_mats)
         %save the mask for each time step
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
-        cd([output_dir,'/',site_abbrev,'/']);
+        cd(output_dir);
         save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
         save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
         saveas(gcf,[site_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
@@ -1116,7 +1116,7 @@ end
 
 %show all the melange outlines cropped to the terminus as a quality check
 %(use fix_individual_melange_masks.m as needed)
-figure; set(gcf,'position',[50 50 800 500]);
+figure; set(gcf,'position',[50 50 1800 600]);
 sub1 = subplot(1,2,1); sub2 = subplot(1,2,2);
 subplot(sub1);
 pl(1) = plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
@@ -1124,19 +1124,21 @@ melmask_cmap = colormap(cool(length(melmask.dated)));
 for p = 1:length(melmask.dated)
     pl(p+1) = plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:)); hold on;
 end
-leg = legend(pl,check_datestrings); set(leg,'location','southoutside','NumColumns',2);
+pos = get(gca,'position');
+leg = legend(pl,check_datestrings); set(leg,'location','eastoutside','NumColumns',2);
+set(gca,'position',[pos(1)-0.05 pos(2) pos(3) pos(4)]); title('Mask Overview');
 drawnow;
+subplot(sub2); title('Individual Mask Check');
 
 %edit individual masks as needed with a retraced terminus 
 retrace = questdlg('Do any older masks need to be redone?',...
     'Redo Any Mask','1) Ugh, yes.','2) Horray, no!','2) Horray, no!');
 switch retrace
     case '1) Ugh, yes.'
-        subplot(sub2);
-        plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
         for p = 1:length(filledDEM_dates)
            subplot(sub2);
-           plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:)); hold on;
+           plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
+           plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:),'linewidth',2); hold on;
             
            %fix the mask
            redo = questdlg('Do you want to fix this mask?',...
@@ -1150,7 +1152,7 @@ switch retrace
                case '2) No'
                    disp('move on to the next date');
            end
-           
+           cla;
         end
     case '2) Horray, no!'
         disp('Done converting geotiffs to mat-files... move on to next function!');

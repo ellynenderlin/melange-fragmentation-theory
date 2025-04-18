@@ -1,12 +1,21 @@
-function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,output_dir)
+function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,im_dir,output_dir)
 %------------------------------------
 % Description: Construct iceberg size distributions from
 % automatically-extracted elevation distributions. Saves size distributions
 % to the site-specific "melange-DEMfilled.mat" file and to a tab-delimited
 % text file ([site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt']).
 %
-%may need to add some paths (depending on permissions) before running: 
-%run in the command window when specifying root_dir, site_abbrev,output_dir
+% Inputs:
+% root_dir = overarching directory containing site-specific directories
+% site_abbrev = 2- or 3-letter site abbreviation (should be the directory
+% name and is used for output file names)
+% AF = along-flow profile created from create_profile_and_transects.m
+% XF = across-flow transects created from create_profile_and_transects.m
+% output_dir = directory where data products produced from the pipeline are
+% stored
+%
+% may need to add some paths (depending on permissions) before running: 
+% run in the command window when specifying root_dir, site_abbrev,output_dir
 % addpath('/users/ellynenderlin/mfiles','/users/ellynenderlin/mfiles/general',...
 %     '/users/ellynenderlin/mfiles/Greenland-calving/icebergs',...
 %     '/users/ellynenderlin/mfiles/Greenland-calving/icebergs/automated-iceberg-mapping',...
@@ -37,7 +46,7 @@ ARcomp.best.autoALL = 2; % iceberg aspect ratio
 ARcomp.range.autoALL = [1.7, 2.3]; % range in iceberg aspect ratio
 
 %load data
-cd([output_dir,'/',site_abbrev,'/']);
+cd(output_dir);
 load([site_abbrev,'-melange-masks.mat']); %created using create_melange_masks
 mask_dates = '';
 for i = 1:length(melmask.dated)
@@ -68,7 +77,7 @@ else
 end
 
 %identify existing melange iceberg distribution datasets
-cd([output_dir,'/',site_abbrev,'/']);
+cd(output_dir);
 melange_mats = dir([site_abbrev,'*_melange-distribution.mat']); melange_dates = ''; %manual iceberg sizes
 for i = 1:length(melange_mats)
     melange_dates(i,:) = melange_mats(i).name(matfile_daterefs);
@@ -79,6 +88,8 @@ for i = 1:length(iceberg_mats)
 end
 
 alphabet = 'abcdefghijklmnopqrstuvwxyz';
+
+disp('Initialized size distribution extraction process.');
 %% PROCESS MELANGE MASKS
 %extract iceberg distributions for all DEMs without a manually-constructed dataset
 disp(['Extracting iceberg distributions for ',site_abbrev,'...']);
@@ -221,6 +232,7 @@ end
 disp("Done creating hole-less melange DEMs");
 
 close all;
+
 %% DELETE DEMS WITH HOLES TO REDUCE SPACE USE
 cd([root_dir,'/',site_abbrev,'/DEMs/']);
 for p = 1:length(mats)
@@ -228,13 +240,133 @@ for p = 1:length(mats)
     delete(mats(p).name);
 end
 
-%% UPDATE FILES AND PLOT ICEBERG SIZE DISTRIBUTIONS
+%% UPDATE FILE LIST
 cd([root_dir,'/',site_abbrev,'/DEMs/']);
 DEM_mats = dir([site_abbrev,'*_melange-DEMfilled.mat']); DEM_dates = ''; %DEMs
-for i = 1:length(DEM_mats)
-    DEM_dates(i,:) = DEM_mats(i).name(matfile_daterefs);
+for p = 1:length(DEM_mats)
+    DEM_dates(p,:) = DEM_mats(p).name(matfile_daterefs);
 end
 close all; drawnow;
+
+%% EXTRACT ELEVATION TRANSECTS & AN ELEVATION PROFILE
+
+%initialize table creation
+y = []; x = []; column_names = ["Northing (m)","Easting (m)"];
+for j = 1:length(XF)
+    hxf(j).x = XF(j).X'; hxf(j).y = XF(j).Y'; 
+    y = [y; hxf(j).y; NaN];
+    x = [x; hxf(j).x; NaN];
+end
+Taf = table(AF.Y,AF.X); Taf.Properties.VariableNames = column_names;
+Txf = table(y,x); Txf.Properties.VariableNames = column_names;
+
+disp('Extracting along & across fjord elevation profiles...');
+for p = 1:length(DEM_mats)
+    %load the data
+    disp(['date ',num2str(p),' of ',num2str(length(DEM_mats)),' = ',DEM_dates(p,:)]);
+    DEM_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat']; 
+    outputberg_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat'];
+    load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
+    disp('Data loaded.');
+        
+    %fill data holes and masked regions with NaNs
+    melange = M.DEM.z_filled;
+    melange(melange<0) = NaN; melange(melange>Hmax/(rho_i/(rho_sw-rho_i))) = NaN;
+    melange(M.mask.DEM==0) = NaN;
+    
+%     %plot the DEM with transects if you want to check data coverage
+%     figure; set(gcf,'position',[50 50 800 800]);
+%     imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
+%     melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+%     set(gca,'clim',[0 16],'fontsize',16); cbar = colorbar('fontsize',16); cbar.Label.String = 'elevation (m a.s.l.)';
+%     set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); 
+%     xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+%     set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+%     xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+%     plot(AF.X,AF.Y,'-k','linewidth',2);
+%     for j = 1:length(XF); plot(XF(j).X,XF(j).Y,'--k','linewidth',1.5); end
+    
+    %interpolate elevations to the centerline & add to the table
+    [DEMx,DEMy] = meshgrid(M.DEM.x,M.DEM.y);
+    h(1).z(:,p) = interp2(DEMx,DEMy,melange,AF.X,AF.Y);
+    Taf.(['Elevation_',DEM_dates(p,:),' (m)']) = h(1).z(:,p);
+    writetable(Taf,[output_dir,site_abbrev,'_centerline_elevations.csv']);
+    
+    %extract profiles and add to the data table: like a shapefile, each
+    %transect is separated by a NaN for x,y,z values 
+    z = [];
+    for j = 1:length(XF)
+        h(j+1).z(:,p) = interp2(DEMx,DEMy,melange,XF(j).X',XF(j).Y');
+        z = [z; h(j+1).z(:,p); NaN];
+    end
+    Txf.(['Elevation_',DEM_dates(p,:),' (m)']) = z;
+    writetable(Txf,[output_dir,site_abbrev,'_transects_elevations.csv']);
+    
+    %clear variables and advance to the next date
+    disp('Elevation CSVs updated & data added to "h" structure. Moving on to the next date.')
+    clear M melange z;
+    
+end
+clear Taf Txf;
+
+%load the Landsat reference image used to create the centerline & transects
+ims = dir([im_dir,'L*.TIF']);
+for j = 1:length(ims)
+    if contains(ims(j).name,'B8')
+        ref_image = [ims(j).folder,'/',ims(j).name];
+    end
+end
+clear im_dir ims;
+%load the panchromatic Landsat scene & create a glacier/fjord mask
+[I,R] = readgeoraster(ref_image);
+%             info = geotiffinfo(ref_image);
+im.x = R.XWorldLimits(1):R.SampleSpacingInWorldX:R.XWorldLimits(2);
+im.y = R.YWorldLimits(2):-R.SampleSpacingInWorldY:R.YWorldLimits(1);
+im.z = double(I);
+clear I R;
+
+%plot the elevation time series as a quality check
+elev_figure; set(gcf,'position',[50 50 1500 600]);
+sub1 = subplot(1,3,1); sub2 = subplot(1,3,2); sub3 = subplot(1,3,3);
+date_cmap = cmocean('solar',size(h(1).z,2)+1); tran_cmap = cmocean('deep',length(XF)+1);
+subplot(sub1);
+imagesc(im.x,im.y,im.z); axis xy equal; colormap gray; hold on;
+af_start = find(~isnan(nanmean(h(1).z,2)) == 1,1,'first');
+plot(AF.X(af_start:end),AF.Y(af_start:end),'-','color',nanmean(date_cmap,1),'linewidth',2); hold on;
+for j = 1:length(XF); plot(XF(j).X,XF(j).Y,'-','color',tran_cmap(j+1,:),'linewidth',2); hold on; end
+set(gca,'xlim',[min(AF.X(af_start:end))-2000,max(AF.X(af_start:end))+2000],...
+    'ylim',[min(AF.Y(af_start:end))-2000,max(AF.Y(af_start:end))+2000],'fontsize',14); 
+xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+set(gca,'xticklabels',round(xticks/1000),'yticklabels',round(yticks/1000));
+xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16); drawnow; 
+%plot the centerline profile time series
+subplot(sub2);
+af_dist(1) = 0; 
+for k = af_start+1:length(AF.X) 
+    af_dist = [af_dist;af_dist(end)+sqrt((AF.X(k)-AF.X(k-1)).^2 + (AF.Y(k)-AF.Y(k-1)).^2)];
+end
+for j = 1:size(h(1).z,2); plot(af_dist,h(1).z(af_start:end,j),'-','color',date_cmap(j,:),'linewidth',2); hold on; end
+leg = legend(DEM_dates); leg.Location = 'northwest';
+set(gca,'fontsize',14); grid on;
+xlabel('Distance along centerline (m)','fontsize',16); 
+ylabel('Elevation (m a.s.l.)','fontsize',16);
+%plot the time-averaged transects
+subplot(sub3);
+for j = 1:length(XF)
+    xf_dist(1) = 0;
+    for k = 2:length(XF(j).X)
+        xf_dist(k) = xf_dist(k-1)+sqrt((XF(j).X(k)-XF(j).X(k-1)).^2 + (XF(j).Y(k)-XF(j).Y(k-1)).^2);
+    end
+    plot(xf_dist,nanmedian(h(j+1).z,2),'-','color',tran_cmap(j+1,:),'linewidth',2); hold on;
+    clear xf_dist;
+end
+set(gca,'fontsize',14); grid on;
+xlabel('Distance across fjord (m)','fontsize',16); 
+ylabel('Elevation (m a.s.l.)','fontsize',16);
+drawnow;
+saveas(elev_fig,[output_dir,site_abbrev,'-elevation-profiles.png'],'png');
+
+%% EXTRACT SIZE DISTRIBUTIONS
 
 %convert elevation distributions into iceberg size distributions   
 %note: this could be merged with the loop above to increase efficiency
@@ -265,7 +397,7 @@ for p = 1:length(DEM_mats)
 %     pixel_nos(max_bin+1) = sum(pixel_nos(max_bin+1:end)); pixel_nos(max_bin+2:end) = NaN; %merge fractions of bergs <0.1berg
     berg_nos = pixel_nos./berg_pixels;
     m.melange.Asurfs = Asurfs; m.melange.bergs = berg_nos; m.melange.binwidth = dA; %add to iceberg size dataset
-    dlmwrite([output_dir,'/',site_abbrev,'/',site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
+    dlmwrite([output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
     clear berg_* *_nos Asurf* dA;
     
     %size distribution using the minimum aspect ratio: yields a smaller range of surface areas for icebergs
@@ -329,7 +461,7 @@ for p = 1:length(DEM_mats)
     xlabel('Iceberg surface area (m^2)','fontsize',16); ylabel('Iceberg count','fontsize',16);
     text(min(xlims)+0.00003*(max(xlims)-min(xlims)),min(ylims)+0.28*(max(ylims)-min(ylims)),'c) iceberg size distribution','fontsize',16); drawnow; clear xlims ylims;
     drawnow;
-    saveas(gcf,[output_dir,'/',site_abbrev,'/',site_abbrev,'-',num2str(DEM_dates(p,:)),'_melange-distribution_subplots.png'],'png');
+    saveas(gcf,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'_melange-distribution_subplots.png'],'png');
     disp('Saved subplots & textfile of size distributions ');
     
     %compile info for all dates
@@ -381,7 +513,7 @@ for j = 1:(max(DEMyrs)-min(DEMyrs)+1)
     %enlarge subplots
     set(gca,'position',[axpos(1) axpos(2) 1.1*axpos(3) 1.1*axpos(4)]);
 end
-saveas(sizedist_fig,[output_dir,'/',site_abbrev,'/',site_abbrev,'-iceberg-size-distribution-timeseries-subplots.png'],'png');
+saveas(sizedist_fig,[output_dir,site_abbrev,'-iceberg-size-distribution-timeseries-subplots.png'],'png');
 
 end
 

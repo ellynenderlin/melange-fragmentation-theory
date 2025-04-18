@@ -13,10 +13,11 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'DJG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'HLG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
-root_dir = basepath; output_dir = basepath;
+root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
 cd([root_dir,site_abbrev]);
+disp('Paths set, move along!');
 
 %% a) Create the melange masks using a series of manual steps
 disp('Create custom melange masks for each DEM... the last step (masking) should ideally run overnight');
@@ -37,14 +38,44 @@ create_melange_masks(root_dir,site_abbrev,output_dir)
 
 disp('Now you can delete the DEM geotiffs to save space on your computer!');
 %% b) Extract the automated iceberg distributions from the DEM
+disp('Extract elevation profiles & iceberg size distributions...');
 
-%CREATE A NEW CODE TO READ-IN A CENTERLINE (DRAW & MAKE EVEN-INCREMENT
-%SPACING IN QGIS, CREATE CROSS-FJORD TRANSECTS, EXTRACT MEAN ELEVATIONS
-%ALONG THE CROSS-FJORD TRANSECTS, AND DIVIDE THE MELANGE INTO MULTIPLE BINS
+%load the melange masks if you skipped over the last section because masks
+%were previously created
+w = who;
+if sum(contains(w,'melmask')) == 0; load([output_dir,'/',site_abbrev,'-melange-masks.mat']); end
+
+%manually delineate the centerline: requires a reference Landsat image & velocity vector (vx,vy) geotiffs
+answer = questdlg('Do centerline & cross-flow profiles exist?',...
+    'profile creation','1) Yes','2) No','2) No');
+switch answer
+    case '1) Yes'
+        if exist('AF') == 1
+            disp('profiles in workspace, advancing to data extraction...');
+        else
+            disp('loading existing shapefiles');
+            shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
+            for j = 1:length(shp_files)
+                if contains(shp_files(j).name,'centerline')
+                    AF = shaperead([shp_files(j).folder,'/',shp_files(j).name]);
+                elseif contains(shp_files(j).name,'transects')
+                    XF = shaperead([shp_files(j).folder,'/',shp_files(j).name]);
+                end
+            end
+        end
+    case '2) No'
+        disp('creating a centerline profile & evenly-spaced cross-flow transects...');
+        LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/'];
+        vel_dir = '/Users/ellynenderlin/Research/miscellaneous/Greenland-VelMosaic_1995-2015/'; %GrIMP velocity mosaic: https://nsidc.org/grimp
+        [AF,XF] = create_profile_and_transects([root_dir,site_abbrev,'/'],melmask,im_dir,vel_dir,3413);
+end
+clear answer;
+
+%UPDATE FUNCTION BELOW TO DIVIDE THE MELANGE INTO MULTIPLE BINS
 %THEN UPDATE THE ICEBERG DISTRIBUTION CODE TO SPIT OUT DISTRIBUTIONS FOR
 %EACH BIN AND THE FULL MELANGE (CURRENTLY ONLY DOES THE FULL MELANGE)
 
-extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,output_dir)
+extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,im_dir,output_dir)
 
 %% c) Automatically fit fragmentation curves to the size distributions
 close all;
