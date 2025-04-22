@@ -240,7 +240,7 @@ for p = 1:length(tifs)
         in = inpolygon(YXgrid,YYgrid,melmask.uncropped.x,melmask.uncropped.y);
         if isempty(in) || sum(in(~isnan(in))) == 0
             disp('... no elevations, deleting files!')
-            DEM_sourcefiles = dir([root_dir,'/',site_abbrev,'/DEMs/*',DEMtif_dates(p,:),'*.t*']);
+            DEM_sourcefiles = dir([root_dir,'/',site_abbrev,'/DEMs/*',tifs(p).name(1:end-4),'*.t*']);
             recycle('on'); for l = 1:length(DEM_sourcefiles); delete([root_dir,'/',site_abbrev,'/DEMs/',DEM_sourcefiles(l).name]); end
             clear DEM_sourcefiles;
         else
@@ -1107,6 +1107,15 @@ for p = 1:length(melange_mats)
 %     end
     close all; drawnow; clear newtif;
 end
+
+%check for any empty dates in the melange mask that may have been produced
+%when the code was newer & had bugs
+empty_ref = [];
+for p = 1:length(melmask.dated)
+    if isempty(melmask.dated(p).x); empty_ref = [empty_ref, p]; end
+end
+melmask.dated(empty_ref) = [];
+save([output_dir,site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
 
 %update datestrings of masks to label plots
 check_datestrings = {'full mask'};
