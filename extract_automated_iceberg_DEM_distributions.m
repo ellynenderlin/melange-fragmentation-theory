@@ -23,7 +23,7 @@ function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,
 %
 %------------------------------------------
 
-%% customization/initialization
+%% INITIALIZE
 
 %account for different date location in file name depending on length of site abbreviation
 if length(site_abbrev) == 3
@@ -257,6 +257,9 @@ for j = 1:length(XF)
     y = [y; hxf(j).y; NaN];
     x = [x; hxf(j).x; NaN];
 end
+%check formatting of variables (must be column vectors)
+if size(AF.X,1) == 1; AF.X = AF.X'; AF.Y = AF.Y'; end
+%create tables to save elevation transects as CSVs
 Taf = table(AF.Y,AF.X); Taf.Properties.VariableNames = column_names;
 Txf = table(y,x); Txf.Properties.VariableNames = column_names;
 
@@ -267,7 +270,7 @@ for p = 1:length(DEM_mats)
     DEM_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat']; 
     outputberg_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat'];
     load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
-    disp('Data loaded.');
+%     disp('Data loaded.');
         
     %fill data holes and masked regions with NaNs
     melange = M.DEM.z_filled;
@@ -326,19 +329,21 @@ im.z = double(I);
 clear I R;
 
 %plot the elevation time series as a quality check
-elev_figure; set(gcf,'position',[50 50 1500 600]);
+elev_fig = figure; set(gcf,'position',[50 50 2000 600]);
 sub1 = subplot(1,3,1); sub2 = subplot(1,3,2); sub3 = subplot(1,3,3);
 date_cmap = cmocean('solar',size(h(1).z,2)+1); tran_cmap = cmocean('deep',length(XF)+1);
 subplot(sub1);
 imagesc(im.x,im.y,im.z); axis xy equal; colormap gray; hold on;
+plot(melmask.uncropped.x,melmask.uncropped.y,'-','color','w','linewidth',2); hold on;
 af_start = find(~isnan(nanmean(h(1).z,2)) == 1,1,'first');
-plot(AF.X(af_start:end),AF.Y(af_start:end),'-','color',nanmean(date_cmap,1),'linewidth',2); hold on;
+plot(AF.X(af_start:end),AF.Y(af_start:end),'-','color','k','linewidth',2); hold on;
 for j = 1:length(XF); plot(XF(j).X,XF(j).Y,'-','color',tran_cmap(j+1,:),'linewidth',2); hold on; end
 set(gca,'xlim',[min(AF.X(af_start:end))-2000,max(AF.X(af_start:end))+2000],...
     'ylim',[min(AF.Y(af_start:end))-2000,max(AF.Y(af_start:end))+2000],'fontsize',14); 
 xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
 set(gca,'xticklabels',round(xticks/1000),'yticklabels',round(yticks/1000));
 xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16); drawnow; 
+pos = get(sub1,'position'); set(sub1,'position',[pos(1)-0.05 pos(2) pos(3) pos(4)]);
 %plot the centerline profile time series
 subplot(sub2);
 af_dist(1) = 0; 
@@ -346,7 +351,8 @@ for k = af_start+1:length(AF.X)
     af_dist = [af_dist;af_dist(end)+sqrt((AF.X(k)-AF.X(k-1)).^2 + (AF.Y(k)-AF.Y(k-1)).^2)];
 end
 for j = 1:size(h(1).z,2); plot(af_dist,h(1).z(af_start:end,j),'-','color',date_cmap(j,:),'linewidth',2); hold on; end
-leg = legend(DEM_dates); leg.Location = 'northwest';
+leg = legend(DEM_dates); leg.Location = 'west outside';
+if length(DEM_dates) > 30; leg.NumColumns = 2; end
 set(gca,'fontsize',14); grid on;
 xlabel('Distance along centerline (m)','fontsize',16); 
 ylabel('Elevation (m a.s.l.)','fontsize',16);
@@ -363,8 +369,11 @@ end
 set(gca,'fontsize',14); grid on;
 xlabel('Distance across fjord (m)','fontsize',16); 
 ylabel('Elevation (m a.s.l.)','fontsize',16);
+pos = get(sub3,'position'); set(sub3,'position',[pos(1)+0.05 pos(2) pos(3) pos(4)]);
+set(sub2,'position',[0.45 pos(2) pos(3) pos(4)]);
 drawnow;
 saveas(elev_fig,[output_dir,site_abbrev,'-elevation-profiles.png'],'png');
+clear h;
 
 %% EXTRACT SIZE DISTRIBUTIONS
 
@@ -380,32 +389,33 @@ for p = 1:length(DEM_mats)
     disp('Data loaded.');
         
     %extract the distribution of elevations from the melange
+%     [M_xgrid,M_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
     melange = M.DEM.z_filled;
-    melange(isnan(M.DEM.z_filled)) = 0;
+    melange(isnan(M.DEM.z_filled)) = NaN;
     melange(melange<0) = 0; melange(melange>Hmax/(rho_i/(rho_sw-rho_i))) = NaN;
     melange(M.mask.DEM==0) = NaN;
-    figureA = figure; set(gcf,'position',[850 100 500 350]); title([site_abbrev,' ',DEM_dates(p,:),' iceberg size distribution']);
-    h = histogram(melange(~isnan(melange)),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
+%     figureA = figure; set(gcf,'position',[850 100 500 350]); title([site_abbrev,' ',DEM_dates(p,:),' iceberg size distribution']);
+    [h.Values,h.BinEdges] = histcounts(melange(~isnan(melange)),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
     bin_zno = double(h.Values); bin_zo = double((h.BinEdges(1:end-1) + h.BinEdges(2:end))/2);
     
     %convert to iceberg size distributions
     berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL.*bin_zo; Asurfs = (1/4)*pi*berg_W.^2; %calculate corresponding surface areas (m^2)
     Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.best.autoALL^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1); %calculate the bin widths in surface area units (m^2)
     berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
-    pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
-%     max_bin = find(berg_nos>0.1,1,'last'); %identify fractions of bergs <0.1berg
-%     pixel_nos(max_bin+1) = sum(pixel_nos(max_bin+1:end)); pixel_nos(max_bin+2:end) = NaN; %merge fractions of bergs <0.1berg
-    berg_nos = pixel_nos./berg_pixels;
+    pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels; pixels_per_bergclass = berg_pixels;
     m.melange.Asurfs = Asurfs; m.melange.bergs = berg_nos; m.melange.binwidth = dA; %add to iceberg size dataset
-    dlmwrite([output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.txt'],[berg_nos' Asurfs' dA'],'delimiter','\t','precision','%.1f'); %EXPORT SIZE DISTRIBUTION DATA TO TAB-DELIMITED TEXT FILE
-    clear berg_* *_nos Asurf* dA;
+    %export the data as a table in a CSV
+    T=table(berg_nos',Asurfs',dA');
+    column_names = ["Count (unitless)", "Area (m^2)", "Area Binwidth (m^2)"];
+    T.Properties.VariableNames = column_names; 
+    writetable(T,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution.csv']);
+    clear berg_* *_nos Asurf* dA T;
     
     %size distribution using the minimum aspect ratio: yields a smaller range of surface areas for icebergs
     berg_W = (rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(1).*bin_zo; Asurfs = (1/4)*pi*berg_W.^2; 
     Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.range.autoALL(1)^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1);
     berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(1)))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
     pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
-    berg_nos = pixel_nos./berg_pixels;
     m.melange.Asurfs_range(1,:) = Asurfs; m.melange.bergs_range(1,:) = berg_nos; m.melange.binwidth_range(1,:) = dA; %add to iceberg size dataset
     clear berg_* *_nos Asurf* dA;
     %size distribution using the maximum aspect ratio: yields a larger range of surface areas for icebergs
@@ -413,24 +423,15 @@ for p = 1:length(DEM_mats)
     Asurf_edges = (pi/4)*(rho_sw/(rho_sw-rho_i))^2*ARcomp.range.autoALL(2)^2*h.BinEdges.^2; dA = Asurf_edges(2:end)-Asurf_edges(1:end-1);
     berg_pixels = (pi*(0.5*(bin_zo.*((rho_sw/(rho_sw-rho_i))*ARcomp.range.autoALL(2)))).^2)./(abs(M.DEM.x(1)-M.DEM.x(2)).^2);
     pixel_nos = bin_zno; berg_nos = pixel_nos./berg_pixels;
-    berg_nos = pixel_nos./berg_pixels;
     m.melange.Asurfs_range(2,:) = Asurfs; m.melange.bergs_range(2,:) = berg_nos; m.melange.binwidth_range(2,:) = dA; %add to iceberg size dataset
-    clear berg_* *_nos Asurf* dA h; close(figureA); drawnow;
-%     bergs = m.melange.bergs; % ADDED BY JUKES - CONFIRM THIS IS OKAY  
-%     outputberg_name = [site_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];        
-%     if exist('m','var')
-%         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''m'',''-v7.3'')']; %iceberg size info
-%         disp('saving');
-%     else
-%         save_icebergs = ['save(''',outputberg_name,''',''bergs'',''-v7.3'')']; %iceberg size info
-%         disp('saving');
-%     end
+    clear berg_* *_nos Asurf* dA h; 
+%     close(figureA); drawnow;
     save([root_dir,'/',site_abbrev,'/DEMs/',outputberg_name],'M','m','-v7.3'); %iceberg size info
     
     %plot a 3-panel figure with (a) the melange DEM, 
     %(b) melange elevation histogram, and (c) the
     %full-melange iceberg size distribution in log-log space
-    figure; set(gcf,'position',[1000 500 500 1000]);
+    figure; set(gcf,'position',[50 50 500 1000]);
     sub1 = subplot(3,1,1); sub2 = subplot(3,1,2); sub3 = subplot(3,1,3);
     subplot(sub1);
     imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
@@ -466,8 +467,154 @@ for p = 1:length(DEM_mats)
     
     %compile info for all dates
     ib(p).Asurf = m.melange.Asurfs; ib(p).bergs = m.melange.bergs; 
+    
+    %repeat size distribution extraction but for a subset of the melange:
+    %iteratively move from the seaward limit to the terminus
+    Tsub = table(m.melange.Asurfs',m.melange.binwidth');
+    column_names = ["Area (m^2)", "Area Binwidth (m^2)"];
+    Tsub.Properties.VariableNames = column_names; 
+    for j = 1:length(XF)-1
+        disp(['Subsetting melange: ',num2str(j),' of ',num2str(length(XF)-1)]);
+        %note: slightly extend the transects to make sure that Matlab finds
+        %an intersection on both end with the melange outline 
+        centroid_coords = [nanmean(XF(j).X) nanmean(XF(j).Y); nanmean(XF(j+1).X) nanmean(XF(j+1).Y)];
+        
+        %first transect: extend & identify intersections
+        dx1 = XF(j).X(2)-XF(j).X(1); dy1 = XF(j).Y(2)-XF(j).Y(1); 
+        if size(XF(j).X,1) == 1
+            XF(j).X = [XF(j).X(1)-dx1,XF(j).X(1:end-1),XF(j).X(end-1)+dx1];
+            XF(j).Y = [XF(j).Y(1)-dy1,XF(j).Y(1:end-1),XF(j).Y(end-1)+dy1];
+        else
+            XF(j).X = [XF(j).X(1)-dx1;XF(j).X(1:end-1);XF(j).X(end-1)+dx1];
+            XF(j).Y = [XF(j).Y(1)-dy1;XF(j).Y(1:end-1);XF(j).Y(end-1)+dy1];
+        end
+        [xi1,yi1,i1] = polyxpoly(XF(j).X,XF(j).Y,melmask.uncropped.x,melmask.uncropped.y);
+        %second transect: extend & identify intersections
+        dx2 = XF(j+1).X(2)-XF(j+1).X(1); dy2 = XF(j+1).Y(2)-XF(j+1).Y(1); 
+        if size(XF(j+1).X,1) == 1
+            XF(j+1).X = [XF(j+1).X(1)-dx2,XF(j+1).X(1:end-1),XF(j+1).X(end-1)+dx2];
+            XF(j+1).Y = [XF(j+1).Y(1)-dy1,XF(j+1).Y(1:end-1),XF(j+1).Y(end-1)+dy2];
+        else
+            XF(j+1).X = [XF(j+1).X(1)-dx2;XF(j+1).X(1:end-1);XF(j+1).X(end-1)+dx2];
+            XF(j+1).Y = [XF(j+1).Y(1)-dy2;XF(j+1).Y(1:end-1);XF(j+1).Y(end-1)+dy2];
+        end
+        [xi2,yi2,i2] = polyxpoly(XF(j+1).X,XF(j+1).Y,melmask.uncropped.x,melmask.uncropped.y);
+        %note: the i1,i2 values should give the indices of the fjord outline segment that is intersected by each transect
+        if i2(1,2) > i1(1,2)
+            mel1_inds = [i1(1,2)+1:1:i2(1,2)]; %fjord mask indices increase between transect ends
+            %confirm that the fjord sidewall length is reasonable with a
+            %positive increment between indices (a huge distance means that
+            %the indices span the starting point of the melange mask)
+            side_coords = [xi1(1) yi1(1); melmask.uncropped.x(mel1_inds) melmask.uncropped.y(mel1_inds); xi2(1) yi2(1)];
+            if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(1) yi1(1); xi2(1) yi2(1)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
+                clear mel1_inds;
+                mel1_inds = [i1(1,2):-1:1, length(melmask.uncropped.x):-1:i2(1,2)+1]; %fjord mask indices wrap around melange mask start/end
+            end
+        elseif i2(1,2) < i1(1,2)
+            mel1_inds = [i1(1,2):-1:i2(1,2)+1];
+            side_coords = [xi1(1) yi1(1); melmask.uncropped.x(mel1_inds) melmask.uncropped.y(mel1_inds); xi2(1) yi2(1)];
+            if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(1) yi1(1); xi2(1) yi2(1)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
+                mel1_inds = [i1(1,2)+1:1:length(melmask.uncropped.x), 1:1:i2(1,2)]; %fjord mask indices wrap around melange mask start/end
+            end
+        elseif i2(1,2) == i1(1,2)
+            mel1_inds = [];
+        else
+            error('no melange mask coordinates identified!');
+        end
+        clear side_coords;
+        %repeat but for the other transect ends
+        if i2(2,2) < i1(2,2)
+            mel2_inds = [i2(2,2)+1:1:i1(2,2)]; %fjord mask indices increase between transect ends
+            %confirm that the fjord sidewall length is reasonable with a
+            %positive increment between indices (a huge distance means that
+            %the indices span the starting point of the melange mask)
+            side_coords = [xi2(2) yi2(2); melmask.uncropped.x(mel2_inds) melmask.uncropped.y(mel2_inds); xi1(2) yi1(2)];
+            if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(2) yi1(2); xi2(2) yi2(2)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
+                clear mel1_inds;
+                mel2_inds = [i2(2,2):-1:1, length(melmask.uncropped.x):-1:i1(2,2)+1]; %fjord mask indices wrap around melange mask start/end
+            end
+        elseif i2(2,2) > i1(2,2)
+            mel2_inds = [i2(2,2):-1:i1(2,2)+1];
+            side_coords = [xi2(2) yi2(2); melmask.uncropped.x(mel2_inds) melmask.uncropped.y(mel2_inds); xi1(2) yi1(2)];
+            if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(2) yi1(2); xi2(2) yi2(2)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
+                mel2_inds = [i2(2,2)+1:1:length(melmask.uncropped.x), 1:1:i1(2,2)]; %fjord mask indices wrap around melange mask start/end
+            end
+        elseif i2(2,2) == i1(2,2)
+            mel2_inds = [];
+        else
+            error('no melange mask coordinates identified!');
+        end
+        clear side_coords;
+        %put the full polygon together to subset the melange
+        if size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(XF(j).X,1)==1
+            melsubset_polyx = [XF(j).X(2:end-1), xi1(1), melmask.uncropped.x(mel1_inds)', xi2(1), XF(j+1).X(end-1:-1:2), xi2(2), melmask.uncropped.x(mel2_inds)', xi1(2), XF(j).X(2)];
+            melsubset_polyy = [XF(j).Y(2:end-1), yi1(1), melmask.uncropped.y(mel1_inds)', yi2(1), XF(j+1).Y(end-1:-1:2), yi2(2), melmask.uncropped.y(mel2_inds)', yi1(2), XF(j).Y(2)];
+        elseif size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(melmask.uncropped.x,1)==1
+            melsubset_polyx = [XF(j).X(2:end-1)', xi1(1), melmask.uncropped.x(mel1_inds), xi2(1), XF(j+1).X(end-1:-1:2)', xi2(2), melmask.uncropped.x(mel2_inds), xi1(2), XF(j).X(2)];
+            melsubset_polyy = [XF(j).Y(2:end-1)', yi1(1), melmask.uncropped.y(mel1_inds), yi2(1), XF(j+1).Y(end-1:-1:2)', yi2(2), melmask.uncropped.y(mel2_inds), yi1(2), XF(j).Y(2)];
+        else
+            error('Unexpected polyline shapes');
+        end
+        clear xi* yi* i1 i2 mel*_inds;
+        
+        %plot the melange mask subset as a quality check
+        if j == 1
+            subfig = figure; set(gcf,'position',[50 50 500 500]);
+            imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
+            melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+            set(gca,'clim',[0 16],'fontsize',16); cbar = colorbar('fontsize',16); cbar.Label.String = 'elevation (m a.s.l.)';
+            set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
+            xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+            set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+            xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); hold on;
+        end
+        figure(subfig);
+        plot(XF(j).X,XF(j).Y,'-b','linewidth',2); hold on;
+        plot(XF(j+1).X,XF(j+1).Y,'-b','linewidth',2); hold on;
+        plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
+        drawnow;
+        
+        %create a DEM subset based on the bounding box for the subregion
+        DEMx_inds = [find(M.DEM.x < min(melsubset_polyx),1,'last'), find(M.DEM.x > max(melsubset_polyx),1,'first')];
+        DEMy_inds = [find(M.DEM.y < min(melsubset_polyy),1,'first'), find(M.DEM.y > max(melsubset_polyy),1,'last')];
+        melange_subset = melange(min(DEMy_inds):max(DEMy_inds),min(DEMx_inds):max(DEMx_inds));
+        if sum(sum(~isnan(melange_subset))) > 0
+            x_subset = M.DEM.x(min(DEMx_inds):max(DEMx_inds));
+            y_subset = M.DEM.y(min(DEMy_inds):max(DEMy_inds));
+            [xgrid_subset,ygrid_subset] = meshgrid(x_subset,y_subset);
+            
+            %find the melange elevations inside the polygon
+%             disp(['identifying DEM pixels in subset...']);
+%             tic
+            xvec = reshape(xgrid_subset,1,[]); yvec = reshape(ygrid_subset,1,[]);
+            xy = [xvec; yvec];
+            [stat] = inpoly2(xy',[melsubset_polyx',melsubset_polyy']);
+            in = reshape(stat,size(melange_subset));
+%             toc
+            [hsub.Values,hsub.BinEdges] = histcounts(melange_subset(in),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
+            binsub_zno = double(hsub.Values); %binsub_zo = double((hsub.BinEdges(1:end-1) + hsub.BinEdges(2:end))/2);
+            bergsub_nos = binsub_zno./pixels_per_bergclass;
+            
+            %add to the table
+            centroid = mean(centroid_coords);
+            disp(['percent data coverage = ',num2str(100*sum(~isnan(melange_subset(in)))./(size(melange_subset,1)*size(melange_subset,2)))]);
+            if sum(~isnan(melange_subset(in)))./(size(melange_subset,1)*size(melange_subset,2)) > 0.25 %if more than 25% of the subset has data, save it
+                Tsub.([num2str(round(centroid(1))),'E,',num2str(round(centroid(2))),'N']) = bergsub_nos';
+                writetable(Tsub,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution-subsets.csv']);
+                disp('subset data saved to CSV');
+            else
+                disp('not enough elevation data in the subset... nothing saved to CSV');
+            end
+        else
+            disp('subset is outside of DEM... nothing saved to CSV');
+        end
+        
+        clear melsubset* in hsub binsub* bergsub* pixelsub* centroid* *_inds *_subset xvec yvec xy stat;
+    end
+    clf(subfig);
 
-    clear bin* melange M m;
+    clear bin* melange M m T Tsub;
 end
     
 %plot size distributions color-coded according to date

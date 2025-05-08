@@ -234,6 +234,17 @@ for p = 1:length(tifs)
         Y.z = double(I); Y.z(Y.z==-9999) = NaN;
         clear I S;
         
+        %crop the DEM to remove data outside the bounding box for the
+        %melange outline
+        ylims = [find(Y.y>=min(melmask.uncropped.y),1,'first'), find(Y.y<=max(melmask.uncropped.y),1,'first')];
+        %adjust crop limits to extend just beyond the melange outline if data fill the full outline extent
+        if min(ylims) > 1; ylims(find(ylims==min(ylims))) = ylims(find(ylims==min(ylims)))-1; end 
+        if max(ylims) > 1; ylims(find(ylims==max(ylims))) = ylims(find(ylims==max(ylims)))+1; end 
+        xlims = [find(Y.x>=min(melmask.uncropped.x),1,'first'), find(Y.x<=max(melmask.uncropped.x),1,'first')];
+        %adjust crop limits to extend just beyond the melange outline if data fill the full outline extent
+        if min(xlims) > 1; xlims(find(xlims==min(xlims))) = xlims(find(xlims==min(xlims)))-1; end 
+        if max(xlims) > 1; xlims(find(xlims==max(xlims))) = xlims(find(xlims==max(xlims)))+1; end 
+        
         %check that the melange shapefile overlies at least part of the DEM
         disp('...checking that the melange mask overlies elevation data');
         [YXgrid,YYgrid] = meshgrid(Y.x,Y.y);
@@ -412,18 +423,18 @@ for i = 1:length(melange_mats)
 end
 
 %uncomment lines directly below if you are just running this section for debugging purposes
-%melangemat_dates = ''; melange_mats = dir([site_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
-%for i = 1:length(melange_mats)
-%melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs);
-%end
-%tifs = dir('*_dem.tif');
-%for i = 1:length(tifs)
+% melangemat_dates = ''; melange_mats = dir([site_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
+% for i = 1:length(melange_mats)
+% melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs);
+% end
+% tifs = dir('*_dem.tif');
+% for i = 1:length(tifs)
 %     if contains(tifs(i).name,'SETSM_')
 %         DEMtif_dates(i,:) = tifs(i).name(14:21); %new PGC DEM name format AFTER MOVING WV NUMBER TO NEAR THE END SO FILES SORT CHRONOLOGICALLY
 %     else
 %         DEMtif_dates(i,:) = tifs(i).name(6:13); %old PGC DEM name format
 %     end
-%end
+% end
 
 %set-up the dated melange mask structure
 if ~isfield(melmask,'dated')
@@ -1087,7 +1098,13 @@ for p = 1:length(melange_mats)
         %create melange mask
         disp('Creating a BW mask from the melange mask shapefile');
         [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
-        in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
+        xvec = reshape(ZXgrid,1,[]); yvec = reshape(ZYgrid,1,[]);
+        xy = [xvec; yvec];
+        %UNTESTED IN THIS CODE BUT ORDERS OF MAGNITUDE FASTER WHEN
+        %IMPLEMENTED INSTEAD OF INPOLYGON!
+        [stat] = inpoly2(xy',[melpoly_x',melpoly_y']);
+        in = reshape(stat,size(Z.z.ortho));
+%         in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
         Z.fjord.DEM_maskX = single(melpoly_x); Z.fjord.DEM_maskY = single(melpoly_y);
         Z.fjord.DEM_mask = zeros(size(Z.z.ortho));
         Z.fjord.DEM_mask(in) = 1;
@@ -1103,7 +1120,7 @@ for p = 1:length(melange_mats)
         save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
         saveas(gcf,[site_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         disp(['Saved ',DEM_name]);
-        clear Z melpoly* out_* *in Z*grid;
+        clear Z melpoly* out_* *in Z*grid xvec yvec xy stat;
 %     end
     close all; drawnow; clear newtif;
 end

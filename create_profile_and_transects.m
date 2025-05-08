@@ -244,18 +244,18 @@ for j = 1:inc:length(CL)
     [xi,yi] = polyxpoly(S.X,S.Y,xt,yt);
     if length(xi) == 2
         %find the transect points inside the AOI
-        in = inpolygon(xt,yt,S.X,S.Y);
+        in = inpolygon(xt,yt,S.X,S.Y); inrefs = find(in==1);
         %add the intersection points to the appropriate ends of the
         %transect within the AOI
         edge_dist = sqrt((xt(in)-xi(1)).^2 + (yt(in)-yi(1)).^2);
         if find(edge_dist==min(edge_dist)) == 1
-            x_perp = [xi(1),xt(in(1:end)),xi(2)]; y_perp = [yi(1),yt(in(1:end)),yi(2)];
+            x_perp = [xi(1),xt(inrefs(1:end)),xi(2)]; y_perp = [yi(1),yt(inrefs(1:end)),yi(2)];
         elseif find(edge_dist==min(edge_dist)) == sum(in)
-            x_perp = [xi(1),xt(in(end:-1:1)),xi(2)]; y_perp = [yi(1),yt(in(end:-1:1)),yi(2)];
+            x_perp = [xi(1),xt(inrefs(end:-1:1)),xi(2)]; y_perp = [yi(1),yt(inrefs(end:-1:1)),yi(2)];
         else
             error('something went wrong with transect cropping!');
         end
-        clear in edge_dist;
+        clear in inrefs edge_dist;
         
         %add transects to a structure if they still intersect the centerline
         [xc,~] = polyxpoly(C.X,C.Y,x_perp,y_perp);
@@ -267,7 +267,7 @@ for j = 1:inc:length(CL)
         clear xc x_perp y_perp;
     else
         plot(xt,yt,'--y'); hold on; drawnow;
-        error('transect has too many AOI intersections');
+        error('transect has too many or too few AOI intersections');
     end
     
     clear perp* del_* xp yp xn ynxt yt xi yi;

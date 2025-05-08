@@ -9,13 +9,16 @@
 clearvars; close all;
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
-    '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/');
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/',...
+    '/Users/ellynenderlin/Research/miscellaneous/general-code/inpoly2/');
 addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'SEK'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
+LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
+vel_dir = '/Users/ellynenderlin/Research/miscellaneous/Greenland-VelMosaic_1995-2015/'; %GrIMP velocity mosaic: https://nsidc.org/grimp
 cd([root_dir,site_abbrev]);
 disp('Paths set, move along!');
 
@@ -65,16 +68,12 @@ switch answer
         end
     case '2) No'
         disp('creating a centerline profile & evenly-spaced cross-flow transects...');
-        LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/'];
-        vel_dir = '/Users/ellynenderlin/Research/miscellaneous/Greenland-VelMosaic_1995-2015/'; %GrIMP velocity mosaic: https://nsidc.org/grimp
         [AF,XF] = create_profile_and_transects([root_dir,site_abbrev,'/'],melmask,im_dir,vel_dir,3413);
 end
 clear answer;
 
-%UPDATE FUNCTION BELOW TO DIVIDE THE MELANGE INTO MULTIPLE BINS
-%THEN UPDATE THE ICEBERG DISTRIBUTION CODE TO SPIT OUT DISTRIBUTIONS FOR
-%EACH BIN AND THE FULL MELANGE (CURRENTLY ONLY DOES THE FULL MELANGE)
-
+%automatically extract size distributions for the full melange and subsets
+%that are defined by the transects
 extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,im_dir,output_dir)
 
 %% c) Automatically fit fragmentation curves to the size distributions
