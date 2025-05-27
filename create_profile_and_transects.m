@@ -265,9 +265,9 @@ for j = 1:inc:length(CL)
             ind = ind+1;
         end
         clear xc x_perp y_perp;
-    else
-        plot(xt,yt,'--y'); hold on; drawnow;
-        error('transect has too many or too few AOI intersections');
+%     else
+%         plot(xt,yt,'--y'); hold on; drawnow;
+%         error('transect has too many or too few AOI intersections');
     end
     
     clear perp* del_* xp yp xn ynxt yt xi yi;

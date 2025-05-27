@@ -248,7 +248,11 @@ for p = 1:length(tifs)
         %check that the melange shapefile overlies at least part of the DEM
         disp('...checking that the melange mask overlies elevation data');
         [YXgrid,YYgrid] = meshgrid(Y.x,Y.y);
-        in = inpolygon(YXgrid,YYgrid,melmask.uncropped.x,melmask.uncropped.y);
+        xvec = reshape(YXgrid,1,[]); yvec = reshape(YYgrid,1,[]);
+        xy = [xvec; yvec];
+        [stat] = inpoly2(xy',[melmask.uncropped.x,melmask.uncropped.y]);
+        in = reshape(stat,size(Y.z));
+%         in = inpolygon(YXgrid,YYgrid,melmask.uncropped.x,melmask.uncropped.y);
         if isempty(in) || sum(in(~isnan(in))) == 0
             disp('... no elevations, deleting files!')
             DEM_sourcefiles = dir([root_dir,'/',site_abbrev,'/DEMs/*',tifs(p).name(1:end-4),'*.t*']);
@@ -305,7 +309,7 @@ for p = 1:length(tifs)
             clear Z melpoly* outline_* out_* in Z*grid;
             close all; drawnow;
         end
-        clear Y*grid in;
+        clear Y*grid xvec yvec stat xy in;
     else
         disp('... already converted to correct format');
     end
@@ -1075,6 +1079,7 @@ for p = 1:length(melange_mats)
                 clear xi yi;
             end
         end
+        
         %find terminus positions inside the outline
         term_in = inpolygon(Z.term.x,Z.term.y,outline_x,outline_y); termx = Z.term.x(term_in); termy = Z.term.y(term_in);
         termdist = sqrt((outline_x(out_intercept(1))-termx).^2 + (outline_y(out_intercept(1))-termy).^2);
@@ -1102,7 +1107,7 @@ for p = 1:length(melange_mats)
         xy = [xvec; yvec];
         %UNTESTED IN THIS CODE BUT ORDERS OF MAGNITUDE FASTER WHEN
         %IMPLEMENTED INSTEAD OF INPOLYGON!
-        [stat] = inpoly2(xy',[melpoly_x',melpoly_y']);
+        [stat] = inpoly2(xy',[melpoly_x,melpoly_y]);
         in = reshape(stat,size(Z.z.ortho));
 %         in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
         Z.fjord.DEM_maskX = single(melpoly_x); Z.fjord.DEM_maskY = single(melpoly_y);
