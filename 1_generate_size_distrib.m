@@ -1,20 +1,20 @@
-% This script runs all the functions written to perform the analysis of
-% melange iceberg distributions for outlet glaciers in Greenland.
+%%% This script runs all the functions written to perform the analysis of
+%%% melange iceberg distributions for outlet glaciers in Greenland.
 
 % Author:   Ellyn Enderlin & Jukes Liu
 %           Department of Geosciences
 %           Boise State University
-%           Date: 13/09/2024
+%           Date: 27/05/2025
 
 clearvars; close all;
 addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/inpoly2/');
-addpath('/Users/ellynenderlin/Research/NSF_Greenland-Calving/melange-fragmentation-code/');
+addpath('/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'HLG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'KOG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
 LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
@@ -23,7 +23,7 @@ cd([root_dir,site_abbrev]);
 disp('Paths set, move along!');
 
 %% a) Create the melange masks using a series of manual steps
-disp('Create custom melange masks for each DEM... the last step (masking) should ideally run overnight');
+disp('Create custom melange masks for each DEM... the last step (masking) might take >1 hr if there are multiple DEMs');
 
 %check DEM location
 answer = questdlg('Are all DEM matfiles & tifs located in a DEMs directory?',...
@@ -57,6 +57,7 @@ switch answer
             disp('profiles in workspace, advancing to data extraction...');
         else
             disp('loading existing shapefiles');
+            warning('off', 'map:shapefile:missingDBF');
             shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
             for j = 1:length(shp_files)
                 if contains(shp_files(j).name,'centerline')

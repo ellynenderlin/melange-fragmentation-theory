@@ -504,7 +504,7 @@ for p = 1:length(DEM_mats)
         centroid_coords = [nanmean(XF(j).X) nanmean(XF(j).Y); nanmean(XF(j+1).X) nanmean(XF(j+1).Y)];
         
         %first transect: extend & identify intersections
-        dx1 = XF(j).X(2)-XF(j).X(1); dy1 = XF(j).Y(2)-XF(j).Y(1); 
+        dx1 = mode(diff(XF(j).X)); dy1 = mode(diff(XF(j).Y)); 
         if size(XF(j).X,1) == 1
             XF(j).X = [XF(j).X(1)-dx1,XF(j).X(1:end-1),XF(j).X(end-1)+dx1];
             XF(j).Y = [XF(j).Y(1)-dy1,XF(j).Y(1:end-1),XF(j).Y(end-1)+dy1];
@@ -514,7 +514,7 @@ for p = 1:length(DEM_mats)
         end
         [xi1,yi1,i1] = polyxpoly(XF(j).X,XF(j).Y,melmask.uncropped.x,melmask.uncropped.y);
         %second transect: extend & identify intersections
-        dx2 = XF(j+1).X(2)-XF(j+1).X(1); dy2 = XF(j+1).Y(2)-XF(j+1).Y(1); 
+        dx2 = mode(diff(XF(j+1).X)); dy2 = mode(diff(XF(j+1).Y)); 
         if size(XF(j+1).X,1) == 1
             XF(j+1).X = [XF(j+1).X(1)-dx2,XF(j+1).X(1:end-1),XF(j+1).X(end-1)+dx2];
             XF(j+1).Y = [XF(j+1).Y(1)-dy1,XF(j+1).Y(1:end-1),XF(j+1).Y(end-1)+dy2];
@@ -623,14 +623,14 @@ for p = 1:length(DEM_mats)
             bergsub_nos = binsub_zno./pixels_per_bergclass;
             %uncomment the next 7 lines to create test maps for
             %identification of DEM pixels inside the subsetted melange polygon
-%             figure; imagesc(x_subset,y_subset,in); axis xy equal; hold on;
-%             mask_cmap = colormap('gray'); mask_cmap = flipud(mask_cmap); colormap(gca,mask_cmap); colorbar;
-%             set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
-%             xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-%             set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-%             xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-%             plot(melmask.uncropped.x,melmask.uncropped.y,'-b','linewidth',2); hold on;
-%             plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
+            % figure; imagesc(x_subset,y_subset,in); axis xy equal; hold on;
+            % mask_cmap = colormap('gray'); mask_cmap = flipud(mask_cmap); colormap(gca,mask_cmap); colorbar;
+            % set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
+            % xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+            % set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+            % xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+            % plot(melmask.uncropped.x,melmask.uncropped.y,'-b','linewidth',2); hold on;
+            % plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
             
             %add to the table
             centroid = mean(centroid_coords);

@@ -208,6 +208,7 @@ for j = 1:length(CL)
     clear dist;
 end
 halfwidth = max(min_dist); %define the half-width vector
+if halfwidth < 1000; halfwidth = 1000; end
 
 %create transects
 inc = transect_inc/spacer;
@@ -215,61 +216,62 @@ XF.X = []; XF.Y = []; ind = 1;
 for j = 1:inc:length(CL)
     disp([num2str(ceil(j/inc)),' of ',num2str(ceil(length(CL)/inc)),' transects']);
     
-    %look for intersections with the AOI at up to 2x the half-width
-    for k = 1:4
-        l=0:spacer:(1+(k*0.25))*halfwidth;
-        
-        %orthogonal +90 degrees from the centerline orientation
-        perp = CL_ang(j)+90;
-        del_y = l.*sind(perp); del_x = l.*cosd(perp);
-        yp = C.Y(j)+del_y; xp = C.X(j)+del_x;
-        %orthogonal -90 degrees from the centerline orientation
-        perp_neg = CL_ang(j)-90;
-        del_y = l.*sind(perp_neg); del_x = l.*cosd(perp_neg);
-        yn = C.Y(j)+del_y; xn = C.X(j)+del_x;
-        %combine the vectors
-        xt = [fliplr(xn),xp(2:end)]; yt = [fliplr(yn),yp(2:end)];
-        
-        [xi,~] = polyxpoly(S.X,S.Y,xt,yt);
-        if isempty(xi)
-            disp('transect falls outside the AOI');
-            break;
-        elseif length(xi) == 1
-            disp('transect only intersects one side of the AOI... increasing transect length');
+    %check that the transect's intersection with the centerline falls
+    %within the fjord polygon
+    xy = [S.X, S.Y];
+    [stat] = inpoly2([C.X(j),C.Y(j)],xy);
+    if stat == 1
+        %look for intersections with the AOI, incrementally increasing
+        %length as needed
+        k=1;
+        while k
+            l=0:spacer:(1+(k*0.25))*halfwidth;
+
+            %orthogonal +90 degrees from the centerline orientation
+            perp = CL_ang(j)+90;
+            del_y = l.*sind(perp); del_x = l.*cosd(perp);
+            yp = C.Y(j)+del_y; xp = C.X(j)+del_x;
+            %orthogonal -90 degrees from the centerline orientation
+            perp_neg = CL_ang(j)-90;
+            del_y = l.*sind(perp_neg); del_x = l.*cosd(perp_neg);
+            yn = C.Y(j)+del_y; xn = C.X(j)+del_x;
+            %combine the vectors
+            xt = [fliplr(xn),xp(2:end)]; yt = [fliplr(yn),yp(2:end)];
+
+            [xi,yi] = polyxpoly(S.X,S.Y,xt,yt);
+            if length(xi) >= 2
+                %find the transect points inside the AOI
+                in = inpolygon(xt,yt,S.X,S.Y); inrefs = find(in==1);
+                %add the intersection points to the appropriate ends of the
+                %transect within the AOI
+                edge_dist = sqrt((xt(in)-xi(1)).^2 + (yt(in)-yi(1)).^2);
+                if find(edge_dist==min(edge_dist)) == 1
+                    x_perp = [xi(1),xt(inrefs(1:end)),xi(2)]; y_perp = [yi(1),yt(inrefs(1:end)),yi(2)];
+                elseif find(edge_dist==min(edge_dist)) == sum(in)
+                    x_perp = [xi(1),xt(inrefs(end:-1:1)),xi(2)]; y_perp = [yi(1),yt(inrefs(end:-1:1)),yi(2)];
+                else
+                    error('something went wrong with transect cropping!');
+                end
+                clear in inrefs edge_dist;
+
+                %add transects to a structure if they still intersect the centerline
+                [xc,~] = polyxpoly(C.X,C.Y,x_perp,y_perp);
+                if ~isempty(xc)
+                    XF(ind).X = x_perp; XF(ind).Y = y_perp;
+                    plot(x_perp,y_perp,'--y'); hold on; drawnow;
+                    ind = ind+1;
+                end
+                clear xc x_perp y_perp;
+                
+                break;
+            else
+                k = k+1;
+            end
         end
+    else
+        disp('transect falls outside the AOI');
     end
-    
-    
-    %keep transects that intersect both sides of the polygon & crop them
-    [xi,yi] = polyxpoly(S.X,S.Y,xt,yt);
-    if length(xi) == 2
-        %find the transect points inside the AOI
-        in = inpolygon(xt,yt,S.X,S.Y); inrefs = find(in==1);
-        %add the intersection points to the appropriate ends of the
-        %transect within the AOI
-        edge_dist = sqrt((xt(in)-xi(1)).^2 + (yt(in)-yi(1)).^2);
-        if find(edge_dist==min(edge_dist)) == 1
-            x_perp = [xi(1),xt(inrefs(1:end)),xi(2)]; y_perp = [yi(1),yt(inrefs(1:end)),yi(2)];
-        elseif find(edge_dist==min(edge_dist)) == sum(in)
-            x_perp = [xi(1),xt(inrefs(end:-1:1)),xi(2)]; y_perp = [yi(1),yt(inrefs(end:-1:1)),yi(2)];
-        else
-            error('something went wrong with transect cropping!');
-        end
-        clear in inrefs edge_dist;
-        
-        %add transects to a structure if they still intersect the centerline
-        [xc,~] = polyxpoly(C.X,C.Y,x_perp,y_perp);
-        if ~isempty(xc)
-            XF(ind).X = x_perp; XF(ind).Y = y_perp;
-            plot(x_perp,y_perp,'--y'); hold on; drawnow;
-            ind = ind+1;
-        end
-        clear xc x_perp y_perp;
-%     else
-%         plot(xt,yt,'--y'); hold on; drawnow;
-%         error('transect has too many or too few AOI intersections');
-    end
-    
+    clear xy stat;
     clear perp* del_* xp yp xn ynxt yt xi yi;
 end
 

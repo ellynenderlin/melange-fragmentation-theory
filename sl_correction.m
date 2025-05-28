@@ -33,19 +33,19 @@ end
 %window size for another pass at the sea level estimate
 fjord_elevs = Z.fjord.DEM_mask.*Z.z.ortho; fjord_elevs(Z.fjord.DEM_mask==0) = NaN;
 wdim = 501; whalf = (wdim-1)/2;
-for i = 1+whalf:whalf:size(Z.z.ortho,1)-(whalf+1);
-    y_sub((i-1)/whalf) = Z.y(i);
-    for j = [1:whalf:size(Z.z.ortho,2),size(Z.z.ortho,2)];
-        xmin = j-whalf; xmax = j+whalf;
+for j = 1+whalf:whalf:size(Z.z.ortho,1)-(whalf+1)
+    y_sub((j-1)/whalf) = Z.y(j);
+    for k = [1:whalf:size(Z.z.ortho,2),size(Z.z.ortho,2)]
+        xmin = k-whalf; xmax = k+whalf;
         if xmin<0; xmin = 1; end
         if xmax>size(Z.z.ortho,2); xmax = size(Z.z.ortho,2); end
-        z_sub = fjord_elevs(i-whalf:i+whalf,xmin:xmax);
-        j_index = round((j+whalf-1)/whalf);
-        x_sub(j_index) = Z.x(j);
+        z_sub = fjord_elevs(j-whalf:j+whalf,xmin:xmax);
+        k_index = round((k+whalf-1)/whalf);
+        x_sub(k_index) = Z.x(k);
         if nansum(nansum(~isnan(z_sub)))>0
-            zmin((i-1)/whalf,j_index) = nanmean(min(z_sub));
+            zmin((j-1)/whalf,k_index) = nanmean(min(z_sub));
         else
-            zmin((i-1)/whalf,j_index) = 0;
+            zmin((j-1)/whalf,k_index) = 0;
         end
         clear z_sub;
     end
