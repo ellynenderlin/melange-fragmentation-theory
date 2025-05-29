@@ -153,9 +153,15 @@ V.x = V.x(min(v_xsub):max(v_xsub)); V.y = V.y(min(v_ysub):max(v_ysub));
 
 %% plot the reference image
 
+%crop the image to adjust brightnesses appropriately
+xlims = [find(im.x<=min(S.X),1,'last'), find(im.x>=max(S.X),1,'first')];
+ylims = [find(im.y>=max(S.Y),1,'last'), find(im.y<=min(S.Y),1,'first')];
+im_subset = im.z(min(ylims):max(ylims),min(xlims):max(xlims));
+im_subset = im_subset./max(max(im_subset));
+
 %plot the image
 fig = figure; set(fig,'position',[50 50 1200 1200]);
-imagesc(im.x,im.y,im.z); axis xy equal; colormap gray; drawnow; hold on;
+imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
 
 %add the quiver to the map
 set(gca,'xlim',[min(S.X) max(S.X)],'ylim',[min(S.Y) max(S.Y)],'fontsize',14);
@@ -238,8 +244,46 @@ for j = 1:inc:length(CL)
             %combine the vectors
             xt = [fliplr(xn),xp(2:end)]; yt = [fliplr(yn),yp(2:end)];
 
+            %find intersections of transect and fjord outline
             [xi,yi] = polyxpoly(S.X,S.Y,xt,yt);
-            if length(xi) >= 2
+
+            %check that there are intersections on both sides of the centerline
+            dist_pts = sqrt((xi-C.X(j)).^2 + (yi-C.Y(j)).^2);
+            dir_pts = sign(atan2d((yi-C.Y(j)),(xi-C.X(j))));
+            vec_pts = dir_pts.*dist_pts;
+
+            %too many intersections, filter!
+            if length(xi) > 2 && ~isempty(find(vec_pts<0)) && ~isempty(find(vec_pts>0))
+                %find the indices for closest intersecting points
+                pt1_ind = find(vec_pts==max(vec_pts(vec_pts<0)));
+                pt2_ind = find(vec_pts==min(vec_pts(vec_pts>0)));
+
+                %isolate only the closest intersections
+                xi_temp = xi; yi_temp = yi; clear xi yi;
+                xi = xi_temp([pt1_ind,pt2_ind],1);
+                yi = yi_temp([pt1_ind,pt2_ind],1);
+                dist_pts = dist_pts([pt1_ind,pt2_ind]);
+                dir_pts = dir_pts([pt1_ind,pt2_ind]);
+                vec_pts = vec_pts([pt1_ind,pt2_ind]);
+                clear pt*_ind *i_temp;
+
+                %crop the transect so that the multiple intersections
+                %don't lead to finding weird points inside the polygon
+                %that make the outline incorrect
+                dist_tran = sqrt((xt-C.X(j)).^2 + (yt-C.Y(j)).^2);
+                dir_tran = sign(atan2d((yt-C.Y(j)),(xt-C.X(j))));
+                vec_tran = dir_tran.*dist_tran;
+                vec_inds = find(vec_tran>vec_pts(vec_pts<0) & vec_tran<vec_pts(vec_pts>0));
+                xt = xt([min(vec_inds)-1,vec_inds,max(vec_inds)+1]); yt = yt([min(vec_inds)-1,vec_inds,max(vec_inds)+1]);
+
+                clear d*_tran vec_tran;
+            else %multiple intersections but only on one side so transect needs to be lengthened
+                k = k + 1;
+            end
+            
+            % crop the transect and save it if it intersects one point on
+            % each side of the centerline
+            if length(xi) == 2 && ~isempty(find(vec_pts<0)) && ~isempty(find(vec_pts>0))
                 %find the transect points inside the AOI
                 in = inpolygon(xt,yt,S.X,S.Y); inrefs = find(in==1);
                 %add the intersection points to the appropriate ends of the
@@ -264,14 +308,14 @@ for j = 1:inc:length(CL)
                 clear xc x_perp y_perp;
                 
                 break;
-            else
-                k = k+1;
+            else %lengthen the transect
+                k = k+1; 
             end
         end
     else
         disp('transect falls outside the AOI');
     end
-    clear xy stat;
+    clear xy stat d*_pts vec_pts;
     clear perp* del_* xp yp xn ynxt yt xi yi;
 end
 

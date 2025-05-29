@@ -128,8 +128,16 @@ for p = 1:length(mats)
             
             %fill DEM gaps
             [Z,data_mask,gap_mask] = sl_correction(Z,WV_sigma); % perform sea level correction
-%             save(DEM_name,'Z','-v7.3'); %SAVE
-            M.DEM.x = Z.x; M.DEM.y = Z.y; M.DEM.z = Z.z.adjusted; Z.z = rmfield(Z.z,'adjusted'); %only save necessary data to the elevation distribution data file
+            
+            %mask-out locations far from the melange that were missed by
+            %earlier manual masking steps
+            BW_DEM = ones(size(Z.z.adjusted));
+            BW_DEM(isnan(Z.z.adjusted)) = 0;
+            
+            
+            %save the DEM
+            M.DEM.x = Z.x; M.DEM.y = Z.y; M.DEM.z = Z.z.adjusted; 
+            Z.z = rmfield(Z.z,'adjusted'); %only save necessary data to the elevation distribution data file
             save(DEM_name,'Z','-v7.3'); %SAVE
             
             %save fjord masks
