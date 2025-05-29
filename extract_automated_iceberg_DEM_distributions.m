@@ -92,7 +92,7 @@ alphabet = 'abcdefghijklmnopqrstuvwxyz';
 disp('Initialized size distribution extraction process.');
 %% PROCESS MELANGE MASKS
 %extract iceberg distributions for all DEMs without a manually-constructed dataset
-disp(['Extracting iceberg distributions for ',site_abbrev,'...']);
+disp('Adjusting for tides so sea level is at 0 m...');
 close all; drawnow;
 for p = 1:length(mats)
 
@@ -128,12 +128,6 @@ for p = 1:length(mats)
             
             %fill DEM gaps
             [Z,data_mask,gap_mask] = sl_correction(Z,WV_sigma); % perform sea level correction
-            
-            %mask-out locations far from the melange that were missed by
-            %earlier manual masking steps
-            BW_DEM = ones(size(Z.z.adjusted));
-            BW_DEM(isnan(Z.z.adjusted)) = 0;
-            
             
             %save the DEM
             M.DEM.x = Z.x; M.DEM.y = Z.y; M.DEM.z = Z.z.adjusted; 
@@ -241,12 +235,95 @@ disp("Done creating hole-less melange DEMs");
 
 close all;
 
-%% DELETE DEMS WITH HOLES TO REDUCE SPACE USE
-cd([root_dir,'/',site_abbrev,'/DEMs/']);
-for p = 1:length(mats)
-    recycle('on'); %send to recycling, not permanently delete
-    delete(mats(p).name);
+%% CHECK THAT MELANGE DEMS DO NOT CONTAIN SMALL REGIONS MISSED BY MANUAL MASKING
+for p = 1:length(filled_DEMs)
+    %load the data
+    disp(['date ',num2str(p),' of ',num2str(length(filled_DEMs)),' = ',filledDEM_dates(p,:)]);
+    DEM_name = [site_abbrev,'-',filledDEM_dates(p,:),'_melange-DEMfilled.mat'];
+    load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
+    [DEM_xgrid,DEM_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
+
+    %plot the map
+    figDEM = figure; set(figDEM,'position',[50 100 500 1000]);
+    sub1 = subplot(3,1,1);
+    imagesc(M.DEM.x,M.DEM.y,M.DEM.z_filled); axis xy equal;
+    melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+    hold on; DEMax = gca;
+    set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
+    cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
+    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+    title([filledDEM_dates(p,1:4),'/',filledDEM_dates(p,5:6),'/',filledDEM_dates(p,7:8)],'fontsize',16); grid on; drawnow;
+
+    %make a dummy mask & plot
+    BW_DEM = ones(size(M.DEM.z_filled));
+    BW_DEM(isnan(M.DEM.z_filled)) = 0;
+    BW_DEM(M.mask.DEM==0) = 0;
+    figure(figDEM); sub2 = subplot(3,1,2);
+    imagesc(M.DEM.x,M.DEM.y,M.mask.DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca; grid on;
+    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+    drawnow;
+    
+    %find any small unmasked bad or non-melange regions and mask them out
+    stats = regionprops(logical(BW_DEM),'Area','PixelIdxList');
+    for j = 1:size(stats,1); areas(j) = stats(j).Area; end
+    [~,idx] = sort(areas,"descend");
+    stats(idx(1)).PixelIdxList = NaN;
+    for j = 1:size(stats,2)
+        if ~isnan(stats(j).PixelIdxList)
+            BW_DEM(stats(j).PixelIdxList) = 0;
+        end
+    end
+    % pause
+    M.mask.DEM = M.mask.DEM.*BW_DEM;
+
+    %plot the mask
+    figure(figDEM); subplot(sub2);
+    imagesc(M.DEM.x,M.DEM.y,M.mask.DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+    for j = 1:size(stats,2)
+        if ~isnan(stats(j).PixelIdxList)
+            plot(DEM_xgrid(stats(j).PixelIdxList),DEM_ygrid(stats(j).PixelIdxList),'.r'); hold on;
+        end
+    end
+    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+
+    %plot to check masking worked
+    melange = M.DEM.z_filled;
+    melange(isnan(M.DEM.z_filled)) = 0;
+    melange(melange<0) = 0; melange(melange>Hmax/(917/(1026-917))) = NaN;
+    melange(M.mask.DEM==0) = NaN;
+
+    %update the figure
+    figure(figDEM);
+    sub3 = subplot(3,1,3);
+    imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal;
+    melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+    hold on; DEMax = gca; grid on;
+    set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
+    cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
+    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+    drawnow;
+
+    %resave
+    save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
+    clear M DEM_name outputberg_name BW*DEM melange stats idx areas;
+    close(figDEM); drawnow;
 end
+
+
+%% DELETE DEMS WITH HOLES TO REDUCE SPACE USE
+% cd([root_dir,'/',site_abbrev,'/DEMs/']);
+% for p = 1:length(mats)
+%     recycle('on'); %send to recycling, not permanently delete
+%     delete(mats(p).name);
+% end
 
 %% UPDATE FILE LIST
 cd([root_dir,'/',site_abbrev,'/DEMs/']);
@@ -353,13 +430,19 @@ if grab_profiles == 1
     im.y = R.YWorldLimits(2):-R.SampleSpacingInWorldY:R.YWorldLimits(1);
     im.z = double(I);
     clear I R;
+
+    %crop the image to adjust brightnesses appropriately
+    xlims = [find(im.x<=min(melmask.uncropped.x),1,'last'), find(im.x>=max(melmask.uncropped.x),1,'first')];
+    ylims = [find(im.y>=max(melmask.uncropped.y),1,'last'), find(im.y<=min(melmask.uncropped.y),1,'first')];
+    im_subset = im.z(min(ylims):max(ylims),min(xlims):max(xlims));
+    im_subset = im_subset./max(max(im_subset));
     
     %plot the elevation time series as a quality check
     elev_fig = figure; set(gcf,'position',[50 50 2000 600]);
     sub1 = subplot(1,3,1); sub2 = subplot(1,3,2); sub3 = subplot(1,3,3);
     date_cmap = cmocean('solar',size(h(1).z,2)+1); tran_cmap = cmocean('deep',length(XF)+1);
     subplot(sub1);
-    imagesc(im.x,im.y,im.z); axis xy equal; colormap gray; hold on;
+    imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; hold on;
     plot(melmask.uncropped.x,melmask.uncropped.y,'-','color','w','linewidth',2); hold on;
     af_start = find(~isnan(nanmean(h(1).z,2)) == 1,1,'first');
     plot(AF.X(af_start:end),AF.Y(af_start:end),'-','color','k','linewidth',2); hold on;
@@ -416,12 +499,11 @@ for p = 1:length(DEM_mats)
     %load the data
     disp(['date ',num2str(p),' of ',num2str(length(DEM_mats)),' = ',DEM_dates(p,:)]);
     DEM_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat']; 
-    outputberg_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat'];
     load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
     disp('Data loaded.');
         
     %extract the distribution of elevations from the melange
-%     [M_xgrid,M_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
+    [M_xgrid,M_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
     melange = M.DEM.z_filled;
     melange(isnan(M.DEM.z_filled)) = NaN;
     melange(melange<0) = 0; melange(melange>Hmax/(rho_i/(rho_sw-rho_i))) = NaN;
@@ -458,7 +540,7 @@ for p = 1:length(DEM_mats)
     m.melange.Asurfs_range(2,:) = Asurfs; m.melange.bergs_range(2,:) = berg_nos; m.melange.binwidth_range(2,:) = dA; %add to iceberg size dataset
     clear berg_* *_nos Asurf* dA h; 
 %     close(figureA); drawnow;
-    save([root_dir,'/',site_abbrev,'/DEMs/',outputberg_name],'M','m','-v7.3'); %iceberg size info
+    save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','m','-v7.3'); %iceberg size info
     
     %plot a 3-panel figure with (a) the melange DEM, 
     %(b) melange elevation histogram, and (c) the
@@ -609,24 +691,30 @@ for p = 1:length(DEM_mats)
         plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
         drawnow;
         
-        %create a DEM subset based on the bounding box for the subregion
-        DEMx_inds = [find(M.DEM.x < min(melsubset_polyx),1,'last'), find(M.DEM.x > max(melsubset_polyx),1,'first')];
-        DEMy_inds = [find(M.DEM.y < min(melsubset_polyy),1,'first'), find(M.DEM.y > max(melsubset_polyy),1,'last')];
-        melange_subset = melange(min(DEMy_inds):max(DEMy_inds),min(DEMx_inds):max(DEMx_inds));
-        if sum(sum(~isnan(melange_subset))) > 0
-            x_subset = M.DEM.x(min(DEMx_inds):max(DEMx_inds));
-            y_subset = M.DEM.y(min(DEMy_inds):max(DEMy_inds));
-            [xgrid_subset,ygrid_subset] = meshgrid(x_subset,y_subset);
+        % %create a DEM subset based on the bounding box for the subregion
+        % DEMx_inds = [1,length(M.DEM.x)]; DEMy_inds = [1,length(M.DEM.y)];
+        % %crop as needed: x vector
+        % if ~isempty(find(M.DEM.x < min(melsubset_polyx),1,'last')); DEMx_inds(1) = find(M.DEM.x < min(melsubset_polyx),1,'last'); end
+        % if ~isempty(find(M.DEM.x > max(melsubset_polyx),1,'first')); DEMx_inds(2) = find(M.DEM.x > max(melsubset_polyx),1,'first'); end
+        % %crop as needed: y vector
+        % if ~isempty(find(M.DEM.y < min(melsubset_polyy),1,'first')); DEMy_inds(1) = find(M.DEM.y < min(melsubset_polyy),1,'first'); end
+        % if ~isempty(find(M.DEM.y > max(melsubset_polyy),1,'last')); DEMy_inds(2) = find(M.DEM.y > max(melsubset_polyy),1,'last'); end
+        % %crop the DEM
+        % melange_subset = melange(min(DEMy_inds):max(DEMy_inds),min(DEMx_inds):max(DEMx_inds));
+        % if sum(sum(~isnan(melange_subset))) > 0
+        %     x_subset = M.DEM.x(min(DEMx_inds):max(DEMx_inds));
+        %     y_subset = M.DEM.y(min(DEMy_inds):max(DEMy_inds));
+        %     [xgrid_subset,ygrid_subset] = meshgrid(x_subset,y_subset);
             
             %find the melange elevations inside the polygon
 %             disp(['identifying DEM pixels in subset...']);
 %             tic
-            xvec = reshape(xgrid_subset,1,[]); yvec = reshape(ygrid_subset,1,[]);
+            xvec = reshape(M_xgrid,1,[]); yvec = reshape(M_ygrid,1,[]);
             xy = [xvec; yvec];
             [stat] = inpoly2(xy',[melsubset_polyx',melsubset_polyy']);
-            in = reshape(stat,size(melange_subset));
+            in = reshape(stat,size(melange));
 %             toc
-            [hsub.Values,hsub.BinEdges] = histcounts(melange_subset(in),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
+            [hsub.Values,hsub.BinEdges] = histcounts(melange(in),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
             binsub_zno = double(hsub.Values); %binsub_zo = double((hsub.BinEdges(1:end-1) + hsub.BinEdges(2:end))/2);
             bergsub_nos = binsub_zno./pixels_per_bergclass;
             %uncomment the next 7 lines to create test maps for
@@ -642,17 +730,17 @@ for p = 1:length(DEM_mats)
             
             %add to the table
             centroid = mean(centroid_coords);
-            disp(['percent data coverage = ',num2str(100*sum(~isnan(melange_subset(in)))./(size(melange_subset,1)*size(melange_subset,2)))]);
-            if sum(~isnan(melange_subset(in)))./sum(in(~isnan(in))) > 0.25 %if more than 25% of the subset has data, save it
+            disp(['percent data coverage = ',num2str(100*sum(~isnan(melange(in)))./sum(in(~isnan(in))))]);
+            if sum(~isnan(melange(in)))./sum(in(~isnan(in))) > 0.25 %if more than 25% of the subset has data, save it
                 Tsub.([num2str(round(centroid(1))),'E,',num2str(round(centroid(2))),'N']) = bergsub_nos';
                 writetable(Tsub,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution-subsets.csv']);
                 disp('subset data saved to CSV');
             else
                 disp('not enough elevation data in the subset... nothing saved to CSV');
             end
-        else
-            disp('subset is outside of DEM... nothing saved to CSV');
-        end
+        % else
+        %     disp('subset is outside of DEM... nothing saved to CSV');
+        % end
         
         clear melsubset* in hsub binsub* bergsub* pixelsub* centroid* *_inds *_subset xvec yvec xy stat;
     end

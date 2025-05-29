@@ -73,7 +73,7 @@ else
     melangemat_dates = '';
     melange_mats = dir([site_abbrev,'*_melange-DEM.mat']);
     for i = 1:length(melange_mats); melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs); end
-    for p = 1:sizeDEMs(1)
+    for p = 1:size(tifs,1)
         disp(DEMtif_dates(p,:));
         cd([root_dir,'/',site_abbrev,'/']);
 
