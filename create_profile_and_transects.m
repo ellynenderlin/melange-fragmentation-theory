@@ -1,4 +1,4 @@
-function [C,XF] = create_profile_and_transects(varargin)
+function [C,XF,transect_inc] = create_profile_and_transects(varargin)
 %SYNTAX (required inputs): [C,XF] = create_profile_and_transects(site_dir,AOI,im_dir,vel_dir)
 %SYNTAX (optional inputs must be in this order): [C,XF] = create_profile_and_transects(site_dir,AOI,im_dir,vel_dir,epsg_code,transect_inc,export_type)
 %
@@ -55,7 +55,6 @@ site_dir = varargin{1}; %output directory
 AOI = varargin{2};
 im_dir = varargin{3};
 vel_dir = varargin{4};
-
 
 %optional inputs
 if nargin >= 5
@@ -323,7 +322,7 @@ end
 %% export the polylines (as a csv or shapefile depending on selection)
 
 %make a directory to house all shapefiles if it doesn't exist
-if ~isfolder('shapefiles'); mkdir('shapefiles'); end
+if ~isfolder([site_dir,'shapefiles']); mkdir([site_dir,'shapefiles']); end
 
 %assume that the last directory specified in the site_dir path is named
 %after the study site & use it to define a site_abbrev variable used in the

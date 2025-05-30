@@ -1,4 +1,4 @@
-function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,im_dir,output_dir)
+function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,mask_check,im_dir,output_dir)
 %------------------------------------
 % Description: Construct iceberg size distributions from
 % automatically-extracted elevation distributions. Saves size distributions
@@ -11,6 +11,8 @@ function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,
 % name and is used for output file names)
 % AF = along-flow profile created from create_profile_and_transects.m
 % XF = across-flow transects created from create_profile_and_transects.m
+% mask_check = automatically filter-out small polygons that were skipped in
+% manual masking if mask_check = 1
 % output_dir = directory where data products produced from the pipeline are
 % stored
 %
@@ -236,87 +238,98 @@ disp("Done creating hole-less melange DEMs");
 close all;
 
 %% CHECK THAT MELANGE DEMS DO NOT CONTAIN SMALL REGIONS MISSED BY MANUAL MASKING
-for p = 1:length(filled_DEMs)
-    %load the data
-    disp(['date ',num2str(p),' of ',num2str(length(filled_DEMs)),' = ',filledDEM_dates(p,:)]);
-    DEM_name = [site_abbrev,'-',filledDEM_dates(p,:),'_melange-DEMfilled.mat'];
-    load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
-    [DEM_xgrid,DEM_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
+if mask_check == 1 
+    %double-check the quality of the manual masks, removing small regions that were missed
+    for p = 1:length(filled_DEMs)
+        %load the data
+        disp(['date ',num2str(p),' of ',num2str(length(filled_DEMs)),' = ',filledDEM_dates(p,:)]);
+        DEM_name = [site_abbrev,'-',filledDEM_dates(p,:),'_melange-DEMfilled.mat'];
+        load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
+        [DEM_xgrid,DEM_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
 
-    %plot the map
-    figDEM = figure; set(figDEM,'position',[50 100 500 1000]);
-    sub1 = subplot(3,1,1);
-    imagesc(M.DEM.x,M.DEM.y,M.DEM.z_filled); axis xy equal;
-    melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
-    hold on; DEMax = gca;
-    set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
-    cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
-    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-    title([filledDEM_dates(p,1:4),'/',filledDEM_dates(p,5:6),'/',filledDEM_dates(p,7:8)],'fontsize',16); grid on; drawnow;
+        %plot the map
+        figDEM = figure; set(figDEM,'position',[50 100 500 1000]);
+        sub1 = subplot(3,1,1);
+        imagesc(M.DEM.x,M.DEM.y,M.DEM.z_filled); axis xy equal;
+        melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+        hold on; DEMax = gca;
+        set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
+        cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        title([filledDEM_dates(p,1:4),'/',filledDEM_dates(p,5:6),'/',filledDEM_dates(p,7:8)],'fontsize',16); grid on; drawnow;
 
-    %make a dummy mask & plot
-    BW_DEM = ones(size(M.DEM.z_filled));
-    BW_DEM(isnan(M.DEM.z_filled)) = 0;
-    BW_DEM(M.mask.DEM==0) = 0;
-    figure(figDEM); sub2 = subplot(3,1,2);
-    imagesc(M.DEM.x,M.DEM.y,M.mask.DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca; grid on;
-    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-    drawnow;
-    
-    %find any small unmasked bad or non-melange regions and mask them out
-    stats = regionprops(logical(BW_DEM),'Area','PixelIdxList');
-    for j = 1:size(stats,1); areas(j) = stats(j).Area; end
-    [~,idx] = sort(areas,"descend");
-    stats(idx(1)).PixelIdxList = NaN;
-    for j = 1:size(stats,2)
-        if ~isnan(stats(j).PixelIdxList)
-            BW_DEM(stats(j).PixelIdxList) = 0;
+        %make a dummy mask & plot
+        BW_DEM = ones(size(M.DEM.z_filled));
+        BW_DEM(isnan(M.DEM.z_filled)) = 0;
+        BW_DEM(M.mask.DEM==0) = 0;
+        figure(figDEM); sub2 = subplot(3,1,2);
+        imagesc(M.DEM.x,M.DEM.y,M.mask.DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca; grid on;
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        drawnow;
+
+        %find any small unmasked bad or non-melange regions and mask them out
+        stats = regionprops(logical(BW_DEM),'Area','PixelIdxList');
+        for j = 1:size(stats,1); areas(j) = stats(j).Area; end
+        [~,idx] = sort(areas,"descend");
+        stats(idx(1)).PixelIdxList = NaN;
+        for j = 1:size(stats,2)
+            if ~isnan(stats(j).PixelIdxList)
+                BW_DEM(stats(j).PixelIdxList) = 0;
+            end
         end
-    end
-    % pause
-    M.mask.DEM = M.mask.DEM.*BW_DEM;
+        % pause
+        M.mask.DEM = M.mask.DEM.*BW_DEM;
 
-    %plot the mask
-    figure(figDEM); subplot(sub2);
-    imagesc(M.DEM.x,M.DEM.y,M.mask.DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
-    for j = 1:size(stats,2)
-        if ~isnan(stats(j).PixelIdxList)
-            plot(DEM_xgrid(stats(j).PixelIdxList),DEM_ygrid(stats(j).PixelIdxList),'.r'); hold on;
+        %plot the mask
+        figure(figDEM); subplot(sub2);
+        imagesc(M.DEM.x,M.DEM.y,M.mask.DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+        for j = 1:size(stats,2)
+            if ~isnan(stats(j).PixelIdxList)
+                plot(DEM_xgrid(stats(j).PixelIdxList),DEM_ygrid(stats(j).PixelIdxList),'.r'); hold on;
+            end
         end
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+
+        %plot to check masking worked
+        melange = M.DEM.z_filled;
+        melange(isnan(M.DEM.z_filled)) = 0;
+        melange(melange<0) = 0; melange(melange>Hmax/(917/(1026-917))) = NaN;
+        melange(M.mask.DEM==0) = NaN;
+
+        %update the figure
+        figure(figDEM);
+        sub3 = subplot(3,1,3);
+        imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal;
+        melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+        hold on; DEMax = gca; grid on;
+        set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
+        cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        drawnow;
+
+        %decide if you want to save the updated mask
+        resave_answer = questdlg('Save the updated mask?',...
+            'mask update','1) Yes','2) No','2) No');
+        switch resave_answer
+            case '1) Yes'
+                save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
+                disp('Updated the mask... moving on')
+            case '2) No'
+                disp('Did NOT update the mask... moving on')
+        end
+        clear M DEM_name outputberg_name BW*DEM melange stats idx areas;
+        clear resave_answer;
+        close(figDEM); drawnow;
     end
-    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-
-    %plot to check masking worked
-    melange = M.DEM.z_filled;
-    melange(isnan(M.DEM.z_filled)) = 0;
-    melange(melange<0) = 0; melange(melange>Hmax/(917/(1026-917))) = NaN;
-    melange(M.mask.DEM==0) = NaN;
-
-    %update the figure
-    figure(figDEM);
-    sub3 = subplot(3,1,3);
-    imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal;
-    melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
-    hold on; DEMax = gca; grid on;
-    set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
-    cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
-    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-    set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-    drawnow;
-
-    %resave
-    save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
-    clear M DEM_name outputberg_name BW*DEM melange stats idx areas;
-    close(figDEM); drawnow;
 end
-
 
 %% DELETE DEMS WITH HOLES TO REDUCE SPACE USE
 % cd([root_dir,'/',site_abbrev,'/DEMs/']);
