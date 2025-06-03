@@ -1030,31 +1030,31 @@ for p = 1:length(melange_mats)
         drawnow;
     end
 
-    %check if you want to forcibly re-create the mask
-%     answer = questdlg('Do you need to recreate the melange mask (redrawn terminus or glacier masked)?',...
-%         'Mask Redo','1) Yes!','2) No!','1) Yes!');
-%     switch answer
-%         case '1) Yes!'
-%             redo_flag = 1;
-%         case '2) No!'
-%             redo_flag = 0;
-%     end
-%     clear answer; close(gcf);
+    %check if you want to forcibly re-create the filled DEM
+    answer = questdlg('Do you need to recreate the filled melange DEM (redrawn terminus or glacier masked)?',...
+        'Mask Redo','1) Yes!','2) No!','1) Yes!');
+    switch answer
+        case '1) Yes!'
+            redo_flag = 1;
+            %delete filled DEM created with wrong mask (if is exists)
+            if ~isempty(filled_DEMs)
+                %find the corresponding filled DEM
+                for k = 1:size(filledDEM_dates,1)
+                    filledflag(k) = contains(DEM_name,filledDEM_dates(k,:));
+                end
+                %delete the corresponding filled DEM
+                if sum(filledflag > 0)
+                    delete([filled_DEMs(filledflag==1).name]);
+                end
+                clear filledflag;
+            end
+        case '2) No!'
+            redo_flag = 0;
+    end
+    clear answer; %close(gcf);
 % 
 %     %identify if it is a newly-delineated terminus (if so, apply masks)
 %     if isempty(melmask.dated(maskref).x) || redo_flag == 1
-        %delete filled DEM created with wrong mask (if is exists)
-        if ~isempty(filled_DEMs)
-            %find the corresponding filled DEM
-            for k = 1:size(filledDEM_dates,1)
-                filledflag(k) = contains(DEM_name,filledDEM_dates(k,:));
-            end
-            %delete the corresponding filled DEM
-            if sum(filledflag > 0)
-                delete([filled_DEMs(filledflag==1).name]);
-            end
-            clear filledflag;
-        end
 
         %crop the melange mask using the terminus trace
         out_intercept = []; out_interceptx = []; out_intercepty = [];

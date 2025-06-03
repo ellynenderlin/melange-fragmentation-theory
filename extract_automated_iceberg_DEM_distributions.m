@@ -1,4 +1,4 @@
-function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,mask_check,im_dir,output_dir)
+function extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,mask_check,transect_spacer,im_dir,output_dir)
 %------------------------------------
 % Description: Construct iceberg size distributions from
 % automatically-extracted elevation distributions. Saves size distributions
@@ -296,6 +296,39 @@ if mask_check == 1
         set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
 
+        %manually mask-out any remaining splotches of data that were
+        %somehow skipped (e.g., near fjord wall but connected to melange)
+        blunder_question = questdlg('Mask out any remaining "blunders"?',...
+            'Blunder ID','1) Yes!','2) No!','1) Yes!');
+        switch blunder_question
+            case '1) Yes!'
+                figure(figDEM); subplot(sub1);
+                disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
+                [a] = ginput(2);
+                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                drawnow;
+                figure(figDEM); subplot(sub2);
+                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                drawnow;
+                disp('Draw a polygon on the mask to update it');
+                [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
+                BW_DEM = anom_zmask.*BW_DEM;
+                
+                %update the plot
+                imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+                fill(xm,ym,'r'); hold on;
+                set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+                set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+                xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+                
+                %update the mask
+                M.mask.DEM = M.mask.DEM.*BW_DEM;
+                clear anom_zmask xm ym;
+            case '2) No!'
+                disp('Good mask!')
+        end
+        clear blunder_question;
+
         %plot to check masking worked
         melange = M.DEM.z_filled;
         melange(isnan(M.DEM.z_filled)) = 0;
@@ -517,6 +550,7 @@ for p = 1:length(DEM_mats)
         
     %extract the distribution of elevations from the melange
     [M_xgrid,M_ygrid] = meshgrid(M.DEM.x,M.DEM.y);
+    xvec = reshape(M_xgrid,1,[]); yvec = reshape(M_ygrid,1,[]); xy = [xvec; yvec];
     melange = M.DEM.z_filled;
     melange(isnan(M.DEM.z_filled)) = NaN;
     melange(melange<0) = 0; melange(melange>Hmax/(rho_i/(rho_sw-rho_i))) = NaN;
@@ -684,6 +718,49 @@ for p = 1:length(DEM_mats)
         else
             error('Unexpected polyline shapes');
         end
+
+        %if the melange mask protruded to the side for real (say where a
+        %tributary glacier enters the system) and the index adjustment to
+        %account for wrapping around the ends forced the mask to go the
+        %other way, the centroid should not be in the mask & you need to
+        %force re-do it (Ex: Midgard Glacier, SE Greenland = MGG)
+        [stat] = inpoly2(nanmean(centroid_coords),[melsubset_polyx',melsubset_polyy']);
+        if stat == 0
+            clear mel*_inds melsubset_polyx melsubset_polyy;
+            %redo first set of side coordinates
+            if i2(nntei,2) > i1(1,2)
+                mel1_inds = [i1(1,2)+1:1:i2(nntei,2)];
+            elseif i2(nntei,2) < i1(1,2)
+                mel1_inds = [i1(1,2):-1:i2(nntei,2)+1];
+            elseif i2(nntei,2) == i1(1,2)
+                mel1_inds = [];
+            else
+                error('no melange mask coordinates identified!');
+            end
+            clear side_coords;
+            %redo second set of side coordinates
+            if i2(nntef,2) < i1(2,2)
+                mel2_inds = [i2(nntef,2)+1:1:i1(2,2)]; %fjord mask indices increase between transect ends
+            elseif i2(nntef,2) > i1(2,2)
+                mel2_inds = [i2(nntef,2):-1:i1(2,2)+1];
+            elseif i2(nntef,2) == i1(2,2)
+                mel2_inds = [];
+            else
+                error('no melange mask coordinates identified!');
+            end
+            clear side_coords;
+            %put the full polygon together to subset the melange
+            if size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(XF(j).X,1)==1
+                melsubset_polyx = [xi1(1), melmask.uncropped.x(mel1_inds)', xi2(nntei), xi2(nntef), melmask.uncropped.x(mel2_inds)', xi1(2), xi1(1)];
+                melsubset_polyy = [yi1(1), melmask.uncropped.y(mel1_inds)', yi2(nntei), yi2(nntef), melmask.uncropped.y(mel2_inds)', yi1(2), yi1(1)];
+            elseif size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(melmask.uncropped.x,1)==1
+                melsubset_polyx = [xi1(1), melmask.uncropped.x(mel1_inds), xi2(nntei), xi2(nntef), melmask.uncropped.x(mel2_inds), xi1(2), xi1(1)];
+                melsubset_polyy = [yi1(1), melmask.uncropped.y(mel1_inds), yi2(nntei), yi2(nntef), melmask.uncropped.y(mel2_inds), yi1(2), yi1(1)];
+            else
+                error('Unexpected polyline shapes');
+            end
+        end
+        clear stat;
         clear xi* yi* i1 i2 mel*_inds;
         
         %plot the melange mask subset as a quality check
@@ -703,59 +780,42 @@ for p = 1:length(DEM_mats)
         plot(XF(j+1).X,XF(j+1).Y,'-b','linewidth',2); hold on;
         plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
         drawnow;
-        
-        % %create a DEM subset based on the bounding box for the subregion
-        % DEMx_inds = [1,length(M.DEM.x)]; DEMy_inds = [1,length(M.DEM.y)];
-        % %crop as needed: x vector
-        % if ~isempty(find(M.DEM.x < min(melsubset_polyx),1,'last')); DEMx_inds(1) = find(M.DEM.x < min(melsubset_polyx),1,'last'); end
-        % if ~isempty(find(M.DEM.x > max(melsubset_polyx),1,'first')); DEMx_inds(2) = find(M.DEM.x > max(melsubset_polyx),1,'first'); end
-        % %crop as needed: y vector
-        % if ~isempty(find(M.DEM.y < min(melsubset_polyy),1,'first')); DEMy_inds(1) = find(M.DEM.y < min(melsubset_polyy),1,'first'); end
-        % if ~isempty(find(M.DEM.y > max(melsubset_polyy),1,'last')); DEMy_inds(2) = find(M.DEM.y > max(melsubset_polyy),1,'last'); end
-        % %crop the DEM
-        % melange_subset = melange(min(DEMy_inds):max(DEMy_inds),min(DEMx_inds):max(DEMx_inds));
-        % if sum(sum(~isnan(melange_subset))) > 0
-        %     x_subset = M.DEM.x(min(DEMx_inds):max(DEMx_inds));
-        %     y_subset = M.DEM.y(min(DEMy_inds):max(DEMy_inds));
-        %     [xgrid_subset,ygrid_subset] = meshgrid(x_subset,y_subset);
             
-            %find the melange elevations inside the polygon
+        %find the melange elevations inside the polygon
 %             disp(['identifying DEM pixels in subset...']);
 %             tic
-            xvec = reshape(M_xgrid,1,[]); yvec = reshape(M_ygrid,1,[]);
-            xy = [xvec; yvec];
-            [stat] = inpoly2(xy',[melsubset_polyx',melsubset_polyy']);
-            in = reshape(stat,size(melange));
+        [stat] = inpoly2(xy',[melsubset_polyx',melsubset_polyy']);
+        in = reshape(stat,size(melange));
 %             toc
-            [hsub.Values,hsub.BinEdges] = histcounts(melange(in),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
-            binsub_zno = double(hsub.Values); %binsub_zo = double((hsub.BinEdges(1:end-1) + hsub.BinEdges(2:end))/2);
-            bergsub_nos = binsub_zno./pixels_per_bergclass;
-            %uncomment the next 7 lines to create test maps for
-            %identification of DEM pixels inside the subsetted melange polygon
-            % figure; imagesc(x_subset,y_subset,in); axis xy equal; hold on;
-            % mask_cmap = colormap('gray'); mask_cmap = flipud(mask_cmap); colormap(gca,mask_cmap); colorbar;
-            % set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
-            % xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-            % set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-            % xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-            % plot(melmask.uncropped.x,melmask.uncropped.y,'-b','linewidth',2); hold on;
-            % plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
-            
-            %add to the table
-            centroid = mean(centroid_coords);
-            disp(['percent data coverage = ',num2str(100*sum(~isnan(melange(in)))./sum(in(~isnan(in))))]);
-            if sum(~isnan(melange(in)))./sum(in(~isnan(in))) > 0.25 %if more than 25% of the subset has data, save it
-                Tsub.([num2str(round(centroid(1))),'E,',num2str(round(centroid(2))),'N']) = bergsub_nos';
-                writetable(Tsub,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution-subsets.csv']);
-                disp('subset data saved to CSV');
-            else
-                disp('not enough elevation data in the subset... nothing saved to CSV');
-            end
-        % else
-        %     disp('subset is outside of DEM... nothing saved to CSV');
-        % end
+        [hsub.Values,hsub.BinEdges] = histcounts(melange(in),0:1:ceil(Hmax/(rho_i/(rho_sw-rho_i)))); hold on;
+        binsub_zno = double(hsub.Values); %binsub_zo = double((hsub.BinEdges(1:end-1) + hsub.BinEdges(2:end))/2);
+        bergsub_nos = binsub_zno./pixels_per_bergclass;
+        %uncomment the next 7 lines to create test maps for
+        %identification of DEM pixels inside the subsetted melange polygon
+        % figure; imagesc(x_subset,y_subset,in); axis xy equal; hold on;
+        % mask_cmap = colormap('gray'); mask_cmap = flipud(mask_cmap); colormap(gca,mask_cmap); colorbar;
+        % set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
+        % xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        % set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        % xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        % plot(melmask.uncropped.x,melmask.uncropped.y,'-b','linewidth',2); hold on;
+        % plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
+
+        %add to the table if the melange area is big enough
+        pixel_area = abs((M.DEM.x(2)-M.DEM.x(1)).*(M.DEM.y(2)-M.DEM.y(1)));
+        centroid = mean(centroid_coords);
+        disp(['percent data coverage = ',num2str(100*sum(~isnan(melange(in)))./sum(in(~isnan(in))))]);
+        disp(['area of data coverage = ',num2str(sum(~isnan(melange(in))).*pixel_area),' m^2']);
+        % if sum(~isnan(melange(in)))./sum(in(~isnan(in))) > 0.25 %if more than 25% of the subset has data, save it
+        if sum(~isnan(melange(in))).*pixel_area > (transect_spacer*1000) %if the subset area with data covers an average of >1 km-wide, save it
+            Tsub.([num2str(round(centroid(1))),'E,',num2str(round(centroid(2))),'N']) = bergsub_nos';
+            writetable(Tsub,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution-subsets.csv']);
+            disp('subset data saved to CSV');
+        else
+            disp('not enough elevation data in the subset... nothing saved to CSV');
+        end
         
-        clear melsubset* in hsub binsub* bergsub* pixelsub* centroid* *_inds *_subset xvec yvec xy stat;
+        clear melsubset* in hsub binsub* bergsub* pixelsub* centroid* *_inds *_subset stat;
     end
     close(subfig);
 

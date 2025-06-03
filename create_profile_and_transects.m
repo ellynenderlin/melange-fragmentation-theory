@@ -21,12 +21,12 @@ function [C,XF,transect_inc] = create_profile_and_transects(varargin)
 %vel_dir = full path for velocity vector geotiffs with 'vx' and 'vy' in
 %file names used to identify the two vector components
 %
-%epsg_code = numeric EPSG code for the coordinate reference system 
+%epsg_code = numeric EPSG code for the coordinate reference system
 %(default = 3413 for Greenland Polar Stereographic)
 %transect_inc = distance, in meters, between cross-flow transects extending
 %from the centerline (default = 2000)
 %
-%export_type = file type for centerline and transect polylines 
+%export_type = file type for centerline and transect polylines
 %(options: SHP, CSV; default = SHP)
 %
 %OUTPUT:
@@ -37,7 +37,7 @@ function [C,XF,transect_inc] = create_profile_and_transects(varargin)
 %SHP or CSV = the centerline and transect polylines will be saved as either
 %shapefiles or comma separated value files in a 'shapefiles' directory
 %
-%DEPENDENCIES: 
+%DEPENDENCIES:
 %interparc.m available through Matlab File Exchange
 %(https://www.mathworks.com/matlabcentral/fileexchange/34874-interparc)
 %
@@ -59,7 +59,7 @@ vel_dir = varargin{4};
 %optional inputs
 if nargin >= 5
     epsg_code = varargin{5}; %specified coordinate reference system
-    
+
     if nargin >= 6
         transect_inc = varargin{6}; %specified transect spacing
         if nargin == 7
@@ -76,6 +76,8 @@ else
     export_type = 'shp'; %default file type for polyline export
 end
 site_crs = projcrs(epsg_code);
+
+spacer = 2; %spacing increment (m): default 2 m is the spatial resolution of WorldView DEMs
 
 %% load data
 
@@ -180,7 +182,6 @@ figure(fig); [~,~,~,xi,yi] = improfile; %be patient, a + cursor will appear, dou
 % plot(xi,yi,'xy'); hold on;
 
 %create a regularly interpolated version of the centerline
-spacer = 2; %spacing increment (m): default 2 m is the spatial resolution of WorldView DEMs
 prof_length = nansum(sqrt((xi(2:end)-xi(1:end-1)).^2 + (yi(2:end)-yi(1:end-1)).^2));
 interpCL_100m = interparc(round(prof_length/100),xi,yi,'spline'); %create a spooth line with spacing of ~100 m
 % plot(interpCL_100m(:,1),interpCL_100m(:,2),'sy'); hold on;
@@ -203,6 +204,7 @@ CL_ang(length(C.X)) = CL_ang(length(C.X)-1);
 
 
 %% extend lines orthogonal from the centerline orientation at even increments
+xy = [S.X, S.Y];
 
 %calculate the distance from each centerline point to the nearest AOI
 %vertex then use the maximum distance to define the length of the
@@ -220,10 +222,9 @@ inc = transect_inc/spacer;
 XF.X = []; XF.Y = []; ind = 1;
 for j = 1:inc:length(CL)
     disp([num2str(ceil(j/inc)),' of ',num2str(ceil(length(CL)/inc)),' transects']);
-    
+
     %check that the transect's intersection with the centerline falls
     %within the fjord polygon
-    xy = [S.X, S.Y];
     [stat] = inpoly2([C.X(j),C.Y(j)],xy);
     if stat == 1
         %look for intersections with the AOI, incrementally increasing
@@ -279,7 +280,7 @@ for j = 1:inc:length(CL)
             else %multiple intersections but only on one side so transect needs to be lengthened
                 k = k + 1;
             end
-            
+
             % crop the transect and save it if it intersects one point on
             % each side of the centerline
             if length(xi) == 2 && ~isempty(find(vec_pts<0)) && ~isempty(find(vec_pts>0))
@@ -301,20 +302,20 @@ for j = 1:inc:length(CL)
                 [xc,~] = polyxpoly(C.X,C.Y,x_perp,y_perp);
                 if ~isempty(xc)
                     XF(ind).X = x_perp; XF(ind).Y = y_perp;
-                    plot(x_perp,y_perp,'--y'); hold on; drawnow;
+                    plot(x_perp,y_perp,'--y','linewidth',2); hold on; drawnow;
                     ind = ind+1;
                 end
                 clear xc x_perp y_perp;
-                
+
                 break;
             else %lengthen the transect
-                k = k+1; 
+                k = k+1;
             end
         end
     else
         disp('transect falls outside the AOI');
     end
-    clear xy stat d*_pts vec_pts;
+    clear stat d*_pts vec_pts;
     clear perp* del_* xp yp xn ynxt yt xi yi;
 end
 
@@ -345,19 +346,19 @@ if strcmpi(export_type,'shp')
     wkt = wktstring(s.CoordinateReferenceSystem);
     writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline.prj'],'FileType','text', 'QuoteStrings', false);
     clear s;
-    
+
     %transects
     for j = 1:length(XF)
         s(j).Geometry = 'Polyline';
         s(j).BoundingBox = double([min(S.X) min(S.Y); max(S.X) max(S.Y)]);
         s(j).X = double(XF(j).X); s(j).Y = double(XF(j).Y);
     end
-    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_',num2str(transect_inc),'m_transects.shp']);
-    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_',num2str(transect_inc),'m_transects.prj'],'FileType','text', 'QuoteStrings', false);
+    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.shp']);
+    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.prj'],'FileType','text', 'QuoteStrings', false);
     clear s;
 else
     disp('exporting centerline & transects as CSVs');
-    
+
     %centerline
     T=table(C.Y,C.X);
     column_names = ["Northing","Easting"];
@@ -365,7 +366,7 @@ else
     T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
     writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline.csv']);
     clear T;
-    
+
     %transects
     TY = []; TX = [];
     for j = 1:length(XF)
@@ -376,9 +377,59 @@ else
     column_names = ["Northing","Easting"];
     column_units = ["m","m"];
     T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
-    writetable(T,[site_dir,'shapefiles/',site_abbrev,'_',num2str(transect_inc),'m_transects.csv']);
+    writetable(T,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.csv']);
     clear T TY TX;
-    
+
+end
+
+%% create CSV of coordinates for the intersection of each transect with the centerline (for velocity extraction)
+xy = [S.X, S.Y]; 
+w = who;
+
+%create centerline profile vector
+if ismember('C',w) == 0 && ismember('AF',w) == 1
+    C.X = AF.X; C.Y = AF.Y;
+end
+
+inc = transect_inc/spacer; ind = 1;
+for j = 1:inc:length(C.X)
+    %check that the transect's intersection with the centerline falls
+    %within the fjord polygon, then add it if it does
+    [stat] = inpoly2([C.X(j),C.Y(j)],xy);
+    if stat == 1
+        %add coordinates to the vector
+        AX_X(ind,1) = C.X(j); AX_Y(ind,1) = C.Y(j);
+
+        %advance
+        ind = ind+1;
+        clear stat;
+    end
+end
+
+%write to file
+if strcmpi(export_type,'shp')
+    disp('exporting centerline points at transect intersections as shapefiles');
+    %centerline
+    s.Geometry = 'PolyLine';
+    s.BoundingBox = double([min(AX_X) min(AX_X); max(AX_Y) max(AX_Y)]);
+    s.X = double(AX_X); s.Y = double(AX_Y);
+    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.shp']);
+    s.CoordinateReferenceSystem = site_crs;
+    wkt = wktstring(s.CoordinateReferenceSystem);
+    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.prj'],'FileType','text', 'QuoteStrings', false);
+    clear s;
+
+else
+    disp('exporting centerline points at transect intersections as CSVs');
+
+    %centerline
+    T=table(AX_Y,AX_X);
+    column_names = ["Northing","Easting"];
+    column_units = ["m","m"];
+    T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
+    writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.csv']);
+    clear T;
+
 end
 
 end
