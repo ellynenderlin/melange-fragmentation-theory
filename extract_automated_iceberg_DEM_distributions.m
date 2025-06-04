@@ -296,38 +296,38 @@ if mask_check == 1
         set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
 
-        %manually mask-out any remaining splotches of data that were
-        %somehow skipped (e.g., near fjord wall but connected to melange)
-        blunder_question = questdlg('Mask out any remaining "blunders"?',...
-            'Blunder ID','1) Yes!','2) No!','1) Yes!');
-        switch blunder_question
-            case '1) Yes!'
-                figure(figDEM); subplot(sub1);
-                disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
-                [a] = ginput(2);
-                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-                drawnow;
-                figure(figDEM); subplot(sub2);
-                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-                drawnow;
-                disp('Draw a polygon on the mask to update it');
-                [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
-                BW_DEM = anom_zmask.*BW_DEM;
-                
-                %update the plot
-                imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
-                fill(xm,ym,'r'); hold on;
-                set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-                set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-                xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-                
-                %update the mask
-                M.mask.DEM = M.mask.DEM.*BW_DEM;
-                clear anom_zmask xm ym;
-            case '2) No!'
-                disp('Good mask!')
-        end
-        clear blunder_question;
+%         %manually mask-out any remaining splotches of data that were
+%         %somehow skipped (e.g., near fjord wall but connected to melange)
+%         blunder_question = questdlg('Mask out any remaining "blunders"?',...
+%             'Blunder ID','1) Yes!','2) No!','1) Yes!');
+%         switch blunder_question
+%             case '1) Yes!'
+%                 figure(figDEM); subplot(sub1);
+%                 disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
+%                 [a] = ginput(2);
+%                 set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+%                 drawnow;
+%                 figure(figDEM); subplot(sub2);
+%                 set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+%                 drawnow;
+%                 disp('Draw a polygon on the mask to update it');
+%                 [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
+%                 BW_DEM = anom_zmask.*BW_DEM;
+%                 
+%                 %update the plot
+%                 imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+%                 fill(xm,ym,'r'); hold on;
+%                 set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+%                 set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+%                 xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+%                 
+%                 %update the mask
+%                 M.mask.DEM = M.mask.DEM.*BW_DEM;
+%                 clear anom_zmask xm ym;
+%             case '2) No!'
+%                 disp('Good mask!')
+%         end
+%         clear blunder_question;
 
         %plot to check masking worked
         melange = M.DEM.z_filled;
@@ -764,22 +764,24 @@ for p = 1:length(DEM_mats)
         clear xi* yi* i1 i2 mel*_inds;
         
         %plot the melange mask subset as a quality check
-        if j == 1
-            subfig = figure; set(gcf,'position',[50 50 500 500]);
-            imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
-            melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
-            set(gca,'clim',[0 16],'fontsize',16); cbar = colorbar('fontsize',16); cbar.Label.String = 'elevation (m a.s.l.)';
-            set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
-            xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-            set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-            xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); hold on;
+        if p == 1 %only plot for the first DEM to check that it is masking correctly
+            if j == 1
+                subfig = figure; set(gcf,'position',[50 50 500 500]);
+                imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal; hold on;
+                melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+                set(gca,'clim',[0 16],'fontsize',16); cbar = colorbar('fontsize',16); cbar.Label.String = 'elevation (m a.s.l.)';
+                set(gca,'xlim',[min(melmask.dated(p).x) max(melmask.dated(p).x)],'ylim',[min(melmask.dated(p).y) max(melmask.dated(p).y)]);
+                xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+                set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+                xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+                plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); hold on;
+            end
+            figure(subfig);
+            plot(XF(j).X,XF(j).Y,'-b','linewidth',2); hold on;
+            plot(XF(j+1).X,XF(j+1).Y,'-b','linewidth',2); hold on;
+            plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
+            drawnow;
         end
-        figure(subfig);
-        plot(XF(j).X,XF(j).Y,'-b','linewidth',2); hold on;
-        plot(XF(j+1).X,XF(j+1).Y,'-b','linewidth',2); hold on;
-        plot(melsubset_polyx,melsubset_polyy,'--c','linewidth',2); hold on;
-        drawnow;
             
         %find the melange elevations inside the polygon
 %             disp(['identifying DEM pixels in subset...']);

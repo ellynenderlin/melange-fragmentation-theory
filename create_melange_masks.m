@@ -477,8 +477,7 @@ for p = 1:length(melange_mats)
         %identify the starting uncropped melange mask vertex to use when
         %generating cropped melange masks (should be in the water!)
         if p == 1
-            w = who; %load a list of current variables
-            if sum(contains(w,'im')) == 0 %if the Landsat image isn't loaded as a variable, load it
+            if ~exist('im') %if the Landsat image isn't loaded as a variable, load it
                 L8bands = dir([im_dir,'L*.TIF']);
                 for i = 1:length(L8bands)
                     if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
@@ -499,7 +498,7 @@ for p = 1:length(melange_mats)
             %plot the image to check the starting point for the melange mask             
             im_fig = figure; set(gcf,'position',[50 50 1600 600]);
             imagesc(im.x,im.y,im.z); axis xy equal; colormap gray; drawnow; hold on;
-            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+            plot(melmask.uncropped.x,melmask.uncropped.y,'-c','linewidth',3); hold on;
             drawnow;
             
             %plot the melange mask
@@ -667,7 +666,10 @@ for p = 1:length(melange_mats)
                     clear termzoom_question;
                     disp('trace a line at the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
                     disp('... if the terminus isn''t visible, draw a straight line across the inland limit of observations');
-                    [term_x,term_y,~] = improfile;
+%                     [term_x,term_y,~] = improfile;
+                    pline = drawpolyline('Color','c','Linewidth',1);
+                    term_x = pline.Position(:,1); term_y = pline.Position(:,2); clear pline;
+                    [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
                     [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
 
                     %save the mask for each time step
@@ -873,7 +875,9 @@ for p = 1:length(melange_mats)
                             end
                         end
                         melmask.dated(maskref).x = []; melmask.dated(maskref).y = [];
-                        [term_x,term_y,~] = improfile;
+%                         [term_x,term_y,~] = improfile;
+                        pline = drawpolyline('Color','c','Linewidth',1);
+                        term_x = pline.Position(:,1); term_y = pline.Position(:,2); clear pline;
                         [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
 
                         %save the mask for each time step
@@ -1094,7 +1098,10 @@ for p = 1:length(melange_mats)
             drawnow;
             disp('retrace the bottom of the terminus cliff, placing one point on each end outside of the melange outline');
             Z.term.x = []; Z.term.y = [];
-            [term_x,term_y,~] = improfile;
+%             [term_x,term_y,~] = improfile;
+            pline = drawpolyline('Color','c','Linewidth',1);
+            term_x = pline.Position(:,1); term_y = pline.Position(:,2); clear pline;
+            [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
             [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
             close(gcf); drawnow;
 
