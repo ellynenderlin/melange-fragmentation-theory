@@ -1,4 +1,4 @@
-function create_melange_masks(root_dir,site_abbrev,output_dir)
+function create_melange_masks(root_dir,site_abbrev,im_dir,output_dir)
 %------------------------------------
 % Description: Intersect the melange masks used to crop digital elevation
 % models with manual terminus delineations to create a time series of
@@ -37,14 +37,13 @@ else
 
     %load the panchromatic Landsat scene & create a glacier/fjord mask
     cd([root_dir,'/',site_abbrev]);
-    L8dir = dir('LC08*'); cd(L8dir(1).name);
-    L8bands = dir('L*.TIF');
+    L8bands = dir([im_dir,'L*.TIF']);
     for i = 1:length(L8bands)
         if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
             if contains(version,'R2021')
-                [I,S] = readgeoraster(L8bands(i).name);
+                [I,S] = readgeoraster([im_dir,L8bands(i).name]);
             else
-                [I,S] = readgeoraster(L8bands(i).name);
+                [I,S] = readgeoraster([im_dir,L8bands(i).name]);
             end
 %             info = geotiffinfo(L8bands(i).name);
             im.x = S.XWorldLimits(1):S.SampleSpacingInWorldX:S.XWorldLimits(2);
@@ -103,7 +102,7 @@ else
     close(gcf); drawnow;
     cd(output_dir);
     melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
-    save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+    save([output_dir,site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
 end
 melange_xlims = [min(melmask.uncropped.x)-2000 max(melmask.uncropped.x)+2000]; melange_ylims = [min(melmask.uncropped.y)-2000 max(melmask.uncropped.y)+2000];
 disp('...moving on');
@@ -337,11 +336,10 @@ switch answer
         melmask_file = dir('*-melange-masks.mat');
 
         %load the panchromatic Landsat scene & create a glacier/fjord mask
-        L8dir = dir('LC08*'); cd(L8dir(1).name);
-        L8bands = dir('L*.TIF');
+        L8bands = dir([im_dir,'L*.TIF']);
         for i = 1:length(L8bands)
             if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
-                [I,S] = readgeoraster(L8bands(i).name);
+                [I,S] = readgeoraster([im_dir,L8bands(i).name]);
                 im.x = S.XWorldLimits(1):S.SampleSpacingInWorldX:S.XWorldLimits(2);
                 im.y = S.YWorldLimits(2):-S.SampleSpacingInWorldY:S.YWorldLimits(1);
                 im.z = double(I);
@@ -400,7 +398,7 @@ switch answer
         cd(output_dir);
         melmask = rmfield(melmask,'uncropped');
         melmask.uncropped.x = fjord_maskx; melmask.uncropped.y = fjord_masky;
-        save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+        save([output_dir,site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
         disp('Edited mask saved');
     case '2) No!'
         disp('Carrying on with already-edited fjord mask');
@@ -479,6 +477,32 @@ for p = 1:length(melange_mats)
         %identify the starting uncropped melange mask vertex to use when
         %generating cropped melange masks (should be in the water!)
         if p == 1
+            w = who; %load a list of current variables
+            if sum(contains(w,'im')) == 0 %if the Landsat image isn't loaded as a variable, load it
+                L8bands = dir([im_dir,'L*.TIF']);
+                for i = 1:length(L8bands)
+                    if ~isempty(strfind(L8bands(i).name,'B8PS.TIF')) %Landsat panchromatic image reprojected to PS coordinates
+                        if contains(version,'R2021')
+                            [I,S] = readgeoraster([im_dir,L8bands(i).name]);
+                        else
+                            [I,S] = readgeoraster([im_dir,L8bands(i).name]);
+                        end
+                        %             info = geotiffinfo(L8bands(i).name);
+                        im.x = S.XWorldLimits(1):S.SampleSpacingInWorldX:S.XWorldLimits(2);
+                        im.y = S.YWorldLimits(2):-S.SampleSpacingInWorldY:S.YWorldLimits(1);
+                        im.z = double(I);
+                        clear I S;
+                    end
+                end
+            end
+
+            %plot the image to check the starting point for the melange mask             
+            im_fig = figure; set(gcf,'position',[50 50 1600 600]);
+            imagesc(im.x,im.y,im.z); axis xy equal; colormap gray; drawnow; hold on;
+            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
+            drawnow;
+            
+            %plot the melange mask
             [meledge_x, meledge_y] = poly2cw(melmask.uncropped.x,melmask.uncropped.y); %make sure melange outline is a clockwise polygon
             [gris_center_x, gris_center_y] = wgs2ps(-41.2, 76.7); % grab the center of the GrIS in PS coordinates
             meledge_dist = sqrt((meledge_x-gris_center_x).^2 + (meledge_y-gris_center_y).^2); %find the distance from the GrIS center to each melange outline vertex
@@ -507,14 +531,7 @@ for p = 1:length(melange_mats)
             else
                 outline_x = meledge_x; outline_y = meledge_y;
             end
-            clear meledge*; close(figure1); drawnow;
-
-            %recreate figure without marks for the melange mask start vertex
-            figure1 = figure; set(gcf,'position',[50 50 1600 600]);
-            imagesc(double(Z.x),double(Z.y),double(Z.z.ortho)); axis xy equal; hold on;
-            colormap(gca,elev_cmap); set(gca,'clim',[0 80]); cbar = colorbar;
-            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',3); hold on;
-            drawnow;
+            clear meledge*; close(im_fig); drawnow;
         end
 
         %determine if using a new DEM (if there is a geotiff with the same date
@@ -531,6 +548,7 @@ for p = 1:length(melange_mats)
             clear spurious* anom* blunders;
 
             %zoom in on the DEM
+            figure(figure1);
             set(gca,'xlim',[nanmean([min(melmask.uncropped.x); min(Z.x')]) nanmean([max(melmask.uncropped.x); max(Z.x)'])],'ylim',[nanmean([min(melmask.uncropped.y); min(Z.y')]) nanmean([max(melmask.uncropped.y); max(Z.y')])]);
             drawnow;
 
@@ -1132,7 +1150,7 @@ for p = 1:length(melange_mats)
         melmask.dated(maskref).datestring = melangemat_dates(p,:);
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
         cd(output_dir);
-        save([site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+        save([output_dir,site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
         save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'Z','-v7.3'); %raw & intermediate elevation data
         saveas(gcf,[site_abbrev,'-',melangemat_dates(p,:),'-melange-DEMmap.png'],'png');
         disp(['Saved ',DEM_name]);

@@ -14,7 +14,7 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 addpath('/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'MDG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'ZIM'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
 LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
@@ -22,8 +22,17 @@ vel_dir = '/Users/ellynenderlin/Research/miscellaneous/Greenland-VelMosaic_1995-
 cd([root_dir,site_abbrev]);
 disp('Paths set, move along!');
 
+%define the spacing increment for cross-flow transects
+transect_spacer = 2000;
+
+
 %% a) Create the melange masks using a series of manual steps
 disp('Create custom melange masks for each DEM... the last step (masking) might take >1 hr if there are multiple DEMs');
+
+%warn users that any new DEM geotiffs need to have a specific naming
+%convention
+warning('If using SETSM DEM geotiffs that start with ''SETSM'', you might need to move the WV## in the file name because the code uses indices 14:21 to identify the YYYYMMDD');
+warning('Is using any other DEM geotiffs, the codes used indices 6:13 to identify the YYYYMMDD');
 
 %check DEM location
 answer = questdlg('Are all DEM matfiles & tifs located in a DEMs directory?',...
@@ -36,7 +45,7 @@ switch answer
         keyboard
 end
 %create masks
-create_melange_masks(root_dir,site_abbrev,output_dir) 
+create_melange_masks(root_dir,site_abbrev,im_dir,output_dir) 
 
 
 disp('Now you can delete the DEM geotiffs to save space on your computer!');
@@ -76,7 +85,7 @@ switch answer
         disp('creating a centerline profile & evenly-spaced cross-flow transects...');
         %manually draw a centerline profile & automatically extract
         %cross-flow transects (default transect spacing = 2km & outputes = shapefiles)
-        [AF,XF,transect_spacer] = create_profile_and_transects([root_dir,site_abbrev,'/'],melmask,im_dir,vel_dir,3413);
+        [AF,XF,~] = create_profile_and_transects([root_dir,site_abbrev,'/'],melmask,im_dir,vel_dir,3413,transect_spacer);
 
         %check that small areas weren't missed during manual masking when
         %running the automated DEM distribution extraction code
@@ -87,7 +96,7 @@ clear answer;
 
 %automatically extract size distributions for the full melange and subsets
 %that are defined by the transects
-extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,mask_check,im_dir,output_dir)
+extract_automated_iceberg_DEM_distributions(root_dir,site_abbrev,AF,XF,mask_check,transect_spacer,im_dir,output_dir)
 
 %% c) Automatically fit fragmentation curves to the size distributions
 close all;

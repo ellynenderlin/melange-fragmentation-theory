@@ -64,6 +64,8 @@ if nargin >= 5
         transect_inc = varargin{6}; %specified transect spacing
         if nargin == 7
             export_type = varargin{7}; %specified file type for polylines
+        else
+            export_type = 'shp';
         end
     else
         transect_inc = 2000; %default transect spacing (m)
