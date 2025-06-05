@@ -72,7 +72,9 @@ switch termzoom_question
 end
 clear termzoom_question;
 disp('Trace just seaward along the terminus, intersecting each side of the fjord');
-[term_x,term_y,~] = improfile;
+% [term_x,term_y,~] = improfile; %old approach to trace the terminus
+pline = drawpolyline('Color','c','Linewidth',1);
+term_x = pline.Position(:,1); term_y = pline.Position(:,2); clear pline;
 [Z.term.x,Z.term.y] = poly2cw(term_x,term_y);
 
 %find the intercepts with the fjord mask

@@ -180,7 +180,10 @@ beep;
 
 %trace the centerline
 disp('trace the centerline starting from the seaward side of the AOI, overlapping each end');
-figure(fig); [~,~,~,xi,yi] = improfile; %be patient, a + cursor will appear, double right click to terminate
+figure(fig); 
+% [~,~,~,xi,yi] = improfile; %old (SLOW) approach: be patient, a + cursor will appear, double right click to terminate
+pline = drawpolyline('Color','c','Linewidth',1); %a + cursor will appear, double right click to terminate
+xi = pline.Position(:,1); yi = pline.Position(:,2); clear pline;
 % plot(xi,yi,'xy'); hold on;
 
 %create a regularly interpolated version of the centerline
@@ -363,9 +366,8 @@ else
 
     %centerline
     T=table(C.Y,C.X);
-    column_names = ["Northing","Easting"];
-    column_units = ["m","m"];
-    T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
+    column_names = ["Northing (m)","Easting (m)"];
+    T.Properties.VariableNames = column_names;
     writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline.csv']);
     clear T;
 
@@ -376,9 +378,8 @@ else
         TX = [TX; XF(j).X'; NaN];
     end
     T=table(TY,TX);
-    column_names = ["Northing","Easting"];
-    column_units = ["m","m"];
-    T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
+    column_names = ["Northing (m)","Easting (m)"];
+    T.Properties.VariableNames = column_names;
     writetable(T,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.csv']);
     clear T TY TX;
 
@@ -425,10 +426,9 @@ else
     disp('exporting centerline points at transect intersections as CSVs');
 
     %centerline
-    T=table(AX_Y,AX_X);
-    column_names = ["Northing","Easting"];
-    column_units = ["m","m"];
-    T.Properties.VariableNames = column_names; T.Properties.VariableUnits = column_units;
+    T=table(AX_Y',AX_X');
+    column_names = ["Northing (m)","Easting (m)"];
+    T.Properties.VariableNames = column_names;
     writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.csv']);
     clear T;
 
