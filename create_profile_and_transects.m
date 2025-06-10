@@ -409,8 +409,9 @@ for j = 1:inc:length(C.X)
     end
 end
 
-%write to file
-if strcmpi(export_type,'shp')
+%write to file (uncomment the if/else statement if you'd prefer to default
+%to outputs in the same format as the centerline & transect profiles)
+% if strcmpi(export_type,'shp')
     disp('exporting centerline points at transect intersections as shapefiles');
     %centerline
     s.Geometry = 'PolyLine';
@@ -421,17 +422,18 @@ if strcmpi(export_type,'shp')
     wkt = wktstring(s.CoordinateReferenceSystem);
     writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.prj'],'FileType','text', 'QuoteStrings', false);
     clear s;
-
-else
+% 
+% else
     disp('exporting centerline points at transect intersections as CSVs');
 
     %centerline
+    AX_X(isnan(AX_X)) = []; AX_Y(isnan(AX_Y)) = []; 
     T=table(AX_Y',AX_X');
     column_names = ["Northing (m)","Easting (m)"];
     T.Properties.VariableNames = column_names;
     writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.csv']);
     clear T;
 
-end
+% end
 
 end

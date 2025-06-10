@@ -417,7 +417,6 @@ if grab_profiles == 1
         %load the data
         disp(['date ',num2str(p),' of ',num2str(length(DEM_mats)),' = ',DEM_dates(p,:)]);
         DEM_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat'];
-        outputberg_name = [site_abbrev,'-',DEM_dates(p,:),'_melange-DEMfilled.mat'];
         load([root_dir,'/',site_abbrev,'/DEMs/',DEM_name]);
         %     disp('Data loaded.');
         
