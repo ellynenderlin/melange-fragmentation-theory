@@ -21,7 +21,7 @@ for i = 1:length(sites)
 end
 
 %loop through the folders & extract info
-disp('Average elevation of each transect plotted over time & centerline velocity');
+disp('Width-averaged elevation of each transect & corresponding centerline velocity');
 MP = struct;
 for j = 1:length(sitenames)
     disp(sitenames(j,:));
@@ -33,7 +33,7 @@ for j = 1:length(sitenames)
     T_headers = T.Properties.VariableNames;
     datestart = strfind(string(T_headers(3)),'20');
     for p = 3:size(T,2)
-        MP(j).date(1,p-2) = string(T_headers{p}(datestart:datestart+7));
+        MP(j).Z.date(1,p-2) = string(T_headers{p}(datestart:datestart+7));
     end
 
     %find the NaNs in the coordinate pairs to identify each transect
@@ -45,33 +45,35 @@ for j = 1:length(sitenames)
     while k < size(T,1)
         if k == 1
             %extract full coordinates for transect
-            MP(j).XF(tran_ind).X = coords(1:nan_inds(k)-1,2);
-            MP(j).XF(tran_ind).Y = coords(1:nan_inds(k)-1,1);
+            MP(j).Z.Xrange(tran_ind,1:2) = coords([1,nan_inds(k)-1],2);
+            MP(j).Z.Yrange(tran_ind,1:2) = coords([1,nan_inds(k)-1],1);
 
             %extract the centroid coordinates
-            MP(j).XF(tran_ind).centroid = nanmean(table2array(T(1:nan_inds(k)-1,1:2)));
+            MP(j).Z.X(tran_ind,1) = nanmean(table2array(T(1:nan_inds(k)-1,2)));
+            MP(j).Z.Y(tran_ind,1) = nanmean(table2array(T(1:nan_inds(k)-1,1)));
 
             %calculate the median elevation for each date
-            MP(j).XF(tran_ind).Z = nanmean(table2array(T(1:nan_inds(k)-1,3:end)));
+            MP(j).Z.Zavg(tran_ind,:) = nanmean(table2array(T(1:nan_inds(k)-1,3:end)));
 
             %add to a temp matrix for plotting
-            zprofs(tran_ind,:) = MP(j).XF(tran_ind).Z;
+            zprofs(tran_ind,:) = MP(j).Z.Zavg(tran_ind,:);
 
             tran_ind = tran_ind+1;
         elseif ismember(k,nan_inds)
             if ~ismember(k+1,nan_inds) %check for back-to-back NaNs
                 %extract full coordinates for transect
-                MP(j).XF(tran_ind).X = coords(k+1:nan_inds(find(nan_inds==k)+1)-1,2);
-                MP(j).XF(tran_ind).Y = coords(k+1:nan_inds(find(nan_inds==k)+1)-1,1);
+                MP(j).Z.Xrange(tran_ind,1:2) = coords([k+1,nan_inds(find(nan_inds==k)+1)-1],2);
+                MP(j).Z.Yrange(tran_ind,1:2) = coords([k+1,nan_inds(find(nan_inds==k)+1)-1],1);
 
                 %extract the centroid coordinates
-                MP(j).XF(tran_ind).centroid = nanmean(table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,1:2)));
+                MP(j).Z.X(tran_ind,1) = nanmean(table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,2)));
+                MP(j).Z.Y(tran_ind,1) = nanmean(table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,1)));
 
                 %calculate the median elevation for each date
-                MP(j).XF(tran_ind).Z = nanmean(table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,3:end)));
+                MP(j).Z.Zavg(tran_ind,:) = nanmean(table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,3:end)));
 
                 %add to a temp matrix for plotting
-                zprofs(tran_ind,:) = MP(j).XF(tran_ind).Z;
+                zprofs(tran_ind,:) = MP(j).Z.Zavg(tran_ind,:);
 
                 tran_ind = tran_ind+1;
             end
@@ -81,34 +83,89 @@ for j = 1:length(sitenames)
     clear T T_headers datestart coords nan_inds;
 
     %plot time-series of the width-averaged elevation profiles
-    figure; set(gcf,'position',[50 50 500 1000]);
-    sub_yr = subplot(2,1,1); yr_cmap = cmocean('matter',length(years)+2); yr_cmap = yr_cmap(2:end,:);
-    sub_mo = subplot(2,1,2); mo_cmap = cmocean('phase',12);
+    figure; set(gcf,'position',[50 50 1000 1000]);
+    subZ_yr = subplot(2,2,1); yr_cmap = cmocean('matter',length(years)+2); yr_cmap = yr_cmap(2:end,:);
+    subZ_mo = subplot(2,2,3); mo_cmap = cmocean('phase',12);
     mean_prof = nanmean(zprofs,2); end_ind = find(~isnan(mean_prof)==1,1,'first');
     for p = 1:size(zprofs,2)
-        yr = str2num(MP(j).date{p}(1:4)); mo = str2num(MP(j).date{p}(5:6));
-        subplot(sub_yr);
-        plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',zprofs(end_ind:end,p),'color',yr_cmap(yr-min(years)+1,:),'linewidth',2); hold on; 
-        %add transect width plotted on the secondary y-axis
-        
-        subplot(sub_mo);
-        plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',zprofs(end_ind:end,p),'color',mo_cmap(mo,:),'linewidth',2); hold on;
-
+        yr = str2num(MP(j).Z.date{p}(1:4)); mo = str2num(MP(j).Z.date{p}(5:6));
+        subplot(subZ_yr);
+        plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',zprofs(end_ind:end,p),'-','color',yr_cmap(yr-min(years)+1,:),'linewidth',2); hold on; 
+        subplot(subZ_mo);
+        plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',zprofs(end_ind:end,p),'-','color',mo_cmap(mo,:),'linewidth',2); hold on;
+        clear yr mo;
     end
-    subplot(sub_yr);
-    title(sitenames(j,:))
-    plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',mean_prof(end_ind:end),'color','k','linewidth',1.5); hold on; 
+    subplot(subZ_yr);
+    title([sitenames(j,:),' elevation profiles'])
+    plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',mean_prof(end_ind:end),'-','color','k','linewidth',1.5); hold on; 
     grid on; drawnow;
-    subplot(sub_mo); 
-    plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',mean_prof(end_ind:end),'color','k','linewidth',1.5); hold on; 
+    subplot(subZ_mo); 
+    plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',mean_prof(end_ind:end),'-','color','k','linewidth',1.5); hold on; 
     grid on; drawnow;
 
-    clear zprofs *_cmap mean_prof end_ind;
+    %load the shapefile of transect-centerline intersections used to
+    %extract the velocity timeseries
+    C = readtable([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'_centerline_2000m-interval.csv']);
+    MP(j).V.X = C.Easting_m_; MP(j).V.Y = C.Northing_m_; clear C;
+
+    %load the velocity timeseries for the transect-centerline intersection
+    %points and plot a velocity profile with the closest mid-date to each
+    %elevation profile (if after 2013, when Landsat 8 was launched)
+    vel_pts = dir([root_dir,sitenames(j,:),'/velocities/']);
+    for i = 1:length(vel_pts)
+        if contains(vel_pts(i).name,'velocity')
+            pt_ref = str2num(vel_pts(i).name(end-5:end-4));
+
+            %read the file
+            V = readtable([root_dir,sitenames(j,:),'/velocities/',vel_pts(i).name]);
+
+            %filter out all the velocities with really low temporal resolution (>90 days)
+            short_dts = find(V.days_dt<90);
+            vel_dates = V.mid_date(short_dts); vel_dts = V.days_dt(short_dts);
+            vels = V.velocity_m_yr_(short_dts);
+
+            %convert datetime to a decimal date
+            for k = 1:length(vel_dates)
+                decidate(k) = convert_to_decimaldate(vel_dates(k),'yyyy-MM-dd HH:mm:ss.SSS');
+            end
+
+            %find the closest velocity mid-date to each elevation profile
+            for p = 1:length(MP(j).Z.date)
+                zdate = convert_to_decimaldate(char(MP(j).Z.date(p)));
+                if zdate > 2013
+                    datediff = abs(zdate - decidate);
+                    MP(j).V.date(pt_ref,p) = string(datetime(vel_dates(find(abs(datediff) == min(datediff),1,'first')),'Format','yyyyMMdd'));
+                    MP(j).V.dt(pt_ref,p) = vel_dts(find(abs(datediff) == min(datediff),1,'first'));
+                    MP(j).V.V(pt_ref,p) = vels(find(abs(datediff) == min(datediff),1,'first'));
+                    clear datediff;
+                else
+                    MP(j).V.date(pt_ref,p) = NaN; MP(j).V.dt(pt_ref,p) = NaN;
+                    MP(j).V.V(pt_ref,p) = NaN;
+                end
+                clear zdate;
+            end
+
+            clear pt_ref V short_dts vel_dates vel_dts vels decidate;
+        end
+    end
+
+    %create velocity profile plots
+    for p = 1:length(MP(j).Z.date)
+        subV_yr = subplot(2,2,2); subV_mo = subplot(2,2,4);
+        yr = str2num(MP(j).Z.date{p}(1:4)); mo = str2num(MP(j).Z.date{p}(5:6));
+        subplot(subV_yr);
+        plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',MP(j).V.V(end_ind:end,p),'--','color',yr_cmap(yr-min(years)+1,:),'linewidth',2); hold on;
+        subplot(subV_mo);
+        plot([0:2000:2000*(size(zprofs,1)-1-(end_ind-1))]',MP(j).V.V(end_ind:end,p),'--','color',mo_cmap(mo,:),'linewidth',2); hold on;
+        clear yr mo;
+    end
+    subplot(subV_yr); 
+    title([sitenames(j,:),' velocity profiles'])
+    grid on; drawnow;
+    subplot(subV_mo); grid on; drawnow;
+
+    clear zprofs *_cmap mean_prof end_ind C vel_pts;
 end
-
-
-
-
 
 
 
