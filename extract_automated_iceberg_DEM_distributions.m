@@ -296,38 +296,38 @@ if mask_check == 1
         set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
 
-%         %manually mask-out any remaining splotches of data that were
-%         %somehow skipped (e.g., near fjord wall but connected to melange)
-%         blunder_question = questdlg('Mask out any remaining "blunders"?',...
-%             'Blunder ID','1) Yes!','2) No!','1) Yes!');
-%         switch blunder_question
-%             case '1) Yes!'
-%                 figure(figDEM); subplot(sub1);
-%                 disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
-%                 [a] = ginput(2);
-%                 set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-%                 drawnow;
-%                 figure(figDEM); subplot(sub2);
-%                 set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-%                 drawnow;
-%                 disp('Draw a polygon on the mask to update it');
-%                 [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
-%                 BW_DEM = anom_zmask.*BW_DEM;
-%                 
-%                 %update the plot
-%                 imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
-%                 fill(xm,ym,'r'); hold on;
-%                 set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-%                 set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-%                 xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-%                 
-%                 %update the mask
-%                 M.mask.DEM = M.mask.DEM.*BW_DEM;
-%                 clear anom_zmask xm ym;
-%             case '2) No!'
-%                 disp('Good mask!')
-%         end
-%         clear blunder_question;
+        %manually mask-out any remaining splotches of data that were
+        %somehow skipped (e.g., near fjord wall but connected to melange)
+        blunder_question = questdlg('Mask out any remaining "blunders"?',...
+            'Blunder ID','1) Yes!','2) No!','1) Yes!');
+        switch blunder_question
+            case '1) Yes!'
+                figure(figDEM); subplot(sub1);
+                disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
+                [a] = ginput(2);
+                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                drawnow;
+                figure(figDEM); subplot(sub2);
+                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                drawnow;
+                disp('Draw a polygon on the mask to update it');
+                [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
+                BW_DEM = anom_zmask.*BW_DEM;
+                
+                %update the plot
+                imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+                fill(xm,ym,'r'); hold on;
+                set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+                set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+                xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+                
+                %update the mask
+                M.mask.DEM = M.mask.DEM.*BW_DEM;
+                clear anom_zmask xm ym;
+            case '2) No!'
+                disp('Good mask!')
+        end
+        clear blunder_question;
 
         %plot to check masking worked
         melange = M.DEM.z_filled;
@@ -535,6 +535,89 @@ else
 end
 clear grab_profiles;
 
+
+%% check for overlapping transects and temporarily modify the melange mask to block transect overlap
+
+%identify overlaps
+for j = 1:length(XF)
+    for k = 1:length(XF)
+        if k ~= j
+            [xi,~] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
+            if ~isempty(xi)
+                transect_crosses(j,k) = k;
+            else
+                transect_crosses(j,k) = NaN;
+            end
+        else
+            transect_crosses(j,k) = NaN;
+        end
+    end
+end
+
+%create a temporary melange mask that is modified as needed to provide a
+%barrier for otherwise overlapping transects
+if sum(~isnan(transect_crosses),'all') > 0
+    transect_overlap = 1; %flag that the transects overlap and the melange mask is modifed
+    
+    %find the middle of neighboring intersections
+    for j = 1:length(XF)
+        if ismember(j-1,transect_crosses(j,:)) || ismember(j+1,transect_crosses(j,:))
+            %         neighbor_crosses(j) = sum([ismember(j-1,transect_crosses(j,:)),ismember(j+1,transect_crosses(j,:))]);
+            neighbor_crosses(j) = 1;
+        else
+            neighbor_crosses(j) = 0;
+        end
+    end
+    mid_crosses = round(nanmean(find(neighbor_crosses==1)));
+    
+    %determine what side of the centerline the intersections occur on (assuming
+    %it is just one side!) then find the segment of the fjord polygon that the
+    %transect intersects on that side
+    j = mid_crosses;
+    for k = 1:length(XF)
+        if k ~= j
+            if ~isempty(polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]))
+                [xi(k),yi(k)] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
+            else
+                xi(k) = NaN; yi(k) = NaN;
+            end
+        else
+            xi(k) = NaN; yi(k) = NaN;
+        end
+    end
+    %extend the transect so it intersects the melange outline
+    dx1 = mode(diff(XF(j).X)); dy1 = mode(diff(XF(j).Y));
+    if size(XF(j).X,1) == 1
+        xd = [XF(j).X(1)-dx1,XF(j).X(1:end-1),XF(j).X(end-1)+dx1];
+        yd = [XF(j).Y(1)-dy1,XF(j).Y(1:end-1),XF(j).Y(end-1)+dy1];
+    else
+        xd = [XF(j).X(1)-dx1;XF(j).X(1:end-1);XF(j).X(end-1)+dx1];
+        yd = [XF(j).Y(1)-dy1;XF(j).Y(1:end-1);XF(j).Y(end-1)+dy1];
+    end
+    %find the intersections for the transect and the outline
+    [xs,ys,is] = polyxpoly(xd,yd,melmask.uncropped.x,melmask.uncropped.y);
+    %calculate the distance between each transect intersection point with the
+    %middle of the intersecting transects and each melange edge
+    dists(1,:) = sqrt((xs(1)-xi).^2 + (ys(1)-yi).^2);
+    dists(2,:) = sqrt((xs(2)-xi).^2 + (ys(2)-yi).^2);
+    %find which melange edge is closer to the transect intersections
+    ind = find(dists == min(dists,[],'all')); [row,~] = ind2sub(size(dists),ind);
+    
+    %create a temp melange mask & add the part of the line that has
+    %intersections to the shape
+    melpoly_x = melmask.uncropped.x(1:is(row,2)); melpoly_y = melmask.uncropped.y(1:is(row,2));
+    %only include the transect to the center-most intersection
+    melpoly_x = [melpoly_x; xs(row); xi(find(dists(row,:) == max(dists(row,:)))); xs(row); melmask.uncropped.x(is(row,2)+1:end)];
+    melpoly_y = [melpoly_y; ys(row); yi(find(dists(row,:) == max(dists(row,:)))); ys(row); melmask.uncropped.y(is(row,2)+1:end)];
+    
+else
+    transect_overlap = 0;
+    
+    melpoly_x = melmask.uncropped.x;
+    melpoly_y = melmask.uncropped.y;
+end
+clear *_crosses xi yi xd yd xs ys is dists ind row;
+
 %% EXTRACT SIZE DISTRIBUTIONS
 
 %convert elevation distributions into iceberg size distributions   
@@ -637,7 +720,11 @@ for p = 1:length(DEM_mats)
         disp(['Subsetting melange: ',num2str(j),' of ',num2str(length(XF)-1)]);
         %note: slightly extend the transects to make sure that Matlab finds
         %an intersection on both end with the melange outline 
-        centroid_coords = [nanmean(XF(j).X) nanmean(XF(j).Y); nanmean(XF(j+1).X) nanmean(XF(j+1).Y)];
+        
+        %find the centroid coordinates for the polygon
+        [xij,yij,ij] = polyxpoly([XF(j).X,XF(j).X(end-1)],[XF(j).Y,XF(j).Y(end-1)],AF.X,AF.Y);
+        [xijp,yijp,ijp] = polyxpoly([XF(j+1).X,XF(j+1).X(end-1)],[XF(j+1).Y,XF(j+1).Y(end-1)],AF.X,AF.Y);
+        centroid_coords = [xij yij; xijp yijp];
         
         %first transect: extend & identify intersections
         dx1 = mode(diff(XF(j).X)); dy1 = mode(diff(XF(j).Y)); 
@@ -648,7 +735,7 @@ for p = 1:length(DEM_mats)
             XF(j).X = [XF(j).X(1)-dx1;XF(j).X(1:end-1);XF(j).X(end-1)+dx1];
             XF(j).Y = [XF(j).Y(1)-dy1;XF(j).Y(1:end-1);XF(j).Y(end-1)+dy1];
         end
-        [xi1,yi1,i1] = polyxpoly(XF(j).X,XF(j).Y,melmask.uncropped.x,melmask.uncropped.y);
+        [xi1,yi1,i1] = polyxpoly(XF(j).X,XF(j).Y,melpoly_x,melpoly_y);
         %second transect: extend & identify intersections
         dx2 = mode(diff(XF(j+1).X)); dy2 = mode(diff(XF(j+1).Y)); 
         if size(XF(j+1).X,1) == 1
@@ -658,7 +745,29 @@ for p = 1:length(DEM_mats)
             XF(j+1).X = [XF(j+1).X(1)-dx2;XF(j+1).X(1:end-1);XF(j+1).X(end-1)+dx2];
             XF(j+1).Y = [XF(j+1).Y(1)-dy2;XF(j+1).Y(1:end-1);XF(j+1).Y(end-1)+dy2];
         end
-        [xi2,yi2,i2] = polyxpoly(XF(j+1).X,XF(j+1).Y,melmask.uncropped.x,melmask.uncropped.y);
+        [xi2,yi2,i2] = polyxpoly(XF(j+1).X,XF(j+1).Y,melpoly_x,melpoly_y);
+        
+        %if there are >2 intersections because the fjord curved, filter out
+        %the ones farthest from the centerline... the 'first' & 'last' are
+        %somewhat arbitrary but prevent double identification of non-unique
+        %intersections where a hinge in the polygons doubles-back
+        if size(i1,1) > 2 %first transect
+            di1 = i1(:,1)-ij(:,1);
+            ref1a = find(di1==max(di1(di1<0)),1,'last'); ref1b = find(di1==min(di1(di1>0)),1,'first'); 
+            xi1_temp = xi1([ref1a,ref1b]); yi1_temp = yi1([ref1a,ref1b]); i1_temp = i1([ref1a,ref1b],:); 
+            clear xi1 yi1 i1;
+            xi1 = xi1_temp; yi1 = yi1_temp; i1 = i1_temp; 
+            clear di1 ref1* *i1_temp;
+        end
+        if size(i2,1) > 2 %second transect
+            di2 = i2(:,1)-ijp(:,1);
+            ref2a = find(di2==max(di2(di2<0)),1,'last'); ref2b = find(di2==min(di2(di2>0)),1,'first'); 
+            xi2_temp = xi2([ref2a,ref2b]); yi2_temp = yi2([ref2a,ref2b]); i2_temp = i2([ref2a,ref2b],:); 
+            clear xi2 yi2 i2;
+            xi2 = xi2_temp; yi2 = yi2_temp; i2 = i2_temp; 
+            clear di2 ref2* *i2_temp;
+        end
+        
         %note: the i1,i2 values should give the indices of the fjord outline segment that is intersected by each transect
         [~,nntei] = min(sqrt(sum(([xi1(1),yi1(1)] - [xi2,yi2]).^2,2))); %find the nearest end vertex for the 2nd transect 
         if i2(nntei,2) > i1(1,2)
@@ -666,16 +775,16 @@ for p = 1:length(DEM_mats)
             %confirm that the fjord sidewall length is reasonable with a
             %positive increment between indices (a huge distance means that
             %the indices span the starting point of the melange mask)
-            side_coords = [xi1(1) yi1(1); melmask.uncropped.x(mel1_inds) melmask.uncropped.y(mel1_inds); xi2(nntei) yi2(nntei)];
+            side_coords = [xi1(1) yi1(1); melpoly_x(mel1_inds) melpoly_y(mel1_inds); xi2(nntei) yi2(nntei)];
             if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(1) yi1(1); xi2(nntei) yi2(nntei)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
                 clear mel1_inds;
-                mel1_inds = [i1(1,2):-1:1, length(melmask.uncropped.x):-1:i2(nntei,2)+1]; %fjord mask indices wrap around melange mask start/end
+                mel1_inds = [i1(1,2):-1:1, length(melpoly_x):-1:i2(nntei,2)+1]; %fjord mask indices wrap around melange mask start/end
             end
         elseif i2(nntei,2) < i1(1,2)
             mel1_inds = [i1(1,2):-1:i2(nntei,2)+1];
-            side_coords = [xi1(1) yi1(1); melmask.uncropped.x(mel1_inds) melmask.uncropped.y(mel1_inds); xi2(nntei) yi2(nntei)];
+            side_coords = [xi1(1) yi1(1); melpoly_x(mel1_inds) melpoly_y(mel1_inds); xi2(nntei) yi2(nntei)];
             if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(1) yi1(1); xi2(nntei) yi2(nntei)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
-                mel1_inds = [i1(1,2)+1:1:length(melmask.uncropped.x), 1:1:i2(nntei,2)]; %fjord mask indices wrap around melange mask start/end
+                mel1_inds = [i1(1,2)+1:1:length(melpoly_x), 1:1:i2(nntei,2)]; %fjord mask indices wrap around melange mask start/end
             end
         elseif i2(nntei,2) == i1(1,2)
             mel1_inds = [];
@@ -690,16 +799,16 @@ for p = 1:length(DEM_mats)
             %confirm that the fjord sidewall length is reasonable with a
             %positive increment between indices (a huge distance means that
             %the indices span the starting point of the melange mask)
-            side_coords = [xi2(nntef) yi2(nntef); melmask.uncropped.x(mel2_inds) melmask.uncropped.y(mel2_inds); xi1(2) yi1(2)];
+            side_coords = [xi2(nntef) yi2(nntef); melpoly_x(mel2_inds) melpoly_y(mel2_inds); xi1(2) yi1(2)];
             if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(2) yi1(2); xi2(nntef) yi2(nntef)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
                 clear mel2_inds;
-                mel2_inds = [i2(nntef,2):-1:1, length(melmask.uncropped.x):-1:i1(2,2)+1]; %fjord mask indices wrap around melange mask start/end
+                mel2_inds = [i2(nntef,2):-1:1, length(melpoly_x):-1:i1(2,2)+1]; %fjord mask indices wrap around melange mask start/end
             end
         elseif i2(nntef,2) > i1(2,2)
             mel2_inds = [i2(nntef,2):-1:i1(2,2)+1];
-            side_coords = [xi2(nntef) yi2(nntef); melmask.uncropped.x(mel2_inds) melmask.uncropped.y(mel2_inds); xi1(2) yi1(2)];
+            side_coords = [xi2(nntef) yi2(nntef); melpoly_x(mel2_inds) melpoly_y(mel2_inds); xi1(2) yi1(2)];
             if sum(sqrt(sum(diff(side_coords).^2,2))) > 2*sum(sqrt(sum(diff([xi1(2) yi1(2); xi2(nntef) yi2(nntef)]).^2,2))) %apply an arbitrary threshold based on centroid distances for transects
-                mel2_inds = [i2(nntef,2)+1:1:length(melmask.uncropped.x), 1:1:i1(2,2)]; %fjord mask indices wrap around melange mask start/end
+                mel2_inds = [i2(nntef,2)+1:1:length(melpoly_x), 1:1:i1(2,2)]; %fjord mask indices wrap around melange mask start/end
             end
         elseif i2(nntef,2) == i1(2,2)
             mel2_inds = [];
@@ -708,12 +817,12 @@ for p = 1:length(DEM_mats)
         end
         clear side_coords;
         %put the full polygon together to subset the melange
-        if size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(XF(j).X,1)==1
-            melsubset_polyx = [xi1(1), melmask.uncropped.x(mel1_inds)', xi2(nntei), xi2(nntef), melmask.uncropped.x(mel2_inds)', xi1(2), xi1(1)];
-            melsubset_polyy = [yi1(1), melmask.uncropped.y(mel1_inds)', yi2(nntei), yi2(nntef), melmask.uncropped.y(mel2_inds)', yi1(2), yi1(1)];
-        elseif size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(melmask.uncropped.x,1)==1
-            melsubset_polyx = [xi1(1), melmask.uncropped.x(mel1_inds), xi2(nntei), xi2(nntef), melmask.uncropped.x(mel2_inds), xi1(2), xi1(1)];
-            melsubset_polyy = [yi1(1), melmask.uncropped.y(mel1_inds), yi2(nntei), yi2(nntef), melmask.uncropped.y(mel2_inds), yi1(2), yi1(1)];
+        if size(XF(j).X,1) ~= size(melpoly_x,1) && size(XF(j).X,1)==1
+            melsubset_polyx = [xi1(1), melpoly_x(mel1_inds)', xi2(nntei), xi2(nntef), melpoly_x(mel2_inds)', xi1(2), xi1(1)];
+            melsubset_polyy = [yi1(1), melpoly_y(mel1_inds)', yi2(nntei), yi2(nntef), melpoly_y(mel2_inds)', yi1(2), yi1(1)];
+        elseif size(XF(j).X,1) ~= size(melpoly_x,1) && size(melpoly_x,1)==1
+            melsubset_polyx = [xi1(1), melpoly_x(mel1_inds), xi2(nntei), xi2(nntef), melpoly_x(mel2_inds), xi1(2), xi1(1)];
+            melsubset_polyy = [yi1(1), melpoly_y(mel1_inds), yi2(nntei), yi2(nntef), melpoly_y(mel2_inds), yi1(2), yi1(1)];
         else
             error('Unexpected polyline shapes');
         end
@@ -749,12 +858,12 @@ for p = 1:length(DEM_mats)
             end
             clear side_coords;
             %put the full polygon together to subset the melange
-            if size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(XF(j).X,1)==1
-                melsubset_polyx = [xi1(1), melmask.uncropped.x(mel1_inds)', xi2(nntei), xi2(nntef), melmask.uncropped.x(mel2_inds)', xi1(2), xi1(1)];
-                melsubset_polyy = [yi1(1), melmask.uncropped.y(mel1_inds)', yi2(nntei), yi2(nntef), melmask.uncropped.y(mel2_inds)', yi1(2), yi1(1)];
-            elseif size(XF(j).X,1) ~= size(melmask.uncropped.x,1) && size(melmask.uncropped.x,1)==1
-                melsubset_polyx = [xi1(1), melmask.uncropped.x(mel1_inds), xi2(nntei), xi2(nntef), melmask.uncropped.x(mel2_inds), xi1(2), xi1(1)];
-                melsubset_polyy = [yi1(1), melmask.uncropped.y(mel1_inds), yi2(nntei), yi2(nntef), melmask.uncropped.y(mel2_inds), yi1(2), yi1(1)];
+            if size(XF(j).X,1) ~= size(melpoly_x,1) && size(XF(j).X,1)==1
+                melsubset_polyx = [xi1(1), melpoly_x(mel1_inds)', xi2(nntei), xi2(nntef), melpoly_x(mel2_inds)', xi1(2), xi1(1)];
+                melsubset_polyy = [yi1(1), melpoly_y(mel1_inds)', yi2(nntei), yi2(nntef), melpoly_y(mel2_inds)', yi1(2), yi1(1)];
+            elseif size(XF(j).X,1) ~= size(melpoly_x,1) && size(melpoly_x,1)==1
+                melsubset_polyx = [xi1(1), melpoly_x(mel1_inds), xi2(nntei), xi2(nntef), melpoly_x(mel2_inds), xi1(2), xi1(1)];
+                melsubset_polyy = [yi1(1), melpoly_y(mel1_inds), yi2(nntei), yi2(nntef), melpoly_y(mel2_inds), yi1(2), yi1(1)];
             else
                 error('Unexpected polyline shapes');
             end
@@ -818,8 +927,9 @@ for p = 1:length(DEM_mats)
         
         clear melsubset* in hsub binsub* bergsub* pixelsub* centroid* *_inds *_subset stat;
     end
-    close(subfig);
-
+    
+    %close the figure as needed and clear date-specific variables
+    if p == 1; close(subfig); end
     clear bin* melange M m T Tsub;
 end
 close all; drawnow;

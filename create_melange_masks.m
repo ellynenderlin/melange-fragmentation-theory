@@ -1141,11 +1141,9 @@ for p = 1:length(melange_mats)
         [ZXgrid,ZYgrid] = meshgrid(Z.x,Z.y);
         xvec = reshape(ZXgrid,1,[]); yvec = reshape(ZYgrid,1,[]);
         xy = [xvec; yvec];
-        %UNTESTED IN THIS CODE BUT ORDERS OF MAGNITUDE FASTER WHEN
-        %IMPLEMENTED INSTEAD OF INPOLYGON!
         [stat] = inpoly2(xy',[melpoly_x,melpoly_y]);
         in = reshape(stat,size(Z.z.ortho));
-%         in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
+%         in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y); %old approach
         Z.fjord.DEM_maskX = single(melpoly_x); Z.fjord.DEM_maskY = single(melpoly_y);
         Z.fjord.DEM_mask = zeros(size(Z.z.ortho));
         Z.fjord.DEM_mask(in) = 1;
