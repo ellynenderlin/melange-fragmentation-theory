@@ -23,16 +23,13 @@ month_array = {'Jan';'Feb';'Mar';'Apr';'May';'Jun';'Jul';'Aug';'Sep';'Oct';'Nov'
 years = 2011:1:2020; start_yr = years(1); end_yr = years(end);
 
 %2-letter region flagging (based on alphabetical order of site folders)
-site_abbrevs = ['ASG'];
-site_names = [{'Alison'}];
-region_flag = ['SE'];
-site_geog_order = [1]; %geographic order, counterclockwise from NW
-% site_abbrevs = ['AG';'HH';'HM';'IB';'IG';'JI';'KB';'KL';'KO';'MD';'MG';'RI';'UM';'UN';'US';'ZI']; %alphabetical site directory list
-% site_names = [{'Alison'},{'Helheim'},{'Ullip Sermia'},{'Salliarutsip Sermia'},{'Illulip Sermia'},...
-%     {'Sermeq Kujalleq'},{'Koge Bugt'},{'Kangerlussuaq'},{'Kong Oscar'},{'Magga Dan'},...
-%     {'Nigertiip Apusiia'},{'Kangilliup Sermia'},{'Umiammakku Sermia'},{'Upernavik North'},{'Upernavik South'},{'Zachariae Isstrom'}];
-% region_flag = ['NW';'SE';'NW';'CW';'NW';'CW';'SE';'SE';'NW';'CE';'SE';'CW';'CW';'NW';'NW';'NE'];
-% site_geog_order = [3;12;1;7;4;10;11;14;2;15;13;9;8;5;6;16]; %geographic order, counterclockwise from NW
+site_abbrevs = ['ASG','DJG','HLG','ILS','KBG','KGS','KOG','MDG','MGG',...
+    'SAS','SEK','ULS','UMS','UNS','ZIM'];
+site_names = [{'Alison'},{'Daugaard-Jensen'},{'Helheim'},{'Illullip'},{'Koge Bugt'},...
+    {'Kong Oscar'},{'Magga Dan'},{'Midgard'},{'Salliarutsip'},{'Sermeq Kujalleq'},...
+    {'Ullip'},{'Umiammakku'},{'Upernavik North'},{'Zachariae Isstrom'}];
+region_flag = ['SE','CE','SE','NW','SE','SW','NW','CE','SE','CW','CW','NW','CW','NW','NE'];
+site_geog_order = [5,4,14,7,16,3,8,12,11,15,1,13,9,2]; %geographic order, counterclockwise from NW
 
 
 %NOTE: data are added to F structure according to index specified by
@@ -43,7 +40,7 @@ site_plotlocs(1:10) = 2*[1:1:10]'-1; %based on 10 sites along W coast
 site_plotlocs(11:end-1) = [11:1:length(site_plotlocs)-1]' - 3*([11:1:length(site_plotlocs)-1]'-14);
 site_plotlocs(end) = 2;
 %letters for labels
-site_plotletts = [{'a)'},{'b)'},{'c)'},{'d)'},{'e)'},{'f)'},{'g)'},{'h)'},{'i)'},{'j)'},{'k)'},{'l)'},{'m)'},{'n)'},{'o)'},{'p)'}];
+site_plotletts = [{'a)'},{'b)'},{'c)'},{'d)'},{'e)'},{'f)'},{'g)'},{'h)'},{'i)'},{'j)'},{'k)'},{'l)'},{'m)'},{'n)'},{'o)'}];
 
 %specify a regional colorramp
 regions = unique(region_flag,'rows');
@@ -60,13 +57,7 @@ day_cmap = [accum_cmap(103:end-10,:); ablat_cmap(11:end,:); accum_cmap(11:102,:)
 
 
 disp('Initialized iceberg meltwater flux code');
-%% Section 1: Convert date-specific size distribution textfiles to a concatenated csv
-disp('Converting iceberg size distribution textfiles for each date to date-specific csvs & a single csv...');
-convert_sizedistribution_txt_to_csv(root_dir);
-
-disp('Melange size distributions for each site saved in *iceberg-distributions.csv files');
-
-%% Section 2: Export generic melange masks as shapefiles
+%% Section 1: Export generic melange masks as shapefiles
 disp('Exporting uncropped melange masks as shapefiles...');
 batch_export_melange_boundingbox_shapefiles(root_dir,EPSG_file);
 disp('DEM-based melange mask shapefiles created.');
@@ -74,7 +65,7 @@ disp('DEM-based melange mask shapefiles created.');
 disp('Create monthly delineations of the melange edge in GEEDiT');
 disp(' & export as a shapefile to the "shapefiles" directory before running the next subsection');
 
-%% Section 3: Manually estimate melange extent
+%% Section 2: Manually estimate melange extent
 close all;
 disp('Create/compile manual melange extent estimates...');
 
@@ -218,7 +209,7 @@ end
 clear melmask melext;
 disp('Move on to the last section!');
 
-%% Section 4: Load iceberg size distributions & melange extent estimates
+%% Section 3: Load iceberg size distributions & melange extent estimates
 close all;
 disp('Bringing datasets together to estimate melange melt fluxes');
 %  TESTING FOR A SINGLE SITE... NEED TO CHECK AUTOMATION
@@ -234,7 +225,7 @@ Asource = questdlg('Specify if you want to use the velocity coherence, manual me
 for p = 1:size(site_abbrevs,1);
     disp(site_abbrevs(p,:));
     cd([root_dir,site_abbrevs(p,:)]);
-    dists = readtable([site_abbrevs(p,:),'-iceberg-distributions.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
+    dists = readtable([site_abbrevs(p,:),'-iceberg-distribution-timeseries.csv'],"VariableNamingRule","preserve"); %load all iceberg size distributions
     load([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-masks.mat']); %load all dated melange datasets
     load([output_dir,site_abbrevs(p,:),'/',site_abbrevs(p,:),'-melange-delineations.mat']); %load manual melange delineations
     

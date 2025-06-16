@@ -982,5 +982,36 @@ disp(['Finished extracting iceberg size distributions from DEMs for ',site_abbre
 disp(['... full-melange size distributions are saved as ',output_dir,site_abbrev,'-yyyymmdd-iceberg-distribution.csv']);
 disp(['... subsetted size distributions are saved as ',output_dir,site_abbrev,'-yyyymmdd-iceberg-distribution-subsets.csv']);
 
+
+%% compile all the time-stamped size distributions into a single CSV
+%set up dummy vectors to compile data for the site
+berg_nos = []; berg_A = []; berg_dA = []; berg_dates = []; berg_dateformat = [];
+berg_dists = dir([output_dir,site_abbrev,'*-iceberg-distribution.csv']);
+
+for p = 1:length(berg_dists)
+    %read the CSV
+    Ttemp = readtable([output_dir,berg_dists(p).name]);
+
+    %add data to the site-compiled table
+    if isempty(berg_A)
+        berg_A = [Ttemp(:,2)];
+        berg_dA = [Ttemp(:,3)];
+    end
+    berg_nos = [berg_nos, Ttemp(:,1)];
+    berg_dates = [berg_dates, string([berg_dists(p).name(5:8),'/',berg_dists(p).name(9:10),'/',berg_dists(p).name(11:12)])];
+    
+    clear Ttemp;
+end
+clear berg_dists;
+
+%export the data compiled for the site as a single table
+berg_dateformat = "YYYY/MM/DD";
+T=array2table([berg_A,berg_dA,berg_nos]);
+site_column_names = ["SurfaceArea_mean", "SurfaceArea_range",berg_dates];
+site_column_units = ["m^2", "m^2", berg_dateformat];
+T.Properties.VariableNames = site_column_names; T.Properties.VariableUnits = site_column_units;
+writetable(T,[sites(j).name,'-iceberg-distribution-timeseries.csv']);
+clear T;
+
 end
 

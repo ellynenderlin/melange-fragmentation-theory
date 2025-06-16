@@ -54,7 +54,7 @@ for j = 1:size(sites,1)
             site_column_names = ["SurfaceArea_mean", "SurfaceArea_range",berg_dates];
             site_column_units = ["m^2", "m^2", berg_dateformat];
             T.Properties.VariableNames = site_column_names; T.Properties.VariableUnits = site_column_units;
-            writetable(T,[sites(j).name,'-iceberg-distributions.csv']);
+            writetable(T,[sites(j).name,'-iceberg-distribution-timeseries.csv']);
             clear T;
         end
         
