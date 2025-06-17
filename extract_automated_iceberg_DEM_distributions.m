@@ -974,32 +974,27 @@ disp(['... subsetted size distributions are saved as ',output_dir,site_abbrev,'-
 
 
 %% compile all the time-stamped size distributions into a single CSV
-%set up dummy vectors to compile data for the site
-% berg_nos = []; berg_A = []; berg_dA = []; berg_dates = []; berg_dateformat = [];
 berg_dists = dir([output_dir,site_abbrev,'*-iceberg-distribution.csv']);
 
+T = table;
 for p = 1:length(berg_dists)
     %read the CSV
     Ttemp = readtable([output_dir,berg_dists(p).name]);
+    Tarray = table2array(Ttemp);
+    msg = warning('query','last'); wid = msg.identifier; warning('off',wid);
 
     %add data to the site-compiled table
     if p == 1
-%         berg_A = [Ttemp(:,2)]; berg_dA = [Ttemp(:,3)];
-        T.('Area (m^2)') = Ttemp(:,2); T.('Area Binwidth (m^2)') = Ttemp(:,3);
+        T.('Area (m^2)') = Tarray(:,2); T.('Area Binwidth (m^2)') = Tarray(:,3);
     end
-%     berg_nos = [berg_nos, Ttemp(:,1)];
-%     berg_dates = [berg_dates, string([berg_dists(p).name(5:8),'/',berg_dists(p).name(9:10),'/',berg_dists(p).name(11:12)])];
-    T.(['Count_',[berg_dists(p).name(5:8),'/',berg_dists(p).name(9:10),'/',berg_dists(p).name(11:12)]]) = Ttemp(:,1);
+    T.(['Count_',berg_dists(p).name(5:12),' (unitless)']) = Tarray(:,1);
     
-    clear Ttemp;
+    clear Ttemp Tarray;
 end
 clear berg_dists;
 
 %export the data compiled for the site as a single table
-% T=array2table([berg_A,berg_dA,berg_nos]);
-% site_column_names = ["Area (m^2)", "Area Binwidth (m^2)",berg_dates];
-% T.Properties.VariableNames = site_column_names; T.Properties.VariableUnits = site_column_units;
-writetable(T,[sites(j).name,'-iceberg-distribution-timeseries.csv']);
+writetable(T,[output_dir,site_abbrev,'-iceberg-distribution-timeseries.csv']);
 clear T;
 
 end

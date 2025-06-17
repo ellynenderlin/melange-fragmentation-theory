@@ -14,7 +14,7 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 addpath('/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'SEK'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
 LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
