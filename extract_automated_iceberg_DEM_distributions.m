@@ -47,6 +47,10 @@ Hmax = 800; %threshold thickness in meters that you do not expect icebergs to ex
 ARcomp.best.autoALL = 2; % iceberg aspect ratio 
 ARcomp.range.autoALL = [1.7, 2.3]; % range in iceberg aspect ratio
 
+% if you want to overwrite the data in the filled DEMs that were
+% previously created, switch filled_flag to 1
+filled_flag = 0; 
+
 %load data
 cd(output_dir);
 load([site_abbrev,'-melange-masks.mat']); %created using create_melange_masks
@@ -71,7 +75,7 @@ for i = 1:length(mats)
 end
 filled_DEMs = dir([site_abbrev,'*melange-DEMfilled.mat']);
 if isempty(filled_DEMs)
-    filledDEM_dates = [];
+    filledDEM_dates = ''; %empty string if no filled DEMs exist
 else
     for i = 1:length(filled_DEMs)
         filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
@@ -80,10 +84,10 @@ end
 
 %identify existing melange iceberg distribution datasets
 cd(output_dir);
-melange_mats = dir([site_abbrev,'*_melange-distribution.mat']); melange_dates = ''; %manual iceberg sizes
-for i = 1:length(melange_mats)
-    melange_dates(i,:) = melange_mats(i).name(matfile_daterefs);
-end
+% melange_mats = dir([site_abbrev,'*_melange-distribution.mat']); melange_dates = ''; %manual iceberg sizes
+% for i = 1:length(melange_mats)
+%     melange_dates(i,:) = melange_mats(i).name(matfile_daterefs);
+% end
 iceberg_mats = dir([site_abbrev,'*_iceberg-data.mat']); iceberg_dates = ''; %automated iceberg sizes
 for i = 1:length(iceberg_mats)
     iceberg_dates(i,:) = iceberg_mats(i).name(matfile_daterefs);
@@ -94,7 +98,7 @@ alphabet = 'abcdefghijklmnopqrstuvwxyz';
 disp('Initialized size distribution extraction process.');
 %% PROCESS MELANGE MASKS
 %extract iceberg distributions for all DEMs without a manually-constructed dataset
-disp('Adjusting for tides so sea level is at 0 m...');
+disp('If any DEMs are new, adjust them for tides so sea level is at 0 m...');
 close all; drawnow;
 for p = 1:length(mats)
 
@@ -102,63 +106,56 @@ for p = 1:length(mats)
     cd([root_dir,'/',site_abbrev,'/DEMs/']);
     DEM_name = [site_abbrev,'-',DEMmat_dates(p,:),'_melange-DEM.mat']; 
     outputberg_name = [site_abbrev,'-',DEMmat_dates(p,:),'_melange-DEMfilled.mat'];
-    %identify the original & filled DEMs
-    if ~isempty(filled_DEMs)
-        for k = 1:size(filledDEM_dates,1)
-            filledflag(k) = contains(string(DEMmat_dates(p,:)),filledDEM_dates(k,:));
-        end
-    else
-        filledflag = zeros(size(DEMmat_dates,1),1);
-    end
     
-    %loop through DEMs & extract elevation distributions
-    if isempty(strmatch(string(DEMmat_dates(p,:)),string(melange_dates))) == 1
+    %loop through DEMs & create a filled DEM with sea level at 0 m if one
+    %does not already exist or if you specify (with filled_flag) that you
+    %want to over-write the existing filled DEM
+    if ismember(string(DEMmat_dates(p,:)),filledDEM_dates) == 0 || filled_flag == 1
         disp(['date ',num2str(p),' of ',num2str(length(mats)),' = ',DEMmat_dates(p,:)]);
-        %load the gap-filled DEM if already generated or the raw DEM if new
-        if sum(filledflag)>0
+        
+        %load the existing filled DEM if specified
+        if filled_flag == 1
             disp('loading gap-filled DEM');
             cd([root_dir,'/',site_abbrev,'/DEMs/']);
-            load(filled_DEMs(filledflag==1).name); %load the gap-filled DEM
-            clear filledflag;
+            load(outputberg_name); %load the gap-filled DEM
         end
-        %check that filled DEM contains all the necessary data
-        if exist('M') ~=1
-            disp('loading raw DEM');
-            cd([root_dir,'/',site_abbrev,'/DEMs/']);
-            load(DEM_name); %load the masked orthometric melange elevations in Z structure
-            disp('DEM loaded');
-            
-            %fill DEM gaps
-            [Z,data_mask,gap_mask] = sl_correction(Z,WV_sigma); % perform sea level correction
-            
-            %save the DEM
-            M.DEM.x = Z.x; M.DEM.y = Z.y; M.DEM.z = Z.z.adjusted; 
-            Z.z = rmfield(Z.z,'adjusted'); %only save necessary data to the elevation distribution data file
-            save(DEM_name,'Z','-v7.3'); %SAVE
-            
-            %save fjord masks
-            M.mask.fjord = Z.fjord.DEM_mask;
-            M.mask.blunders = Z.melange.blunder_mask+gap_mask; M.mask.blunders(M.mask.blunders>1) = 1;
-            M.mask.DEM = data_mask; clear data_mask;
-            save(outputberg_name,'M','-v7.3');
-            clear Z Y;
-            
-            %fill-in NaNs in the melange DEM
-            disp('Filling NaNs in the melange DEM');
-            fjord_elevs = M.mask.fjord.*M.DEM.z; fjord_elevs(fjord_elevs<0) = 0; fjord_elevs(M.mask.fjord==0) = 0;
-            fjord_nans = sum(sum(isnan(fjord_elevs)));
-            if fjord_nans < 100000
-                infill_iters = 50;
-            else %reduce inpaintn iterations to prevent computer from crashing (uses too much memory)
-                infill_iters = 20;
-            end
-            fjord_filled = inpaintn(fjord_elevs,infill_iters); clear fjord_elevs;
-            M.DEM.z_filled = fjord_filled; M.DEM.z_filled(M.mask.fjord~=1) = NaN;
-            M.DEM.z_filled(M.mask.blunders==1) = NaN; M.DEM.z_filled = single(M.DEM.z_filled);
-            M.DEM.z_filled(M.DEM.z_filled<0) = 0;
-            M.DEM = rmfield(M.DEM,'z'); %M.DEM.z(M.DEM.z<0) = 0;
-            save(outputberg_name,'M','-v7.3'); %SAVE
+
+        %adjust sea level to 0 m then fill holes in the DEM
+        disp('loading raw DEM');
+        cd([root_dir,'/',site_abbrev,'/DEMs/']);
+        load(DEM_name); %load the masked orthometric melange elevations in Z structure
+        disp('DEM loaded');
+        
+        %fill DEM gaps
+        [Z,data_mask,gap_mask] = sl_correction(Z,WV_sigma); % perform sea level correction
+        
+        %save the DEM
+        M.DEM.x = Z.x; M.DEM.y = Z.y; M.DEM.z = Z.z.adjusted;
+        Z.z = rmfield(Z.z,'adjusted'); %only save necessary data to the elevation distribution data file
+        save(DEM_name,'Z','-v7.3'); %SAVE
+        
+        %save fjord masks
+        M.mask.fjord = Z.fjord.DEM_mask;
+        M.mask.blunders = Z.melange.blunder_mask+gap_mask; M.mask.blunders(M.mask.blunders>1) = 1;
+        M.mask.DEM = data_mask; clear data_mask;
+        save(outputberg_name,'M','-v7.3');
+        clear Z Y;
+        
+        %fill-in NaNs in the melange DEM
+        disp('Filling NaNs in the melange DEM');
+        fjord_elevs = M.mask.fjord.*M.DEM.z; fjord_elevs(fjord_elevs<0) = 0; fjord_elevs(M.mask.fjord==0) = 0;
+        fjord_nans = sum(sum(isnan(fjord_elevs)));
+        if fjord_nans < 100000
+            infill_iters = 50;
+        else %reduce inpaintn iterations to prevent computer from crashing (uses too much memory)
+            infill_iters = 20;
         end
+        fjord_filled = inpaintn(fjord_elevs,infill_iters); clear fjord_elevs;
+        M.DEM.z_filled = fjord_filled; M.DEM.z_filled(M.mask.fjord~=1) = NaN;
+        M.DEM.z_filled(M.mask.blunders==1) = NaN; M.DEM.z_filled = single(M.DEM.z_filled);
+        M.DEM.z_filled(M.DEM.z_filled<0) = 0;
+        M.DEM = rmfield(M.DEM,'z'); %M.DEM.z(M.DEM.z<0) = 0;
+        save(outputberg_name,'M','-v7.3'); %SAVE
         
 %         %if there is an "iceberg-data" matfile, which is leftover from an
 %         %old processing pipeline, add it to the filled DEM then delete
@@ -177,59 +174,51 @@ for p = 1:length(mats)
 %             end
 %         end
         
-        %create a melange map to double-check data
-        if isempty(filledDEM_dates) || isempty(strmatch(string(DEMmat_dates(p,:)),string(filledDEM_dates))) == 1            
+        %extract melange elevations
+        melange = M.DEM.z_filled;
+        melange(isnan(M.DEM.z_filled)) = 0;
+        melange(melange<0) = 0; melange(melange>Hmax/(917/(1026-917))) = NaN;
+        melange(M.mask.DEM==0) = NaN;
 
-            %extract melange elevations
-            melange = M.DEM.z_filled;
-            melange(isnan(M.DEM.z_filled)) = 0;
-            melange(melange<0) = 0; melange(melange>Hmax/(917/(1026-917))) = NaN;
-            melange(M.mask.DEM==0) = NaN;
-            
-            %plot the melange DEM
-            close(gcf);
-            figure; h = histogram(melange(~isnan(melange)),min(melange(~isnan(melange))):1:max(melange(~isnan(melange)))); %use the elevation histogram to set colormap range
-            cmax = h.BinEdges(find(cumsum(h.Values)>=0.98*sum(h.Values),1,'first')+1); elevcont_cmap = colormap(parula(max(threshold_range-adjuster)));
-            clear h; close(gcf);
-            figDEM = figure; set(figDEM,'position',[550 100 1000 500]);
-            imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal;
-            melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
-            hold on; DEMax = gca;
-            set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]); 
-            cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
-            if find(nansum(melange)>0,1,'first')-50 > 1; mel_xlims = [find(nansum(melange)>0,1,'first')-50]; else; mel_xlims = 1; end
-            if find(nansum(melange)>0,1,'last')+50 < length(M.DEM.x); mel_xlims = [mel_xlims find(nansum(melange)>0,1,'last')+50]; else; mel_xlims = [mel_xlims length(M.DEM.x)]; end
-            if find(nansum(melange,2)>0,1,'first')-50 > 1; mel_ylims = [find(nansum(melange,2)>0,1,'first')-50]; else; mel_ylims = 1; end
-            if find(nansum(melange,2)>0,1,'last')+50 < length(M.DEM.y); mel_ylims = [mel_ylims find(nansum(melange,2)>0,1,'last')+50]; else; mel_ylims = [mel_ylims length(M.DEM.y)]; end
-            set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-            set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-            xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-            title([DEMmat_dates(p,1:4),'/',DEMmat_dates(p,5:6),'/',DEMmat_dates(p,7:8)],'fontsize',16); grid on; drawnow;
-            
-            %uncomment next two lines if you want to delete the HUGE iceberg distribution files for the manual delineations
-%             recycle('on'); %send to recycling, not permanently delete
-%             delete([site_abbrev,'-',DEMmat_dates(p,:),'_melange-distribution.mat'])
-            
-          %clear a bunch of variables & close all figures
-            clear Z *_mask G ib term* x_* y_* xi yi Zl* zjord* E...
-                a ans bergH bergL bergW berg_W berg_length cmax fig*...
-                fjord_nans fjord_filled in on infill_iters max_dim mel_*lims save_*...
-                spurious_vals stats sub* z_adjusted z_mad z_median zfjord_filled...
-                whalf berg_count termbuff_* m *grid *_sub zmin*;
-%             close all;
-            
-            %update list of filled DEM dates
-            filled_DEMs = dir([site_abbrev,'*melange-DEMfilled.mat']);
-            for i = 1:length(filled_DEMs)
-                filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
-            end
-            disp('Advancing...');
-        else
-            disp('Already checked the filled melange map. Not plotting again. Advancing...');
+        %plot the melange DEM
+        close(gcf);
+        figure; h = histogram(melange(~isnan(melange)),min(melange(~isnan(melange))):1:max(melange(~isnan(melange)))); %use the elevation histogram to set colormap range
+        cmax = h.BinEdges(find(cumsum(h.Values)>=0.98*sum(h.Values),1,'first')+1); elevcont_cmap = colormap(parula(max(threshold_range-adjuster)));
+        clear h; close(gcf);
+        figDEM = figure; set(figDEM,'position',[550 100 1000 500]);
+        imagesc(M.DEM.x,M.DEM.y,melange); axis xy equal;
+        melange_cmap = cmocean('thermal',1001); melange_cmap(1,:) = [1 1 1]; colormap(gca,melange_cmap);
+        hold on; DEMax = gca;
+        set(gca,'clim',[0 16]);  %set(gca,'clim',[0 cmax]);
+        cbar = colorbar; cbar.Label.String  = 'elevation (m a.s.l.)';
+        if find(nansum(melange)>0,1,'first')-50 > 1; mel_xlims = [find(nansum(melange)>0,1,'first')-50]; else; mel_xlims = 1; end
+        if find(nansum(melange)>0,1,'last')+50 < length(M.DEM.x); mel_xlims = [mel_xlims find(nansum(melange)>0,1,'last')+50]; else; mel_xlims = [mel_xlims length(M.DEM.x)]; end
+        if find(nansum(melange,2)>0,1,'first')-50 > 1; mel_ylims = [find(nansum(melange,2)>0,1,'first')-50]; else; mel_ylims = 1; end
+        if find(nansum(melange,2)>0,1,'last')+50 < length(M.DEM.y); mel_ylims = [mel_ylims find(nansum(melange,2)>0,1,'last')+50]; else; mel_ylims = [mel_ylims length(M.DEM.y)]; end
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        title([DEMmat_dates(p,1:4),'/',DEMmat_dates(p,5:6),'/',DEMmat_dates(p,7:8)],'fontsize',16); grid on; drawnow;
+
+        %uncomment next two lines if you want to delete the HUGE iceberg distribution files for the manual delineations
+        %             recycle('on'); %send to recycling, not permanently delete
+        %             delete([site_abbrev,'-',DEMmat_dates(p,:),'_melange-distribution.mat'])
+
+        %clear a bunch of variables & close all figures
+        clear Z *_mask G ib term* x_* y_* xi yi Zl* zjord* E...
+            a ans bergH bergL bergW berg_W berg_length cmax fig*...
+            fjord_nans fjord_filled in on infill_iters max_dim mel_*lims save_*...
+            spurious_vals stats sub* z_adjusted z_mad z_median zfjord_filled...
+            whalf berg_count termbuff_* m *grid *_sub zmin*;
+        %             close all;
+
+        %update list of filled DEM dates
+        filled_DEMs = dir([site_abbrev,'*melange-DEMfilled.mat']);
+        for i = 1:length(filled_DEMs)
+            filledDEM_dates(i,:) = filled_DEMs(i).name(matfile_daterefs);
         end
-        
-    else
-        disp('Iceberg data already extracted');
+        disp('Advancing...');
+
     end
     clear M;
 end
@@ -239,6 +228,7 @@ close all;
 
 %% CHECK THAT MELANGE DEMS DO NOT CONTAIN SMALL REGIONS MISSED BY MANUAL MASKING
 if mask_check == 1 
+    disp('Manual check of melange masks...');
     %double-check the quality of the manual masks, removing small regions that were missed
     for p = 1:length(filled_DEMs)
         %load the data
@@ -985,7 +975,7 @@ disp(['... subsetted size distributions are saved as ',output_dir,site_abbrev,'-
 
 %% compile all the time-stamped size distributions into a single CSV
 %set up dummy vectors to compile data for the site
-berg_nos = []; berg_A = []; berg_dA = []; berg_dates = []; berg_dateformat = [];
+% berg_nos = []; berg_A = []; berg_dA = []; berg_dates = []; berg_dateformat = [];
 berg_dists = dir([output_dir,site_abbrev,'*-iceberg-distribution.csv']);
 
 for p = 1:length(berg_dists)
@@ -993,23 +983,22 @@ for p = 1:length(berg_dists)
     Ttemp = readtable([output_dir,berg_dists(p).name]);
 
     %add data to the site-compiled table
-    if isempty(berg_A)
-        berg_A = [Ttemp(:,2)];
-        berg_dA = [Ttemp(:,3)];
+    if p == 1
+%         berg_A = [Ttemp(:,2)]; berg_dA = [Ttemp(:,3)];
+        T.('Area (m^2)') = Ttemp(:,2); T.('Area Binwidth (m^2)') = Ttemp(:,3);
     end
-    berg_nos = [berg_nos, Ttemp(:,1)];
-    berg_dates = [berg_dates, string([berg_dists(p).name(5:8),'/',berg_dists(p).name(9:10),'/',berg_dists(p).name(11:12)])];
+%     berg_nos = [berg_nos, Ttemp(:,1)];
+%     berg_dates = [berg_dates, string([berg_dists(p).name(5:8),'/',berg_dists(p).name(9:10),'/',berg_dists(p).name(11:12)])];
+    T.(['Count_',[berg_dists(p).name(5:8),'/',berg_dists(p).name(9:10),'/',berg_dists(p).name(11:12)]]) = Ttemp(:,1);
     
     clear Ttemp;
 end
 clear berg_dists;
 
 %export the data compiled for the site as a single table
-berg_dateformat = "YYYY/MM/DD";
-T=array2table([berg_A,berg_dA,berg_nos]);
-site_column_names = ["SurfaceArea_mean", "SurfaceArea_range",berg_dates];
-site_column_units = ["m^2", "m^2", berg_dateformat];
-T.Properties.VariableNames = site_column_names; T.Properties.VariableUnits = site_column_units;
+% T=array2table([berg_A,berg_dA,berg_nos]);
+% site_column_names = ["Area (m^2)", "Area Binwidth (m^2)",berg_dates];
+% T.Properties.VariableNames = site_column_names; T.Properties.VariableUnits = site_column_units;
 writetable(T,[sites(j).name,'-iceberg-distribution-timeseries.csv']);
 clear T;
 
