@@ -101,7 +101,6 @@ for i = 1:length(site_names)
         leg = legend(pl,num2str(years'),'location','east','orientation','vertical');
     end
     drawnow;
-    saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.eps'],'epsc'); 
     saveas(gcf,[root_dir,site_names(i,:),'/',site_names(i,:),'_site-map.png'],'png'); %save the image
     
     hold on;

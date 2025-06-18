@@ -10,7 +10,8 @@ addpath('/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-fragmentation
 %specify paths
 % root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/';
-years = 2011:1:2023;
+years = 2011:1:2023; yr_cmap = cmocean('matter',length(years)+2); yr_cmap = yr_cmap(2:end,:);
+mo_cmap = cmocean('phase',12); close all;
 
 %identify the site folders
 cd(root_dir);
@@ -22,13 +23,16 @@ for i = 1:length(sites)
 end
 
 %loop through the folders & extract info
-disp('Width-averaged elevation of each transect & corresponding centerline velocity');
+disp('Creating plots of elevation, velocity, and terminus position...');
 MP = struct;
 for j = 1:length(sitenames)
-    disp(sitenames(j,:));
-    cd([root_dir,sitenames(j,:),'/']);
+    disp(sitenames(j,:)); output_dir = [root_dir,sitenames(j,:),'/'];
     MP(j).name = sitenames(j,:);
-
+    
+    %navigate to the study site directory
+    cd(output_dir);
+    LCdir = dir([root_dir,sitenames(j,:),'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
+    
     %open the CSV of time-stamped elevation transects
     T = readtable([sitenames(j,:),'_transects_elevations.csv']);
     T_headers = T.Properties.VariableNames;
@@ -56,12 +60,89 @@ for j = 1:length(sitenames)
     for p = 1:size(melmask.dated,2)
         zdate(p) = convert_to_decimaldate(char(MP(j).Z.date(p)));
         [xis,yis,iis] = polyxpoly(melmask.dated(p).x,melmask.dated(p).y,MP(j).V.X,MP(j).V.Y);
+        MP(j).T.X(1,p) = xis(end); MP(j).T.Y(1,p) = yis(end);
         if length(xis)>1
-            MP(j).T.X(1,p) = xis(end); MP(j).T.Y(1,p) = yis(end);
-            MP(j).T.centerline(1,p) = tran_dist(iis(2,end))+sqrt((MP(j).T.X(1,p)-MP(j).V.X(iis(2,end))).^2 + (MP(j).T.Y(1,p)-MP(j).V.Y(iis(2,end))).^2);
+            MP(j).T.centerline(1,p) = tran_dist(iis(end,2))+sqrt((MP(j).T.X(1,p)-MP(j).V.X(iis(end,2))).^2 + (MP(j).T.Y(1,p)-MP(j).V.Y(iis(end,2))).^2);
+        else
+            MP(j).T.centerline(1,p) = tran_dist(iis(1,2))+sqrt((MP(j).T.X(1,p)-MP(j).V.X(iis(1,2))).^2 + (MP(j).T.Y(1,p)-MP(j).V.Y(iis(1,2))).^2);
         end
         clear xis yis iis;
     end
+    
+    %identify which terminus traces are actually the edge of the DEM
+    %(straight lines) then make an overview map that excludes them
+    ims = dir([im_dir,'L*.TIF']);
+    for k = 1:length(ims)
+        if contains(ims(k).name,'B8')
+            ref_image = [ims(k).folder,'/',ims(k).name];
+        end
+    end
+    clear im_dir ims;
+    %load the panchromatic Landsat scene
+    [I,R] = readgeoraster(ref_image);
+    im.x = R.XWorldLimits(1):R.SampleSpacingInWorldX:R.XWorldLimits(2);
+    im.y = R.YWorldLimits(2):-R.SampleSpacingInWorldY:R.YWorldLimits(1);
+    im.z = double(I);
+    clear I R;
+    %crop the image to adjust brightnesses appropriately
+    xlims = [find(im.x<=min(melmask.uncropped.x),1,'last'), find(im.x>=max(melmask.uncropped.x),1,'first')];
+    ylims = [find(im.y>=max(melmask.uncropped.y),1,'last'), find(im.y<=min(melmask.uncropped.y),1,'first')];
+    im_subset = im.z(min(ylims):max(ylims),min(xlims):max(xlims));
+    im_subset = im_subset./max(max(im_subset));
+    %plot the image
+    temp_fig = figure; set(temp_fig,'position',[50 50 1200 1200]);
+    for p = 1:size(melmask.dated,2)
+        imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',14);
+        plot(C.X,C.Y,'.k'); hold on;
+        plot(melmask.dated(p).x,melmask.dated(p).y,'-m','linewidth',2); drawnow;
+        answer = questdlg('Is the terminus delineation good?',...
+            'terminus delineation','1) Yes: wiggly & good','2) No: DEM edge (straight)','3) No: wonky polygon','1) Yes: wiggly & good');
+        switch answer
+            case '1) Yes: wiggly & good'
+                term_trace(p) = 1;
+            case '2) No: DEM edge (straight)'
+                term_trace(p) = 0;
+            case '3) No: wonky polygon'
+                fix_individual_melange_masks(root_dir,sitenames(j,:),output_dir,melmask,p);
+                term_trace(p) = 1;
+        end
+        clear answer; cla;
+    end
+    close(temp_fig);
+    
+    %create an overview map of all the dated melange masks
+    map_fig = figure; set(map_fig,'position',[650 50 600 600]);
+    imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
+    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]);
+    %plot dummy lines to create a legend
+    first_term = find(term_trace == 1,1,'first');
+    for l = 1:size(yr_cmap,1)
+        pt(l) = plot(melmask.dated(first_term).x,melmask.dated(first_term).y,...
+            '-','color',yr_cmap(l,:),'linewidth',1.5); hold on;
+    end
+    %plot the real terminus traces
+    for p = 1:size(melmask.dated,2)
+        if term_trace(p) == 1
+            plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',...
+                yr_cmap(str2num(melmask.dated(p).datestring(1:4))-min(years)+1,:),'linewidth',1.5); hold on;
+            drawnow;
+        end
+    end
+    plot(C.X,C.Y,'.k'); hold on;
+    plot(melmask.uncropped.x,melmask.uncropped.y,'-b','linewidth',2); hold on;
+    xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+    set(gca,'xticklabels',xticks/1000,'yticklabels',yticks/1000,'fontsize',16);
+    xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+    if range(xlims) > range(ylims) %short and fat map so plot the legend below
+        map_leg = legend(pt,num2str(years'),'Location','southoutside',...
+            'Orientation','horizontal','NumColumns',7);
+    else %tall and thin map so plot the legend on the side
+        map_leg = legend(pt,num2str(years'),'Location','eastoutside',...
+            'Orientation','vertical','NumColumns',1);
+    end
+    drawnow;
+    saveas(map_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'_site-map.png'],'png'); %save the image
     
     %find the NaNs in the coordinate pairs to identify each transect
     coords = table2array(T(:,1:2));
@@ -111,8 +192,7 @@ for j = 1:length(sitenames)
 
     %plot time-series of the width-averaged elevation profiles
     figure; set(gcf,'position',[50 50 1200 600]);
-    subZ_yr = subplot(2,3,1); yr_cmap = cmocean('matter',length(years)+2); yr_cmap = yr_cmap(2:end,:);
-    subZ_mo = subplot(2,3,4); mo_cmap = cmocean('phase',12);
+    subZ_yr = subplot(2,3,1); subZ_mo = subplot(2,3,4); 
     mean_prof = nanmean(zprofs,2); end_ind = find(~isnan(mean_prof)==1,1,'first');
     for p = 1:size(zprofs,2)
         %add dummy lines for the legend
@@ -209,9 +289,11 @@ for j = 1:length(sitenames)
 %     term_fig = figure;
     subT = subplot(2,3,[3,6]);
     for p = 1:length(MP(j).Z.date)
-        mo = str2num(MP(j).Z.date{p}(5:6));
-        plot(MP(j).T.centerline(p)-tran_dist(end_ind),zdate(p),'x','color',mo_cmap(mo,:),'linewidth',2); hold on;
-        clear mo;
+        if term_trace(p) == 1 %don't plot terminus delineations that are the DEM edge, not the true terminus
+            mo = str2num(MP(j).Z.date{p}(5:6));
+            plot(MP(j).T.centerline(p)-tran_dist(end_ind),zdate(p),'x','color',mo_cmap(mo,:),'linewidth',2); hold on;
+            clear mo;
+        end
     end
     set(gca,'xlim',[0 max(MP(j).T.centerline)-tran_dist(end_ind)]); xticks = get(gca,'xtick');
     set(gca,'xtick',xticks,'xticklabels',xticks/1000);
