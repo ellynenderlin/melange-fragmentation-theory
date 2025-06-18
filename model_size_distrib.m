@@ -269,7 +269,7 @@ for p = 1:nfiles
             mkdir([root_dir,site_abbrev,'/models/']) % make models folder if it doesn't exist
             disp('Models folder created.');
         end
-        saveas(gcf,[root_dir,site_abbrev,'/models/',name(1:11),'_model.png']) % save into models folder
+        saveas(gcf,[root_dir,site_abbrev,'/models/',site_abbrev,'-',matfile_daterefs,'_model.png']) % save into models folder
         
         % save the parameters
         params(p,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4, c5, c6];
