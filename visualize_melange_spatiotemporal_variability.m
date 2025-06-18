@@ -22,10 +22,23 @@ for i = 1:length(sites)
     end
 end
 
+%option to reload the existing data if any data have been saved
+if exist([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']) == 2
+    reload = questdlg('Reload the existing centerline data & start from there?',...
+        'data reload','1) Yes: reload','2) No: start fresh','1) Yes: reload');
+    switch reload
+        case '1) Yes: reload'
+            load([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']);
+            site_start = length(MP)+1;
+        case '2) No: start fresh'
+            site_start = 1;
+    end
+end
+
 %loop through the folders & extract info
 disp('Creating plots of elevation, velocity, and terminus position...');
 MP = struct;
-for j = 1:length(sitenames)
+for j = site_start:length(sitenames)
     disp(sitenames(j,:)); output_dir = [root_dir,sitenames(j,:),'/'];
     MP(j).name = sitenames(j,:);
     
@@ -303,7 +316,8 @@ for j = 1:length(sitenames)
             clear mo;
         end
     end
-    set(gca,'xlim',[0 max(MP(j).T.centerline)-tran_dist(end_ind)]); xticks = get(gca,'xtick');
+    set(gca,'xlim',[0 max(MP(j).T.centerline)-tran_dist(end_ind)],'ylim',[min(years) max(years)]); 
+    xticks = get(gca,'xtick');
     set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',14);
     xlabel('Centerline distance (km)','fontsize',14); ylabel('Year','fontsize',14); 
     %UPDATE ALL THE PLOTS SO THAT THE CENTERLINE DISTANCE IS MOVING AWAY
@@ -316,12 +330,16 @@ for j = 1:length(sitenames)
     %standardize the x-limits on the plots
 %     set(subZ_yr,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]); set(subZ_mo,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]);
 %     set(subV_yr,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]); set(subV_mo,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]);
+    subplot(subZ_yr);
     set(subZ_yr,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000); 
     ylabel('Elevation (m)','fontsize',14); 
+    subplot(subZ_mo);
     set(subZ_mo,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000);
     xlabel('Centerline distance (km)','fontsize',14); ylabel('Elevation (m)','fontsize',14); 
+    subplot(subV_yr);
     set(subV_yr,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000); 
     ylabel('Speed (m/yr)','fontsize',14); 
+    subplot(subV_mo);
     set(subV_mo,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000);  
     xlabel('Centerline distance (km)','fontsize',14); ylabel('Speed (m/yr)','fontsize',14); 
     drawnow;
