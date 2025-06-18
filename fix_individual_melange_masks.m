@@ -1,4 +1,4 @@
-function fix_individual_melange_masks(root_dir,site_abbrev,output_dir,melmask,p)
+function [removed_flag] = fix_individual_melange_masks(root_dir,site_abbrev,melmask,p)
 %%% Use this code to fix one-off strange melange masks that you may suspect
 %%% when analyzing melange distributions or melange velocity coherence
 % clearvars; close all;
@@ -109,7 +109,7 @@ switch size_answer
         %remake the fjord mask & save the dated melange outline and fjord mask
         plot(melpoly_x,melpoly_y,'--c','linewidth',2); hold on;
         melmask.dated(maskref).x = melpoly_x; melmask.dated(maskref).y = melpoly_y;
-        save([output_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+        save([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
         [ZXgrid,ZYgrid] = meshgrid(M.DEM.x,M.DEM.y);
         disp('Recreating the melange mask... this will take ~1 hr!');
         in = inpolygon(ZXgrid,ZYgrid,melpoly_x,melpoly_y);
@@ -119,13 +119,16 @@ switch size_answer
         M.DEM.z_filled(M.mask.fjord~=1) = NaN;
         save([root_dir,site_abbrev,'/DEMs/',site_abbrev,'-',melmask.dated(p).datestring,'_melange-DEMfilled.mat'],'M','m','-v7.3');
         
+        %set output
+        removed_flag = 'fixed';
+        
     case 'No'
         %remove from the melange mask matfile
         mel.uncropped = melmask.uncropped;
         mel.dated = melmask.dated(1:p-1);
         mel.dated(p:length(melmask.dated)-1) = melmask.dated(p+1:length(melmask.dated));
         clear melmask; melmask = mel; clear mel;
-        save([output_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
+        save([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat'],'melmask','-v7.3');
         
         %delete the filled DEM & iceberg distribution files (if they exist)
         recycle('on'); 
@@ -154,6 +157,8 @@ switch size_answer
         disp([site_abbrev,'_centerline_elevations.csv']);
         disp([site_abbrev,'_transect_elevations.csv']);
         
+        %set output
+        removed_flag = 'removed';
 end
 
 end

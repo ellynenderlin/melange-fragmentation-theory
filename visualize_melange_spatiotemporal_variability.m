@@ -45,6 +45,7 @@ for j = 1:length(sitenames)
     %terminus position as the intersection between the centerline and the
     %DEM-based melange outline
     load([MP(j).name,'-melange-masks.mat']); %load the melange mask file
+    DEM_num = size(melmask.dated,2); term_trace = [];
     
     %load the shapefile of transect-centerline intersections used to
     %extract the velocity timeseries & the full centerline to precisely
@@ -91,7 +92,7 @@ for j = 1:length(sitenames)
     im_subset = im_subset./max(max(im_subset));
     %plot the image
     temp_fig = figure; set(temp_fig,'position',[50 50 1200 1200]);
-    for p = 1:size(melmask.dated,2)
+    for p = 1:DEM_num
         imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
         set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',14);
         plot(C.X,C.Y,'.k'); hold on;
@@ -100,16 +101,23 @@ for j = 1:length(sitenames)
             'terminus delineation','1) Yes: wiggly & good','2) No: DEM edge (straight)','3) No: wonky polygon','1) Yes: wiggly & good');
         switch answer
             case '1) Yes: wiggly & good'
-                term_trace(p) = 1;
+                term_trace = [term_trace; 1]; melmask.dated(length(term_trace)).terminus = 1;
             case '2) No: DEM edge (straight)'
-                term_trace(p) = 0;
+                term_trace = [term_trace; 0]; melmask.dated(length(term_trace)).terminus = 1;
             case '3) No: wonky polygon'
-                fix_individual_melange_masks(root_dir,sitenames(j,:),output_dir,melmask,p);
-                term_trace(p) = 1;
+                removed_flag = fix_individual_melange_masks(root_dir,sitenames(j,:),melmask,p);
+                if strmatch(removed_flag,'removed')
+                    %removed the DEM from melmask so reload it
+                    load([MP(j).name,'-melange-masks.mat']);
+                    DEM_num = size(melmask.dated,2);
+                else
+                    term_trace = [term_trace; 1]; melmask.dated(length(term_trace)).terminus = 1;
+                end
         end
         clear answer; cla;
     end
     close(temp_fig);
+    save([root_dir,sitenames(j,:),'/',sitenames(j,:),'-melange-masks.mat'],'melmask','-v7.3');
     
     %create an overview map of all the dated melange masks
     map_fig = figure; set(map_fig,'position',[650 50 600 600]);
@@ -219,11 +227,11 @@ for j = 1:length(sitenames)
     title([sitenames(j,:),' elevation profiles'])
     plot(tran_dist(end_ind:end)'-tran_dist(end_ind),mean_prof(end_ind:end),'-','color','k','linewidth',3); hold on; 
     leg_yr = legend(py,num2str(years')); leg_yr.Location = 'northwest';
-    grid on; drawnow;
+    set(gca,'fontsize',14); grid on; drawnow;
     subplot(subZ_mo); 
     plot(tran_dist(end_ind:end)'-tran_dist(end_ind),mean_prof(end_ind:end),'-','color','k','linewidth',3); hold on; 
     leg_mo = legend(pm,num2str([1:1:12]')); leg_mo.Location = 'northwest';
-    grid on; drawnow;
+    set(gca,'fontsize',14); grid on; drawnow;
     Zxlims = get(subZ_mo,'xlim');
 
     %load the velocity timeseries for the transect-centerline intersection
@@ -279,10 +287,10 @@ for j = 1:length(sitenames)
     subplot(subV_yr); 
     plot(tran_dist(end_ind:end)'-tran_dist(end_ind),nanmean(MP(j).V.V(end_ind:end,:),2),'-','color','k','linewidth',3); hold on; 
     title([sitenames(j,:),' velocity profiles'])
-    grid on; drawnow;
+    set(gca,'fontsize',14); grid on; drawnow;
     subplot(subV_mo); 
     plot(tran_dist(end_ind:end)'-tran_dist(end_ind),nanmean(MP(j).V.V(end_ind:end,:),2),'-','color','k','linewidth',3); hold on; 
-    grid on; drawnow;
+    set(gca,'fontsize',14); grid on; drawnow;
     Vxlims = get(subV_mo,'xlim');
     
     %create a terminus position timeseries
@@ -296,8 +304,8 @@ for j = 1:length(sitenames)
         end
     end
     set(gca,'xlim',[0 max(MP(j).T.centerline)-tran_dist(end_ind)]); xticks = get(gca,'xtick');
-    set(gca,'xtick',xticks,'xticklabels',xticks/1000);
-    xlabel('Centerline distance (km)');
+    set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',14);
+    xlabel('Centerline distance (km)','fontsize',14); ylabel('Year','fontsize',14); 
     %UPDATE ALL THE PLOTS SO THAT THE CENTERLINE DISTANCE IS MOVING AWAY
     %FROM THE MOST-RETREATED TERMINUS POSITION OR THE AVERAGE POSITION,
     %INSTEAD OF INLAND FROM THE OCEAN (BECAUSE THE START IS REALLY
@@ -309,17 +317,25 @@ for j = 1:length(sitenames)
 %     set(subZ_yr,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]); set(subZ_mo,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]);
 %     set(subV_yr,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]); set(subV_mo,'xlim',[0 min([Zxlims(2),Vxlims(2),Txlims(2)])]);
     set(subZ_yr,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000); 
+    ylabel('Elevation (m)','fontsize',14); 
     set(subZ_mo,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000);
+    xlabel('Centerline distance (km)','fontsize',14); ylabel('Elevation (m)','fontsize',14); 
     set(subV_yr,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000); 
-    set(subV_mo,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000);    
+    ylabel('Speed (m/yr)','fontsize',14); 
+    set(subV_mo,'xlim',[0 max(MP(j).T.centerline)],'xtick',xticks,'xticklabels',xticks/1000);  
+    xlabel('Centerline distance (km)','fontsize',14); ylabel('Speed (m/yr)','fontsize',14); 
     drawnow;
-    
+    saveas(gcf,[root_dir,sitenames(j,:),'/',sitenames(j,:),'_centerline-elev-speed-terminus_subplots.png'],'png'); %save the image
     
     %clear profile variables
-    clear zprofs zdate *_cmap mean_prof end_ind C vel_pts;
+    clear im im_subset LCdir zprofs zdate mean_prof end_ind centerline C vel_pts term_trace melmask;
+    clear DEM_num pm pt py sub* tran_* *xlims xticks *ylims yticks;
+    
+    %save the structure with the centerline data
+    save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
     
     %compile size distributions
-    
+    close all;
     
 end
 

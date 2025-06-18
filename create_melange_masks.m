@@ -1178,6 +1178,7 @@ check_datestrings = {'full mask'};
 for p = 1:length(melmask.dated)
    check_datestrings =  [check_datestrings; {melmask.dated(p).datestring}];
 end
+DEM_num = length(filledDEM_dates);
 
 %show all the melange outlines cropped to the terminus as a quality check
 %(use fix_individual_melange_masks.m as needed)
@@ -1200,7 +1201,7 @@ retrace = questdlg('Do any older masks need to be redone?',...
     'Redo Any Mask','1) Ugh, yes.','2) Horray, no!','2) Horray, no!');
 switch retrace
     case '1) Ugh, yes.'
-        for p = 1:length(filledDEM_dates)
+        for p = 1:DEM_num
            subplot(sub2);
            plot(melmask.uncropped.x,melmask.uncropped.y,'-k','linewidth',2); axis xy equal; hold on;
            plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:),'linewidth',2); hold on;
@@ -1210,10 +1211,16 @@ switch retrace
                'Redo This Mask','1) Yes','2) No','2) No');
            switch redo
                case '1) Yes'
-                   fix_individual_melange_masks(root_dir,site_abbrev,output_dir,melmask,p);
+                   removed_flag = fix_individual_melange_masks(root_dir,site_abbrev,melmask,p);
                    %replot updated mask outline
-                   plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:),'linewidth',2); hold on;
-                   drawnow;
+                   if strmatch(removed_flag,'removed')
+                       %removed the DEM from melmask so reload it
+                       load([MP(j).name,'-melange-masks.mat']);
+                       DEM_num = size(melmask.dated,2); p = p-1; %adjust counting to account for the removed DEM
+                   else
+                       plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',melmask_cmap(p,:),'linewidth',2); hold on;
+                       drawnow;
+                   end
                case '2) No'
                    disp('move on to the next date');
            end
