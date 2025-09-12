@@ -175,29 +175,52 @@ plot(S.X,S.Y,'-r','linewidth',2); %plot the AOI
 drawnow;
 
 %% trace the centerline, fit a spline, and extract points at even increments
-disp('use image to map the centerline following flow...');
-beep;
 
-%trace the centerline
-disp('trace the centerline starting from the seaward side of the AOI, overlapping each end');
-figure(fig); 
-% [~,~,~,xi,yi] = improfile; %old (SLOW) approach: be patient, a + cursor will appear, double right click to terminate
-pline = drawpolyline('Color','c','Linewidth',1); %a + cursor will appear, double right click to terminate
-xi = pline.Position(:,1); yi = pline.Position(:,2); clear pline;
-% plot(xi,yi,'xy'); hold on;
+%look for an existing centerline file & give the user the option to load it
+if exist([site_dir,'shapefiles/',site_abbrev,'_centerline.shp'],'file') == 2
+    center_reuse = questdlg('Do you want to use the existing centerline (to re-do transect spacing)?',...
+        'reuse','1) Yes','2) No','2) No');
+    switch center_reuse
+        case '1) Yes'
+            C = shaperead([site_dir,'shapefiles/',site_abbrev,'_centerline.shp']);
+            figure(fig);
+            plot(C.X,C.Y,'-y','linewidth',2); %plot the centerline
+            drawnow;
+            delineation_flag = 0;
+        case '2) No'
+            disp('opted out of reusing the existing centerline');
+            delineation_flag = 1;
+    end
+else
+    delineation_flag = 1;
+end
 
-%create a regularly interpolated version of the centerline
-prof_length = nansum(sqrt((xi(2:end)-xi(1:end-1)).^2 + (yi(2:end)-yi(1:end-1)).^2));
-interpCL_100m = interparc(round(prof_length/100),xi,yi,'spline'); %create a spooth line with spacing of ~100 m
-% plot(interpCL_100m(:,1),interpCL_100m(:,2),'sy'); hold on;
-prof_length = nansum(sqrt((interpCL_100m(2:end,1)-interpCL_100m(1:end-1,1)).^2 + (interpCL_100m(2:end,2)-interpCL_100m(1:end-1,2)).^2));
-interpCL = interparc(round(prof_length/spacer),xi,yi,'spline'); %create a spooth line with spacing defined by "spacer"
-C.X = interpCL(:,1); C.Y = interpCL(:,2);
-%plot
-plot(C.X,C.Y,'-y','linewidth',2); %plot the centerline
-drawnow;
-%clear out old variables
-clear xi yi interpCL* prof_length;
+%draw the centerline
+if delineation_flag == 1
+    disp('use image to map the centerline following flow...');
+    beep;
+    
+    %trace the centerline
+    disp('trace the centerline starting from the seaward side of the AOI, overlapping each end');
+    figure(fig);
+    % [~,~,~,xi,yi] = improfile; %old (SLOW) approach: be patient, a + cursor will appear, double right click to terminate
+    pline = drawpolyline('Color','c','Linewidth',1); %a + cursor will appear, double right click to terminate
+    xi = pline.Position(:,1); yi = pline.Position(:,2); clear pline;
+    % plot(xi,yi,'xy'); hold on;
+    
+    %create a regularly interpolated version of the centerline
+    prof_length = nansum(sqrt((xi(2:end)-xi(1:end-1)).^2 + (yi(2:end)-yi(1:end-1)).^2));
+    interpCL_100m = interparc(round(prof_length/100),xi,yi,'spline'); %create a spooth line with spacing of ~100 m
+    % plot(interpCL_100m(:,1),interpCL_100m(:,2),'sy'); hold on;
+    prof_length = nansum(sqrt((interpCL_100m(2:end,1)-interpCL_100m(1:end-1,1)).^2 + (interpCL_100m(2:end,2)-interpCL_100m(1:end-1,2)).^2));
+    interpCL = interparc(round(prof_length/spacer),xi,yi,'spline'); %create a spooth line with spacing defined by "spacer"
+    C.X = interpCL(:,1); C.Y = interpCL(:,2);
+    %plot
+    plot(C.X,C.Y,'-y','linewidth',2); %plot the centerline
+    drawnow;
+    %clear out old variables
+    clear xi yi interpCL* prof_length;
+end
 
 %convert the centerline coordinates to along-profile distance from the origin
 CL(1) = 0;
