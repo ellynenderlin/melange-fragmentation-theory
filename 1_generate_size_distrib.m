@@ -15,15 +15,16 @@ addpath('/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-fragmentation
 
 % set paths and glacier to analyze manually:
 site_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
-basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
+% basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
+basepath='/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
 LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
-vel_dir = '/Users/ellynenderlin/Research/miscellaneous/Greenland-VelMosaic_1995-2015/'; %GrIMP velocity mosaic: https://nsidc.org/grimp
+vel_dir = '/Users/ellynenderlin/Research/miscellaneous/velocities/Greenland-VelMosaic_1995-2015/'; %GrIMP velocity mosaic: https://nsidc.org/grimp
 cd([root_dir,site_abbrev]);
 disp('Paths set, move along!');
 
 %define the spacing increment for cross-flow transects
-transect_spacer = 2000;
+transect_spacer = 1000;
 
 
 %% a) Create the melange masks using a series of manual steps
@@ -58,10 +59,20 @@ w = who;
 if sum(contains(w,'melmask')) == 0; load([output_dir,'/',site_abbrev,'-melange-masks.mat']); end
 
 %manually delineate the centerline: requires a reference Landsat image & velocity vector (vx,vy) geotiffs
-answer = questdlg('Do centerline & cross-flow profiles exist?',...
-    'profile creation','1) Yes','2) No','2) No');
+answer = questdlg('Do you need to create or update a centerline profile + transects?',...
+    'profile creation','1) Yes','2) No','1) Yes');
 switch answer
     case '1) Yes'
+        disp('Creating or updating a centerline profile & evenly-spaced cross-flow transects...');
+        %manually draw a centerline profile & automatically extract
+        %cross-flow transects (default transect spacing = 2km & outputes = shapefiles)
+        [AF,XF,~] = create_profile_and_transects([root_dir,site_abbrev,'/'],melmask,im_dir,vel_dir,3413,transect_spacer);
+
+        %check that small areas weren't missed during manual masking when
+        %running the automated DEM distribution extraction code
+        mask_check = 1;
+
+    case '2) No' %the profile and transects already exist and you're happy with them
         if exist('AF') == 1
             disp('profiles in workspace, advancing to data extraction...');
         else
@@ -80,16 +91,6 @@ switch answer
         %don't double-check melange masks because they should have been
         %checked when the code was initially run through & transects were made
         mask_check = 0; 
-
-    case '2) No'
-        disp('creating a centerline profile & evenly-spaced cross-flow transects...');
-        %manually draw a centerline profile & automatically extract
-        %cross-flow transects (default transect spacing = 2km & outputes = shapefiles)
-        [AF,XF,~] = create_profile_and_transects([root_dir,site_abbrev,'/'],melmask,im_dir,vel_dir,3413,transect_spacer);
-
-        %check that small areas weren't missed during manual masking when
-        %running the automated DEM distribution extraction code
-        mask_check = 1;
 
 end
 clear answer;

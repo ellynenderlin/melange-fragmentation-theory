@@ -288,36 +288,36 @@ if mask_check == 1
 
         %manually mask-out any remaining splotches of data that were
         %somehow skipped (e.g., near fjord wall but connected to melange)
-        blunder_question = questdlg('Mask out any remaining "blunders"?',...
-            'Blunder ID','1) Yes!','2) No!','1) Yes!');
-        switch blunder_question
-            case '1) Yes!'
-                figure(figDEM); subplot(sub1);
-                disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
-                [a] = ginput(2);
-                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-                drawnow;
-                figure(figDEM); subplot(sub2);
-                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-                drawnow;
-                disp('Draw a polygon on the mask to update it');
-                [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
-                BW_DEM = anom_zmask.*BW_DEM;
-                
-                %update the plot
-                imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
-                fill(xm,ym,'r'); hold on;
-                set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-                set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-                xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-                
-                %update the mask
-                M.mask.DEM = M.mask.DEM.*BW_DEM;
-                clear anom_zmask xm ym;
-            case '2) No!'
-                disp('Good mask!')
-        end
-        clear blunder_question;
+        % blunder_question = questdlg('Mask out any remaining "blunders"?',...
+        %     'Blunder ID','1) Yes!','2) No!','1) Yes!');
+        % switch blunder_question
+        %     case '1) Yes!'
+        %         figure(figDEM); subplot(sub1);
+        %         disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
+        %         [a] = ginput(2);
+        %         set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+        %         drawnow;
+        %         figure(figDEM); subplot(sub2);
+        %         set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+        %         drawnow;
+        %         disp('Draw a polygon on the mask to update it');
+        %         [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
+        %         BW_DEM = anom_zmask.*BW_DEM;
+        % 
+        %         %update the plot
+        %         imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+        %         fill(xm,ym,'r'); hold on;
+        %         set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+        %         set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+        %         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+        % 
+        %         %update the mask
+        %         M.mask.DEM = M.mask.DEM.*BW_DEM;
+        %         clear anom_zmask xm ym;
+        %     case '2) No!'
+        %         disp('Good mask!')
+        % end
+        % clear blunder_question;
 
         %plot to check masking worked
         melange = M.DEM.z_filled;
@@ -338,18 +338,18 @@ if mask_check == 1
         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
         drawnow;
 
-        %decide if you want to save the updated mask
-        resave_answer = questdlg('Save the updated mask?',...
-            'mask update','1) Yes','2) No','2) No');
-        switch resave_answer
-            case '1) Yes'
-                save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
-                disp('Updated the mask... moving on')
-            case '2) No'
-                disp('Did NOT update the mask... moving on')
-        end
+        % %decide if you want to save the updated mask
+        % resave_answer = questdlg('Save the updated mask?',...
+        %     'mask update','1) Yes','2) No','2) No');
+        % switch resave_answer
+        %     case '1) Yes'
+        %         save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
+        %         disp('Updated the mask... moving on')
+        %     case '2) No'
+        %         disp('Did NOT update the mask... moving on')
+        % end
         clear M DEM_name outputberg_name BW*DEM melange stats idx areas;
-        clear resave_answer;
+        % clear resave_answer;
         close(figDEM); drawnow;
     end
 end
@@ -494,7 +494,7 @@ if grab_profiles == 1
     for k = af_start+1:length(AF.X)
         af_dist = [af_dist;af_dist(end)+sqrt((AF.X(k)-AF.X(k-1)).^2 + (AF.Y(k)-AF.Y(k-1)).^2)];
     end
-    for j = 1:size(h(1).z,2); plot(af_dist,h(1).z(af_start:end,j),'-','color',date_cmap(j,:),'linewidth',2); hold on; end
+    for j = 1:size(h(1).z,2); plot(af_dist,smooth(h(1).z(af_start:end,j),100),'-','color',date_cmap(j,:),'linewidth',2); hold on; end
     leg = legend(DEM_dates); leg.Location = 'west outside';
     if length(DEM_dates) > 30; leg.NumColumns = 2; end
     set(gca,'fontsize',14); grid on;
@@ -507,7 +507,7 @@ if grab_profiles == 1
         for k = 2:length(XF(j).X)
             xf_dist(k) = xf_dist(k-1)+sqrt((XF(j).X(k)-XF(j).X(k-1)).^2 + (XF(j).Y(k)-XF(j).Y(k-1)).^2);
         end
-        plot(xf_dist,nanmedian(h(j+1).z,2),'-','color',tran_cmap(j+1,:),'linewidth',2); hold on;
+        plot(xf_dist,smooth(nanmedian(h(j+1).z,2),100),'-','color',tran_cmap(j+1,:),'linewidth',2); hold on;
         clear xf_dist;
     end
     set(gca,'fontsize',14); grid on;
@@ -912,7 +912,9 @@ for p = 1:length(DEM_mats)
             writetable(Tsub,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution-subsets.csv']);
             disp('subset data saved to CSV');
         else
-            disp('not enough elevation data in the subset... nothing saved to CSV');
+            Tsub.([num2str(round(centroid(1))),'E,',num2str(round(centroid(2))),'N']) = NaN(size(hsub.Values))';
+            writetable(Tsub,[output_dir,site_abbrev,'-',num2str(DEM_dates(p,:)),'-iceberg-distribution-subsets.csv']);
+            disp('not enough elevation data in the subset... writing NaNs to CSV');
         end
         
         clear melsubset* in hsub binsub* bergsub* pixelsub* centroid* *_inds *_subset stat;

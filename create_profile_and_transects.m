@@ -177,12 +177,13 @@ drawnow;
 %% trace the centerline, fit a spline, and extract points at even increments
 
 %look for an existing centerline file & give the user the option to load it
-if exist([site_dir,'shapefiles/',site_abbrev,'_centerline.shp'],'file') == 2
+centerline_file = dir([site_dir,'shapefiles/*_centerline.shp']);
+if ~isempty(centerline_file)
     center_reuse = questdlg('Do you want to use the existing centerline (to re-do transect spacing)?',...
         'reuse','1) Yes','2) No','2) No');
     switch center_reuse
         case '1) Yes'
-            C = shaperead([site_dir,'shapefiles/',site_abbrev,'_centerline.shp']);
+            C = shaperead([centerline_file(1).folder,'/',centerline_file(1).name]);
             figure(fig);
             plot(C.X,C.Y,'-y','linewidth',2); %plot the centerline
             drawnow;
