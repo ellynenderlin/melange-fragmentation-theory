@@ -54,14 +54,14 @@ if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
             %fun = @(a) fit(v,n,i_cut(i),j_cut(j),a,norm_type);
             
             %find for which a the error is minimal
-            %a = fminbnd(fun,1.5, 2.0);
-            a = 2;
+            a = fminbnd(fun,1.2, 2.0);
+            % a = 2;
             %find parameters and error for the fit with new a
             [error, c] = EBC_fit(v,n,i,j,a,norm_type);
             
             err_array(i,j) = error;
             c_array(i,j,:) = c;
-%             a_array(i,j) = a;
+            % a_array(i,j) = a;
         end
     end
     
@@ -71,10 +71,10 @@ if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     
     [i,j]=ind2sub(size(err_array),idx);
     c = c_array(i,j,:);
-%     a = a_array(i,j);
+    % a = a_array(i,j);
     
     %rename variables
-    alpha=a;
+    alpha=a; 
     c1 = c(1); c2 = c(2); c3 = c(4); c4 = c(5);
     data_lims(:) = [i j]; error = min_val;
     
