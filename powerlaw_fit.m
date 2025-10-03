@@ -1,4 +1,4 @@
-function [error,c1,c2] = powerlaw_fit(v, n, norm_type, lbounds, ubounds)
+function [error,c1,c2] = powerlaw_fit(v, n, a, norm_type, lbounds, ubounds)
 % This script fits a power law function to the iceberg
 % size distribution data n(v) affected by submarine melt.
 % The function is of the form:
@@ -25,9 +25,10 @@ A = [ones(m,1),v]; % initialize matrix A for linearization
 pwr = log(n); % linearize n
 b = pinv(A)*pwr; % Find model using Moore-Penrose Psuedoinverse
 c0(1) = exp(b(1)); % c1
-c0(2) = b(2); % c2 - power law exponent
+% c0(2) = b(2); % c2 - power law exponent
+c0(2) = a; % c2 - power law exponent (initial guess based on theory)
 
-c0 = abs(c0); %making sure initial guess is at least positive in all coeficients
+c0 = abs(c0); %making sure initial guess is at least positive in all coefficients
 
 % fit algorithm:
 opts = optimset('Display','off');

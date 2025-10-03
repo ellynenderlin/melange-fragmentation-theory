@@ -41,7 +41,7 @@ disp('Data identified');
 
 nfiles = size(fnames,1); % grab number of files
 
-nthresh = 1e-8; % set small size bin cutoff (n1 must be greater than this value)
+nthresh = 1e-6; % set small size bin cutoff (n1 must be greater than this value)
 
 % colormap:
 season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
@@ -65,7 +65,7 @@ for p = 1:nfiles
     % plot
     figure(p); 
     loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fnames(p,moref)),:)); 
-    grid on; set(gca,'FontSize',16); title(name(1:11)); %ylim([0.01,10^8]); 
+    grid on; set(gca,'FontSize',16); title(name(1:max(matfile_daterefs))); %ylim([0.01,10^8]); 
     xlabel('surface area [m^2]'); ylabel('count');
     drawnow; disp('Plot generated.'); 
     clear v1 n1 dv1;
@@ -89,7 +89,7 @@ end
 %         % plot
 %         figure(p);
 %         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(fnames(p,moref)),:)); hold on;
-%         grid on; set(gca,'FontSize',16); title(name(1:11)); %ylim([0.01,10^8]);
+%         grid on; set(gca,'FontSize',16); title(name(1:max(matfile_daterefs))); %ylim([0.01,10^8]);
 %         xlabel('surface area [m^2]'); ylabel('count');
 %         drawnow; disp('Plot generated.');
 %         
@@ -152,7 +152,7 @@ dplawthresh = 10^5; % upper bound on the intercept for the dummy power
 
 norm_type = 2; % toggle between L2, max, and log norm using 2, Inf, and 'log'
 
-normalize_exp = 1.2; % Increase to weight residuals towards end of the curve, minimum = 1
+normalize_exp = 1.5; % Increase to weight residuals towards end of the curve, minimum = 1
 
 % LOOP START  
 for p = 1:nfiles
@@ -165,11 +165,11 @@ for p = 1:nfiles
         n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; clear m;
         
         v1 = v1(n1>nthresh); n1 = n1(n1>nthresh); dv1 = dv1(n1>nthresh); % TOGGLE TO REMOVE SMALLEST COUNTS
-        v = v1(~isnan(n1)); n = n1(~isnan(n1)); % Remove NaNs
+        v = v1(~isnan(n1)); dv = dv1(~isnan(n1)); n = n1(~isnan(n1)); % Remove NaNs
         
         % Fit E-BC fragmentation model to the data and plot
-        [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(name, v1, n1, dv1, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
-        n_mod = EBC_model([c1,c2,alpha,c3,c4],v1); % grab model 
+        [alpha,c1,c2,c3,c4,~,~] = EBC_fragmentation_curve(name, v1, n1, dv1, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
+        n_mod = EBC_model([c1,c2,alpha,c3,c4],v); % grab model 
 
         subplot(1,2,1); % plot result
         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
@@ -177,19 +177,21 @@ for p = 1:nfiles
         xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
         title('Iceberg size distribution'); grid on;
         
-        if use_dummy == 1
-            % Fit dummy power law to determine if sub. melt is affecting the
-            % smaller bergs in the size distribution:
-            subset = 6:length(v1); % set subset of the distribution to fit 
-            [error_d, c1_d, c2_d] = powerlaw_fit(v1(subset),n1(subset),norm_type,[max(n1) 0],[max(n1)*dplawthresh 1e12]); % fit with bounds, keep close to the first value
-            nmod_dummy = powerlaw_model([c1_d, c2_d],v1);
-            loglog(v1, nmod_dummy, '--', 'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); % plot the dummy power law
-            res = n1 - nmod_dummy; % calculate residuals from dummy power law
-        else % otherwise, use Eq. 1
+        % if use_dummy == 1
+        %     % Fit dummy power law to determine if sub. melt is affecting the
+        %     % smaller bergs in the size distribution:
+        %     subset = 6:length(v1); % set subset of the distribution to fit 
+        %     [error_d, c1_d, c2_d] = powerlaw_fit(v1(subset),n1(subset),1,norm_type,[max(n1) 0],[max(n1)*dplawthresh 1e12]); % fit with bounds, keep close to the first value
+        %     nmod_dummy = powerlaw_model([c1_d, c2_d],v1);
+        %     loglog(v1, nmod_dummy, '--', 'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); % plot the dummy power law
+        %     res = n1 - nmod_dummy; % calculate residuals from dummy power law
+        % else % otherwise, use Eq. 1
             res = n1 - n_mod; % calculate residuals from E-BC model (data - model)
-        end
+        % end
             
-        % Use negative residuals do determine if sub. melt is necessary
+        % Use negative residuals to determine if sub. melt is potentially
+        % causing a smaller-than-expected number of small icebergs based on
+        % fragmentation alone
         resp = res(res >= 0); resn = res(res < 0); % split pos. and neg. residuals
         resp_idx = find(res >= 0); % grab index of positive residuals
         resn_idx = find(res < 0); % grab index of negative residuals
@@ -199,7 +201,7 @@ for p = 1:nfiles
         loglog(resn_idx, abs(resn)./(abs(n(resn_idx)).^normalize_exp), 'kx'); 
         legend('positive', 'negative'); set(gca,'FontSize',16);
         title('Residuals'); grid on;
-        sgtitle(name(1:11)); % plot title
+        sgtitle(name(1:max(matfile_daterefs))); % plot title
         
         submarine_melt_influence = 1; % initially assume influence of sub. melt
         % if there are at least 2 negative residuals in the first 8 points,
@@ -229,7 +231,7 @@ for p = 1:nfiles
             dv1_EBC = [dv1(1:idx_sm_start); dv1(idx_sm_end:end)];
             
             % fit power law model to data influenced by submarine melt
-            [error2,c5,c6] = powerlaw_fit(v1_sm, n1_sm, 2,[0 0],[1e12 1e12]);
+            [error2,c5,c6] = powerlaw_fit(v1_sm, n1_sm, 1, 2,[0 0],[1e12 1e12]);
             nmod_sm = powerlaw_model([c5,c6],v1(1:8));
             
             if c1 < c5 % if the sub. melt y-intercept is greater than the original model y-intercept
@@ -245,9 +247,10 @@ for p = 1:nfiles
                 subplot(1,2,1); % old result
                 loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
                 loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on; % original model
-                if use_dummy == 1
-                    loglog(v1, nmod_dummy, '--', 'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); %  dummy power law
-                end
+                % if use_dummy == 1
+                %     loglog(v1, nmod_dummy, '--', 'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); %  dummy power law
+                % end
+                ylims = get(gca,'ylim'); set(gca,'ylim',[10^-6 max(ylims)]);
                 xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
                 title('Iceberg size distribution'); grid on;
                 subplot(1,2,2); % new result
@@ -257,7 +260,7 @@ for p = 1:nfiles
                 xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
                 title('submarine melt considered');
                 legend('data','submarine melt','E-BC frag. model');
-                sgtitle(name(1:11)); % plot title
+                sgtitle(name(1:max(matfile_daterefs))); % plot title
             end
         else
             c5 = NaN; c6 = NaN;
@@ -269,8 +272,9 @@ for p = 1:nfiles
             mkdir([root_dir,site_abbrev,'/models/']) % make models folder if it doesn't exist
             disp('Models folder created.');
         end
-        saveas(gcf,[root_dir,site_abbrev,'/models/',site_abbrev,'-',matfile_daterefs,'_model.png']) % save into models folder
-        
+        % saveas(gcf,[root_dir,site_abbrev,'/models/',site_abbrev,'-',name(matfile_daterefs),'_model.png']) % save into models folder
+        print([root_dir,site_abbrev,'/models/',site_abbrev,'-',name(matfile_daterefs),'_model.png'],"-dpng","-r600");
+
         % save the parameters
         params(p,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4, c5, c6];
         

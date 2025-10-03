@@ -39,24 +39,32 @@ if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     %remove the very small iceberg fragments of BIG icebergs since those
     %are simply elevation peaks in the largest icebergs
     v1 = v1(n1>nthresh); n1 = n1(n1>nthresh);
-    
-    v = v1(~isnan(n1)); n = n1(~isnan(n1)); % NO REMOVAL OF FIRST POINTS
+    v1 = v1(2:end); n1 = n1(2:end); dv1 = dv1(2:end);
+    v = v1(~isnan(n1)); dv = dv1(~isnan(n1)); n = n1(~isnan(n1)); % NO REMOVAL OF FIRST POINTS
     
     %begin the search loop - compute error for every combination of i_cut, j_cut
     err_array = 1e12*ones(length(v)); %pre-allocate error array
     c_array = zeros(length(v),length(v),5);
 %     a_array = zeros(length(v),length(v));
-    
-    for i=4:length(v)-3
-        for j=4:length(v)-3
+
+    %set reasonable bound for the exponential cut-off
+    i_min = find(v>=1e5,1,'first'); 
+    if isempty(i_min) || i_min > find(n>0,1,'last')-4
+        i_min = find(n>0,1,'last')-4;
+    end
+
+    %constrain the more complex/complete model so the power law portion of
+    %the curve is fixed based on the initial guess
+    for i=4:i_min+4
+        for j=i_min-12:find(n>0,1,'last')-4
             %create a function which computes error for parameter a
-            %given the cutoff values i_cut and j_cut
-            %fun = @(a) fit(v,n,i_cut(i),j_cut(j),a,norm_type);
-            
+            %given the cutoff values
+            fun = @(a) EBC_fit(v,n,i,j,a,norm_type);
+
             %find for which a the error is minimal
             a = fminbnd(fun,1.2, 2.0);
-            % a = 2;
-            %find parameters and error for the fit with new a
+
+            %find parameters and error for the fit with prescribed a
             [error, c] = EBC_fit(v,n,i,j,a,norm_type);
             
             err_array(i,j) = error;
@@ -74,12 +82,12 @@ if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     % a = a_array(i,j);
     
     %rename variables
-    alpha=a; 
+    alpha=c(3); 
     c1 = c(1); c2 = c(2); c3 = c(4); c4 = c(5);
     data_lims(:) = [i j]; error = min_val;
     
     %display results
-    fprintf(fname(4:11)); fprintf("\n");
+    fprintf(fname(5:12)); fprintf("\n");
     fprintf("[c1, c2, c3, c4] = [%e %e %e %e]\n",c(1),c(2),c(4),c(5));
     fprintf("alpha = %f\n",c(3));
     fprintf("==========================================\n")
@@ -117,7 +125,7 @@ cl(2) = -1/b(2);
 cl(3) = a;
 
 %exponential fit - right side
-vr = v(j_cut:end); nr = n(j_cut:end);
+vr = v(j_cut:find(n>0,1,'last')); nr = n(j_cut:find(n>0,1,'last'));
 
 m = length(vr);
 A = [ones(m,1),vr];
@@ -131,14 +139,32 @@ cr(2) = -1/b(2);
 c0 = [cl, cr]; %Initial guess
 c0 = abs(c0); %making sure initial guess is at least positive in all coeficients
 
-opts = optimset('Display','off');
-c = lsqcurvefit(@EBC_model, c0, v, n, [0 1e4 0 0 0], [1e12 1e12 3 1e12 1e12],opts); % ADJUST BOUNDS!!
+opts = optimset('Display','off','MaxFunEvals',2000,'TolFun',1e-6);
+[cf,~,~,exitflag,~] = lsqcurvefit(@EBC_model, c0, v, n, 0.95*c0, 1.15*c0,opts); % ADJUST BOUNDS!!
+% if exitflag == 0
+%     disp('lsqcurvefit stopped because the maximum number of iterations or function evaluations was reached.');
+% elseif exitflag == 1
+%     disp('lsqcurvefit converged to a solution.');
+% elseif exitflag == 2
+%     disp('lsqcurvefit stopped because the change in x was less than StepTolerance.');
+% elseif exitflag == 3
+%     disp('lsqcurvefit stopped because the change in the residual was less than FunctionTolerance.');
+% else
+%     disp(['lsqcurvefit stopped with exitflag: ' num2str(exitflag)]);
+% end
 
-if norm_type == 'log' % if log norm is specified
-    error = sqrt(mean(((log10(EBC_model(c,v)+1) - log10(n+1))./(n.^normalize_exp)).^2)); % RMSLE
-else % otherwise use L2 or Inf in the norm function
-    error = norm((EBC_model(c,v)-n)./(n.^normalize_exp),norm_type); % normalized residuals
+cs = [c0; cf];
+for k = 1:2
+    %calculate errors
+    if norm_type == 'log' % if log norm is specified
+        error(k,:) = sqrt(mean(((log10(EBC_model(cs(k,:),v)+1) - log10(n+1))./(n.^normalize_exp)).^2)); % RMSLE
+    else % otherwise use L2 or Inf in the norm function
+        error(k,:) = norm((EBC_model(cs(k,:),v)-n)./(n.^normalize_exp),norm_type); % normalized residuals
+    end
 end
+%determine which fit is better
+if error(1) < error(2); c = c0; error = error(1); else c = cf; error = error(2); end
+
 end
 
 end

@@ -249,7 +249,15 @@ if halfwidth < 1000; halfwidth = 1000; end
 %create transects
 inc = transect_inc/spacer;
 XF.X = []; XF.Y = []; ind = 1;
-for j = 1:inc:length(CL)
+center_points = [1:inc:length(CL)];
+%if the fjord polygon is really long, decrease transect spacing increment to avoid memory issues and crashes
+if length(center_points) > 10 && halfwidth > 5000
+    transect_inc = 1.5*transect_inc; 
+    inc = transect_inc/spacer;
+    clear center_points; center_points = [1:inc:length(CL)];
+end
+%loop through all the centerline points & extend transects
+for j = center_points
     disp([num2str(ceil(j/inc)),' of ',num2str(ceil(length(CL)/inc)),' transects']);
 
     %check that the transect's intersection with the centerline falls
@@ -431,6 +439,10 @@ for j = 1:inc:length(C.X)
         ind = ind+1;
         clear stat;
     end
+end
+%throw an error if there are not the same number of centerline points as transects
+if length(AX_X) ~= length(XF)
+    error('Check code because centerline points & transects do not have the same number')
 end
 
 %write to file (uncomment the if/else statement if you'd prefer to default

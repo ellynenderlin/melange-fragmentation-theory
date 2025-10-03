@@ -288,36 +288,36 @@ if mask_check == 1
 
         %manually mask-out any remaining splotches of data that were
         %somehow skipped (e.g., near fjord wall but connected to melange)
-        % blunder_question = questdlg('Mask out any remaining "blunders"?',...
-        %     'Blunder ID','1) Yes!','2) No!','1) Yes!');
-        % switch blunder_question
-        %     case '1) Yes!'
-        %         figure(figDEM); subplot(sub1);
-        %         disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
-        %         [a] = ginput(2);
-        %         set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-        %         drawnow;
-        %         figure(figDEM); subplot(sub2);
-        %         set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
-        %         drawnow;
-        %         disp('Draw a polygon on the mask to update it');
-        %         [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
-        %         BW_DEM = anom_zmask.*BW_DEM;
-        % 
-        %         %update the plot
-        %         imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
-        %         fill(xm,ym,'r'); hold on;
-        %         set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
-        %         set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
-        %         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
-        % 
-        %         %update the mask
-        %         M.mask.DEM = M.mask.DEM.*BW_DEM;
-        %         clear anom_zmask xm ym;
-        %     case '2) No!'
-        %         disp('Good mask!')
-        % end
-        % clear blunder_question;
+        blunder_question = questdlg('Mask out any remaining "blunders"?',...
+            'Blunder ID','1) Yes!','2) No!','1) Yes!');
+        switch blunder_question
+            case '1) Yes!'
+                figure(figDEM); subplot(sub1);
+                disp('Click on UL & LR corners of a box bounding the anomalous elevations in the DEM subplot to zoom in'); % Upper left, lower right.
+                [a] = ginput(2);
+                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                drawnow;
+                figure(figDEM); subplot(sub2);
+                set(gca,'xlim',[min(a(:,1)) max(a(:,1))],'ylim',[min(a(:,2)) max(a(:,2))]);
+                drawnow;
+                disp('Draw a polygon on the mask to update it');
+                [anom_zmask,xm,ym] = roipoly; anom_zmask = double(~anom_zmask);
+                BW_DEM = anom_zmask.*BW_DEM;
+
+                %update the plot
+                imagesc(M.DEM.x,M.DEM.y,M.mask.DEM.*BW_DEM); axis xy equal; colormap(gca,gray); hold on; DEMax = gca;
+                fill(xm,ym,'r'); hold on;
+                set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)]); xticks = get(gca,'xtick'); yticks = get(gca,'ytick');
+                set(gca,'xticklabel',xticks/1000,'yticklabel',yticks/1000,'fontsize',16);
+                xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
+
+                %update the mask
+                M.mask.DEM = M.mask.DEM.*BW_DEM;
+                clear anom_zmask xm ym;
+            case '2) No!'
+                disp('Good mask!')
+        end
+        clear blunder_question;
 
         %plot to check masking worked
         melange = M.DEM.z_filled;
@@ -338,16 +338,16 @@ if mask_check == 1
         xlabel('Easting (km)','fontsize',16); ylabel('Northing (km)','fontsize',16);
         drawnow;
 
-        % %decide if you want to save the updated mask
-        % resave_answer = questdlg('Save the updated mask?',...
-        %     'mask update','1) Yes','2) No','2) No');
-        % switch resave_answer
-        %     case '1) Yes'
-        %         save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
-        %         disp('Updated the mask... moving on')
-        %     case '2) No'
-        %         disp('Did NOT update the mask... moving on')
-        % end
+        %decide if you want to save the updated mask
+        resave_answer = questdlg('Save the updated mask?',...
+            'mask update','1) Yes','2) No','2) No');
+        switch resave_answer
+            case '1) Yes'
+                save([root_dir,'/',site_abbrev,'/DEMs/',DEM_name],'M','-v7.3'); %SAVE
+                disp('Updated the mask... moving on')
+            case '2) No'
+                disp('Did NOT update the mask... moving on')
+        end
         clear M DEM_name outputberg_name BW*DEM melange stats idx areas;
         % clear resave_answer;
         close(figDEM); drawnow;
@@ -922,6 +922,7 @@ for p = 1:length(DEM_mats)
     
     %close the figure as needed and clear date-specific variables
     if p == 1; close(subfig); end
+    close all;
     clear bin* melange M m T Tsub;
 end
 close all; drawnow;
@@ -983,7 +984,7 @@ for p = 1:length(berg_dists)
     %read the CSV
     Ttemp = readtable([output_dir,berg_dists(p).name]);
     Tarray = table2array(Ttemp);
-    msg = warning('query','last'); wid = msg.identifier; warning('off',wid);
+    % msg = warning('query','last'); wid = msg.identifier; warning('off',wid);
 
     %add data to the site-compiled table
     if p == 1
