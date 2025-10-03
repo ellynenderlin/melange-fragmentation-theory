@@ -11,12 +11,12 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/cmocean/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/ArcticMappingTools/',...
     '/Users/ellynenderlin/Research/miscellaneous/general-code/inpoly2/');
-addpath('/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-fragmentation-code/');
+addpath('/Users/ellynenderlin/Research/miscellaneous/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'ASG'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'SEK'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 % basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
-basepath='/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange-melt/';
+basepath='/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];
 LCdir = dir([root_dir,site_abbrev,'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
 vel_dir = '/Users/ellynenderlin/Research/miscellaneous/velocities/Greenland-VelMosaic_1995-2015/'; %GrIMP velocity mosaic: https://nsidc.org/grimp
@@ -53,7 +53,7 @@ disp('Now you can delete the DEM geotiffs to save space on your computer!');
 %% b) Extract the automated iceberg distributions from the DEM
 disp('Extract elevation profiles & iceberg size distributions...');
 
-%load the melange masks if you skipped over the last section because masks
+%load ther melange masks if you skipped over the last section because masks
 %were previously created
 w = who;
 if sum(contains(w,'melmask')) == 0; load([output_dir,'/',site_abbrev,'-melange-masks.mat']); end
@@ -80,9 +80,9 @@ switch answer
             warning('off', 'map:shapefile:missingDBF');
             shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
             for j = 1:length(shp_files)
-                if contains(shp_files(j).name,'centerline')
+                if contains(shp_files(j).name,'centerline.')
                     AF = shaperead([shp_files(j).folder,'/',shp_files(j).name]);
-                elseif contains(shp_files(j).name,'transects')
+                elseif contains(shp_files(j).name,['transects_',num2str(transect_spacer)])
                     XF = shaperead([shp_files(j).folder,'/',shp_files(j).name]);
                 end
             end
@@ -104,4 +104,4 @@ close all;
 disp('Fit & plot size distributions... don''t close any figures while this runs');
 model_size_distrib(root_dir,site_abbrev)
 
-disp('Move on to ''2_manually_adjust_fits.ipynb'' Jupyter Notebook to correct wonky fragmentation fits');
+disp('Move on to ''2_manually_adjust_fits.ipynb'' Jupyter Notebook to correct wonky fragmentation fits')

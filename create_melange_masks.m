@@ -425,18 +425,18 @@ for i = 1:length(melange_mats)
 end
 
 %uncomment lines directly below if you are just running this section for debugging purposes
-% melangemat_dates = ''; melange_mats = dir([site_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
-% for i = 1:length(melange_mats)
-% melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs);
-% end
-% tifs = dir('*_dem.tif');
-% for i = 1:length(tifs)
-%     if contains(tifs(i).name,'SETSM_')
-%         DEMtif_dates(i,:) = tifs(i).name(14:21); %new PGC DEM name format AFTER MOVING WV NUMBER TO NEAR THE END SO FILES SORT CHRONOLOGICALLY
-%     else
-%         DEMtif_dates(i,:) = tifs(i).name(6:13); %old PGC DEM name format
-%     end
-% end
+melangemat_dates = ''; melange_mats = dir([site_abbrev,'*_melange-DEM.mat']); %identify the melange DEMs
+for i = 1:length(melange_mats)
+melangemat_dates(i,:) = melange_mats(i).name(matfile_daterefs);
+end
+tifs = dir('*_dem.tif');
+for i = 1:length(tifs)
+    if contains(tifs(i).name,'SETSM_')
+        DEMtif_dates(i,:) = tifs(i).name(14:21); %new PGC DEM name format AFTER MOVING WV NUMBER TO NEAR THE END SO FILES SORT CHRONOLOGICALLY
+    else
+        DEMtif_dates(i,:) = tifs(i).name(6:13); %old PGC DEM name format
+    end
+end
 
 %set-up the dated melange mask structure
 if ~isfield(melmask,'dated')
@@ -1211,7 +1211,7 @@ switch retrace
                'Redo This Mask','1) Yes','2) No','2) No');
            switch redo
                case '1) Yes'
-                   removed_flag = fix_individual_melange_masks(root_dir,site_abbrev,melmask,p);
+                   removed_flag = fix_individual_melange_masks(root_dir,site_abbrev,melmask,melmask.dated(p).datestring);
                    %replot updated mask outline
                    if strmatch(removed_flag,'removed')
                        %removed the DEM from melmask so reload it
