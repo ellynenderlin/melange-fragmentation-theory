@@ -12,8 +12,9 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/melange-fragmentation-code/
 root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
 % root_dir = '/Volumes/Jokulhaup_5T/Greenland-melange/';
 
-%define transect spacing
+%define custom parameters for size distributions
 transect_inc = 1000; %distance between transects along the centerline (meters)
+ARcomp.best.autoALL = 2; % iceberg aspect ratio 
 
 %customize visualization
 years = 2011:1:2023; yr_cmap = cmocean('matter',length(years)+1); yr_cmap = yr_cmap(2:end,:);
@@ -693,14 +694,19 @@ saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],
 %% create seasonally-averaged thickness & speed profiles and plot with seasonal size distributions from near the terminus & near the seaward margin
 close all; drawnow;
 
-%convert elevations to thickness estimates using set densities
-rho_i = 900; %kg/m^3
-rho_w = 1026; %kg/m^3
+%Thickness parameters:
+zcutoff = 6; %elevation threshold below which to ignore iceberge (m)
+rho_i = 900; %ice density (kg/m^3)
+rho_w = 1026; %water density (kg/m^3)
+
+%Velocity parameters: ideally only use velocities from time periods with
+%DEMs to create the seasonal profiles but you can also use all velocities
+%from that season (even if there is no DEM for that season-year combination)
+vfilter = 'annual'; %options: 'annual' OR 'alldates'
 
 %decide whether to sample data at (1) fixed locations or (2) relative
 %locations with respect to the terminus positions in the DEMs
-% sampling = 'fixed';
-sampling = 'dated';
+sampling = 'dated'; % options: 'dated' OR 'fixed';
 
 %iterate
 for j = 1:length(MP)
@@ -737,10 +743,15 @@ for j = 1:length(MP)
         D = readtable([root_dir,MP(j).name,'/',Dsubs(p).name],"VariableNamingRule","preserve");
         name_split = split(Dsubs(p).name,'-',2);
         berg_dates(p) = datetime(name_split{2},'Inputformat','yyyyMMdd'); clear name_split;
+
+        %identify observational limits along the centerline
         berg_nos = table2array(D(:,3:end)); berg_nos(berg_nos==0) = NaN;
         size_classes(p,:) = sum(~isnan(berg_nos),1);
         seaward_ext(p) = find(size_classes(p,:)>0,1,'first');
         inland_ext(p) = find(size_classes(p,:)>0,1,'last');
+
+        %create average thickness profile
+        Havg(p,:) = sum((2/ARcomp.best.autoALL)*sqrt(table2array(D(zcutoff:end,1))./pi()).*table2array(D(zcutoff:end,3:end)),1)./sum(table2array(D(zcutoff:end,3:end)),1);
     end
 
     %assign seaward & inland sampling limits based on the selected sampling
@@ -762,8 +773,8 @@ for j = 1:length(MP)
     %create an annual average seasonal surface elevation profile: 
     %SWITCH THIS WORKFLOW SO THAT AVERAGE THICKNESSES ARE CALCULATED FROM
     %THE BINNED SIZE DISTRIBUTIONS (ON A STAGGERED GRID RELATIVE TO V)
-    Zfilt = MP(j).Z.Zavg; Zfilt(MP(j).Z.Zavg==0) = NaN;
-    Zfilt(:,term_trace==0) = NaN;
+    Zfilt = MP(j).Z.Zavg; Zfilt(MP(j).Z.Zavg==0) = NaN; Zfilt(:,term_trace==0) = NaN;
+    Havg(term_trace==0,:) = NaN;
     for p = 1:length(years)
         yr_idx = find(zyrs == years(p));
         if ~isempty(yr_idx)
@@ -771,10 +782,14 @@ for j = 1:length(MP)
 
             %create a matrix of elevations relative to the terminus position
             z_profiles = NaN(max(inland_idx),length(yr_idx));
+            H_profiles = NaN(length(yr_idx),max(inland_idx)-1);
             for k = 1:length(yr_idx)
                 if ~isnan(inland_idx(yr_idx(k)))
                     z_temp = flipud(Zfilt(1:inland_idx(yr_idx(k)),yr_idx(k)));
-                    z_profiles(1:length(z_temp),k) = z_temp; clear z_temp;
+                    z_profiles(1:length(z_temp),k) = z_temp; 
+                    H_temp = fliplr(Havg(yr_idx(k),1:inland_idx(yr_idx(k))-1));
+                    H_profiles(k,1:length(H_temp)) = H_temp; 
+                    clear z_temp H_temp;
                 end
             end
             % z_yr = Zfilt(:,yr_idx); % if sampling at fixed locations
@@ -782,21 +797,21 @@ for j = 1:length(MP)
             %calculate seasonal averages
             for k = 1:4
                 z_seas(:,k,p) = nanmean(z_profiles(:,ismember(mos_yr,seasons(k,:))==1),2);
-                H_seas(:,k,p) = (rho_w./(rho_w-rho_i))*nanmean(z_profiles(:,ismember(mos_yr,seasons(k,:))==1),2);
+                % H_seas(:,k,p) = (rho_w./(rho_w-rho_i))*nanmean(z_profiles(:,ismember(mos_yr,seasons(k,:))==1),2);
+                H_seas(:,k,p) = nanmean(H_profiles(ismember(mos_yr,seasons(k,:))==1,:),1)';
+
                 % z_seas(:,k,p) = nanmean(z_yr(:,ismember(mos_yr,seasons(k,:))==1),2);
                 % H_seas(:,k,p) = (rho_w./(rho_w-rho_i))*nanmean(z_yr(:,ismember(mos_yr,seasons(k,:))==1),2);
             end
-            clear z_profiles mos_yr;
+            clear z_profiles H_profiles mos_yr;
             % clear z_yr mos_yr;
         end
         clear yr_idx
     end
     z_seas(z_seas==0) = NaN; H_seas(H_seas==0) = NaN; 
     zdist = 0:transect_inc:(max(inland_idx)-1)*transect_inc; 
+    Hdist = zdist+transect_inc/2;
 
-    %EDIT VELOCITY PROFILE AVERAGING:
-    % STILL NEED TO ADOPT A MOVING TERMINUS BOUNDARY FOR PROFILES AND NEED
-    % TO ADJUST FILTERING BASED ON DEM COVERAGE (SEE NOTES)
     %load the velocity timeseries for the transect-centerline intersection
     %points & create seasonally-averaged climatologies for each year
     vel_pts = dir([root_dir,sitenames(j,:),'/velocities/']);
@@ -806,7 +821,6 @@ for j = 1:length(MP)
             pt_ref = str2num(vel_pts(i).name(end-5:end-4));
 
             if pt_ref <= max(inland_idx)
-                rel_ref = max(inland_idx)-pt_ref+1;
 
                 %read the file
                 V = readtable([root_dir,sitenames(j,:),'/velocities/',vel_pts(i).name]);
@@ -819,10 +833,9 @@ for j = 1:length(MP)
 
                 %calculate seasonal average speeds for each year at the point
                 for p = 1:length(years)
-                    if sum(ismember(zyrs,years(p))) > 0
+                    if sum(ismember(zyrs,years(p))) > 0 %only extract velocities from years with DEMs
                         yr_idx = find(vyrs == years(p));
                         if ~isempty(yr_idx)
-                            mos_yr = vmos(yr_idx);
 
                             %isolate the velocities for that year
                             for k = 1:length(yr_idx)
@@ -832,9 +845,15 @@ for j = 1:length(MP)
 
                             %calculate seasonal average if there is a DEM
                             %for that year and within that season
+                            mos_yr = vmos(yr_idx);
                             for k = 1:4
-                                if ~isempty(zmos(zyrs==years(p) & ismember(zmos,seasons(2,:)))) 
-                                    vel_seas(rel_ref,k,p) = nanmean(v_temp(ismember(mos_yr,seasons(k,:))==1));
+                                if ~isempty(zmos(zyrs==years(p) & ismember(zmos,seasons(k,:)))) 
+                                    %use the DEMs from that season to come
+                                    %up with the position wrt the terminus
+                                    rel_ref = round(median(inland_idx(zyrs==years(p) & ismember(zmos,seasons(k,:)))))-pt_ref+1; %EDIT ME!!!!
+                                    if rel_ref >=1
+                                        vel_seas(rel_ref,k,p) = nanmean(v_temp(ismember(mos_yr,seasons(k,:))==1));
+                                    end
                                 end
                             end
                             % for k = 1:4
@@ -862,6 +881,7 @@ for j = 1:length(MP)
 
         %first 2 columns are area & bin width, so 3+ are data from points along the centerline
         if ~isnan(inland_idx(p))
+            %full size distributions at two points
             bergdist_inland(p,:) = table2array(D(:,inland_idx(p)+2))'; %near-terminus
             bergdist_seaward_setdx(p,:) = table2array(D(:,seaward_ext(p)+2))'; %standard distance from near-terminus
         else
@@ -887,41 +907,56 @@ for j = 1:length(MP)
     subz = subplot(3,2,[1:2]); subv = subplot(3,2,[3:4]); 
     subplot(subz);
     for k = 1:4
+        %relative to moving terminus
         Hmean = nanmean(H_seas(:,k,:),3);
         Hmax = (nanmean(H_seas(:,k,:),3)+std(H_seas(:,k,:),0,3,'omitnan')); 
         Hmin = (nanmean(H_seas(:,k,:),3)-std(H_seas(:,k,:),0,3,'omitnan')); 
+
+        %fixed locations
         % zdist = tran_reldist(seaward_idx:inland_idx);
         % Hmean = nanmean(H_seas(seaward_idx:inland_idx,k,:),3);
         % Hmax = (nanmean(H_seas(seaward_idx:inland_idx,k,:),3)+std(H_seas(seaward_idx:inland_idx,k,:),0,3,'omitnan')); 
         % Hmin = (nanmean(H_seas(seaward_idx:inland_idx,k,:),3)-std(H_seas(seaward_idx:inland_idx,k,:),0,3,'omitnan')); 
+        
+        %plot
         Hmax_idx = find(~isnan(Hmax)==1); Hmin_idx = find(~isnan(Hmin)==1);
         if sum(~isnan(Hmean)) > 0
-            fill([zdist(Hmax_idx), fliplr(zdist(Hmin_idx))]',[Hmax(Hmax_idx); flipud(Hmin(Hmin_idx))],...
+            % fill([zdist(Hmax_idx), fliplr(zdist(Hmin_idx))]',[Hmax(Hmax_idx); flipud(Hmin(Hmin_idx))],...
+            %     mo_cmap(k*3-2,:),'FaceAlpha',0.2,'EdgeColor','none'); hold on;
+            % pz(k) = plot(zdist(~isnan(Hmean))',Hmean(~isnan(Hmean)),'-','color',mo_cmap(k*3-2,:),'linewidth',3); hold on;
+            fill([Hdist(Hmax_idx), fliplr(Hdist(Hmin_idx))]',[Hmax(Hmax_idx); flipud(Hmin(Hmin_idx))],...
                 mo_cmap(k*3-2,:),'FaceAlpha',0.2,'EdgeColor','none'); hold on;
-            pz(k) = plot(zdist(~isnan(Hmean))',Hmean(~isnan(Hmean)),'-','color',mo_cmap(k*3-2,:),'linewidth',3); hold on;
+            pz(k) = plot(Hdist(~isnan(Hmean))',Hmean(~isnan(Hmean)),'-','color',mo_cmap(k*3-2,:),'linewidth',3); hold on;
         else
            pz(k) = plot(NaN,NaN,'-','color',mo_cmap(k*3-2,:),'linewidth',3); hold on; 
         end
-        H_ylim(k) = max(Hmean);
+        % H_ylim(k,:) = [min(Hmin), max(Hmax)];
+        H_ylim(k,:) = [min(Hmean), max(Hmean)];
         clear Hmean Hmax* Hmin*;
         % clear zdist;
     end
     seas_leg = legend(pz,'DJF','MAM','JJA','SON');
     set(gca,'fontsize',20); grid on; drawnow;
-    set(subz,'xlim',[0,max(zdist)],'xticklabel',[],'ylim',[0 ceil(max(H_ylim)/50)*50]); 
+    set(subz,'xlim',[0,vdist(max([find(sum(sum(~isnan(H_seas),2),3)>0,1,'last'),find(sum(sum(~isnan(vel_seas),2),3)>0,1,'last')]))],...
+        'xticklabel',[],'ylim',[floor(min(H_ylim(:,1))/10)*10 ceil(max(H_ylim(:,2))/10)*10],'ytick',[floor(min(H_ylim(:,1))/10)*10:10:ceil(max(H_ylim(:,2))/10)*10]); 
     % set(subz,'xlim',[0,floor(tran_reldist(seaward_idx)/1000)*1000+500],'xticklabel',[],'ylim',[0 ceil(max(H_ylim)/50)*50]); 
     clear yticks ylims;
     ylabel('Thickness (m)','fontsize',20); %xlabel('Distance from terminus (km)','fontsize',20); 
     drawnow;
     subplot(subv);
     for k = 1:4
+        %relative to moving terminus
         vmean = nanmean(vel_seas(:,k,:),3)./365;
         vmax = (nanmean(vel_seas(:,k,:),3)+std(vel_seas(:,k,:),0,3,'omitnan'))./365; 
         vmin = (nanmean(vel_seas(:,k,:),3)-std(vel_seas(:,k,:),0,3,'omitnan'))./365; 
+
+        %fixed locations
         % vdist = tran_reldist(seaward_idx:inland_idx);
         % vmean = nanmean(vel_seas(seaward_idx:inland_idx,k,:),3);
         % vmax = (nanmean(vel_seas(seaward_idx:inland_idx,k,:),3)+std(vel_seas(seaward_idx:inland_idx,k,:),0,3,'omitnan'))./365; 
         % vmin = (nanmean(vel_seas(seaward_idx:inland_idx,k,:),3)-std(vel_seas(seaward_idx:inland_idx,k,:),0,3,'omitnan'))./365; 
+        
+        %plot
         vmax_idx = find(~isnan(vmax)==1); vmin_idx = find(~isnan(vmin)==1);
         if sum(~isnan(vmean)) ~= 0
             fill([vdist(vmax_idx), fliplr(vdist(vmin_idx))]',[vmax(vmax_idx); flipud(vmin(vmin_idx))],...
@@ -932,7 +967,7 @@ for j = 1:length(MP)
         % clear vdist;
     end
     set(gca,'fontsize',20); grid on; drawnow;
-    set(subv,'xlim',[0,max(vdist)]); 
+    set(subv,'xlim',[0,vdist(max([find(sum(sum(~isnan(H_seas),2),3)>0,1,'last'),find(sum(sum(~isnan(vel_seas),2),3)>0,1,'last')]))]);
     % set(subv,'xlim',[0,floor(tran_reldist(seaward_idx)/1000)*1000+500]); 
     ylims = get(subv,'ylim'); set(subv,'ylim',[0 max(ylims)]); clear ylims;
     xlabel('Distance from terminus (km)','fontsize',20); ylabel('Speed (m/d)','fontsize',20);
@@ -966,7 +1001,7 @@ for j = 1:length(MP)
     uiwait %advance only after figure is closed
     
     %refresh
-    clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* sub* Zfilt H* vel_* vels* w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos;
+    clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* sub* Zfilt H* vel_* vels* w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos H*;
     close all; drawnow;
 end
 
