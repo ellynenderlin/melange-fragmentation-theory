@@ -695,7 +695,7 @@ saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],
 close all; drawnow;
 
 %Thickness parameters:
-zcutoff = 3; %elevation threshold below which to ignore iceberge (m)
+zcutoff = 6; %elevation threshold below which to ignore iceberge (m)
 rho_i = 900; %ice density (kg/m^3)
 rho_w = 1026; %water density (kg/m^3)
 Hcutoff = round((rho_w/(rho_w-rho_i))*zcutoff); %H threshold for figure naming
@@ -708,6 +708,8 @@ vfilter = 'annual'; %options: 'annual' OR 'all'
 %decide whether to sample data at (1) fixed locations or (2) relative
 %locations with respect to the terminus positions in the DEMs
 sampling = 'dated'; % options: 'dated' OR 'fixed';
+
+disp(['Creating profile plots ignoring icebergs thinner than ',num2str(Hcutoff),'m & using ',vfilter,' speeds'])
 
 %iterate
 for j = 1:length(MP)
@@ -748,7 +750,8 @@ for j = 1:length(MP)
         inland_ext(p) = find(size_classes(p,:)>0,1,'last');
 
         %create average thickness profile
-        Havg(p,:) = sum((2/ARcomp.best.autoALL)*sqrt(table2array(D(zcutoff:end,1))./pi()).*table2array(D(zcutoff:end,3:end)),1)./sum(table2array(D(zcutoff:end,3:end)),1);
+        Havg(p,:) = sum((2/ARcomp.best.autoALL)*sqrt(table2array(D(zcutoff+1:end,1))./pi()).*table2array(D(zcutoff+1:end,3:end)),1)./sum(table2array(D(zcutoff+1:end,3:end)),1);
+        packing(p,:) = sum(table2array(D(zcutoff+1:end,1)).*table2array(D(zcutoff+1:end,3:end)),1)./sum(table2array(D(:,1)).*table2array(D(:,3:end)),1);
     end
 
     %assign seaward & inland sampling limits based on the selected sampling
@@ -778,13 +781,16 @@ for j = 1:length(MP)
             %create a matrix of elevations relative to the terminus position
             z_profiles = NaN(max(inland_idx),length(yr_idx));
             H_profiles = NaN(length(yr_idx),max(inland_idx)-1);
+            pack_profiles = NaN(length(yr_idx),max(inland_idx)-1);
             for k = 1:length(yr_idx)
                 if ~isnan(inland_idx(yr_idx(k)))
                     z_temp = flipud(Zfilt(1:inland_idx(yr_idx(k)),yr_idx(k)));
                     z_profiles(1:length(z_temp),k) = z_temp; 
                     H_temp = fliplr(Havg(yr_idx(k),1:inland_idx(yr_idx(k))-1));
                     H_profiles(k,1:length(H_temp)) = H_temp; 
-                    clear z_temp H_temp;
+                    pack_temp = fliplr(packing(yr_idx(k),1:inland_idx(yr_idx(k))-1));
+                    pack_profiles(k,1:length(pack_temp)) = pack_temp; 
+                    clear z_temp H_temp pack_temp;
                 end
             end
 
@@ -793,9 +799,24 @@ for j = 1:length(MP)
                 z_seas(:,k,p) = nanmean(z_profiles(:,ismember(mos_yr,seasons(k,:))==1),2);
                 % H_seas(:,k,p) = (rho_w./(rho_w-rho_i))*nanmean(z_profiles(:,ismember(mos_yr,seasons(k,:))==1),2);
                 H_seas(:,k,p) = nanmean(H_profiles(ismember(mos_yr,seasons(k,:))==1,:),1)';
+                if ~isempty(inland_idx(ismember(mos_yr,seasons(k,:))==1))
+                    MP(j).B.ref(1,k,p) = mean(inland_idx(ismember(mos_yr,seasons(k,:))==1));
+                    MP(j).B.Ho(zcutoff+1,k,p) = nanmean(H_profiles(ismember(mos_yr,seasons(k,:))==1,1),1)';
+                    MP(j).B.packing(zcutoff+1,k,p) = nanmean(pack_profiles(ismember(mos_yr,seasons(k,:))==1,1),1)';
+                else
+                    MP(j).B.ref(1,k,p) = NaN;
+                    MP(j).B.Ho(zcutoff+1,k,p) = NaN;
+                    MP(j).B.packing(zcutoff+1,k,p) = NaN;
+                end
             end
 
-            clear z_profiles H_profiles mos_yr;
+            clear z_profiles H_profiles pack_profiles mos_yr;
+        else
+            %no DEM for that year so fill in all thickness-based datasets
+            %used to calculate buttressing with NaNs
+            MP(j).B.ref(1,1:4,p) = NaN;
+            MP(j).B.Ho(zcutoff+1,1:4,p) = NaN;
+            MP(j).B.packing(zcutoff+1,1:4,p) = NaN;
         end
         clear yr_idx
     end
@@ -892,6 +913,36 @@ for j = 1:length(MP)
         end
     end
     vdist = 0:transect_inc:(max(inland_idx)-1)*transect_inc; 
+
+    %estimate buttressing
+    if contains(vfilter,'annual')
+        %calculate buttressing
+        for p = 1:length(years)
+            for k = 1:4
+                MP(j).B.dVdx(1,k,p) = (diff(vel_seas(1:2,k,p))./diff(vdist(1:2)))/365;
+                press = 0.5*rho_i*(1-(rho_i/rho_w))*9.81*MP(j).B.Ho(zcutoff+1,k,p);
+                MP(j).B.butt_Meng(zcutoff+1,k,p) = press*MP(j).B.packing(zcutoff+1,k,p)*MP(j).B.Ho(zcutoff+1,k,p);
+                MP(j).B.butt_Amundson(zcutoff+1,k,p) = (-2*(MP(j).B.Ho(zcutoff+1,k,p)*press*MP(j).B.dVdx(1,k,p))/((MP(j).B.dVdx(1,k,p)/0.3)+MP(j).B.dVdx(1,k,p)))+press*MP(j).B.Ho(zcutoff+1,k,p);
+                clear press;
+            end
+        end
+
+        %display buttressing data
+        disp(' Buttressing estimated using near-terminus observations:');
+        disp('   Meng Eqn (thickness- & packing-based): x10^6 N/m');
+        disp(['    spring = ',num2str(round(nanmedian(MP(j).B.butt_Meng(zcutoff+1,2,:))/10^6,1)),', summer = ',num2str(round(nanmedian(MP(j).B.butt_Meng(zcutoff+1,3,:))/10^6,1)),', fall = ',num2str(round(nanmedian(MP(j).B.butt_Meng(zcutoff+1,4,:))/10^6,1))]);
+        disp('   Amundson Eqn (thickness- & strainrate-based): x10^6 N/m');
+        disp(['    spring = ',num2str(round(nanmedian(MP(j).B.butt_Amundson(zcutoff+1,2,:))/10^6,1)),', summer = ',num2str(round(nanmedian(MP(j).B.butt_Amundson(zcutoff+1,3,:))/10^6,1)),', fall = ',num2str(round(nanmedian(MP(j).B.butt_Amundson(zcutoff+1,4,:))/10^6,1))]);
+        disp(' Thickness: m')
+        disp(['    spring = ',num2str(round(nanmedian(MP(j).B.Ho(zcutoff+1,2,:)),1)),', summer = ',num2str(round(nanmedian(MP(j).B.Ho(zcutoff+1,3,:)),1)),', fall = ',num2str(round(nanmedian(MP(j).B.Ho(zcutoff+1,4,:)),1))]);
+        disp(' Packing density: fractional area')
+        disp(['    spring = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,2,:)),2)),', summer = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,3,:)),2)),', fall = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,4,:)),2))]);
+        disp(' Strain rate characteristics: (m/d)/m')
+        disp(['    spring = ',num2str(round(nanmedian(MP(j).B.dVdx(1,2,:)),4)),', summer = ',num2str(round(nanmedian(MP(j).B.dVdx(1,3,:)),4)),', fall = ',num2str(round(nanmedian(MP(j).B.dVdx(1,4,:)),4))]);
+        disp(' ');
+
+        %export data as CSVs
+    end
     
     %loop through the subsetted size distributions and compute seasonal
     %averages nearest the terminus & a fixed relative distance down-fjord
@@ -986,6 +1037,7 @@ for j = 1:length(MP)
     end
     set(gca,'fontsize',20); grid on; drawnow;
     set(subv,'xlim',[0,vdist(max([find(sum(sum(~isnan(H_seas),2),3)>0,1,'last'),find(sum(sum(~isnan(vel_seas),2),3)>0,1,'last')]))]);
+    xticks = get(subv,'xtick'); set(subv,'xticklabel',xticks/1000); clear xticks;
     % set(subv,'xlim',[0,floor(tran_reldist(seaward_idx)/1000)*1000+500]); 
     ylims = get(subv,'ylim'); set(subv,'ylim',[0 max(ylims)]); 
     yticks = get(gca,'ytick'); 
@@ -1024,11 +1076,14 @@ for j = 1:length(MP)
     xlabel('Surface area (m^2)','fontsize',20);
     text(10000,10^-2,'seaward','fontsize',20);
     drawnow;
+
+    %save the data and the figure
+    save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
     saveas(af_fig,[root_dir,MP(j).name,'/',MP(j).name,'_seasonal-speed-size_',num2str(Hcutoff),'m-Hthreshold_',vfilter,'-speeds_',sampling,'-profiles.png'],'png'); %save the plots
     % uiwait %advance only after figure is closed
     
     %refresh
-    clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* size_classes sub* Zfilt H_* Havg vel_* vels* w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos seas_leg;
+    clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* size_classes sub* Zfilt H_* Havg vel_* vels* w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos seas_leg packing;
     close all; drawnow;
 end
 
