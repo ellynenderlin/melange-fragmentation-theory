@@ -18,6 +18,7 @@ ARcomp.best.autoALL = 2; % iceberg aspect ratio
 
 %customize visualization
 years = 2011:1:2023; yr_cmap = cmocean('matter',length(years)+1); yr_cmap = yr_cmap(2:end,:);
+seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MMA','JJA','SON'};
 mo_cmap = cmocean('phase',12); close all;
 
 %identify the site folders
@@ -519,7 +520,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     dist_fig = figure; set(dist_fig,'position',[850 850 1200 600]);
     subd1 = subplot(1,2,1); subd2 = subplot(1,2,2);
     berg_normdist = bergdist./sum((bergdist.*MP(j).D.area'),2,'omitnan');
-    MP(j).D.months(1,:) = [12,1,2]; MP(j).D.months(2,:) = [3,4,5]; MP(j).D.months(3,:) = [6,7,8]; MP(j).D.months(4,:) = [9,10,11]; 
+    MP(j).D.months(1,:) = seasons(1,:); MP(j).D.months(2,:) = seasons(2,:); MP(j).D.months(3,:) = seasons(3,:); MP(j).D.months(4,:) = seasons(4,:); 
     MP(j).D.bergs = NaN(4,size(bergdist,2));
     for p = 1:4
         subplot(subd1);
@@ -919,11 +920,15 @@ for j = 1:length(MP)
         %calculate buttressing
         for p = 1:length(years)
             for k = 1:4
+                % add seasonal buttressing info to the structure
                 MP(j).B.dVdx(1,k,p) = (diff(vel_seas(1:2,k,p))./diff(vdist(1:2)))/365;
                 press = 0.5*rho_i*(1-(rho_i/rho_w))*9.81*MP(j).B.Ho(zcutoff+1,k,p);
                 MP(j).B.butt_Meng(zcutoff+1,k,p) = press*MP(j).B.packing(zcutoff+1,k,p)*MP(j).B.Ho(zcutoff+1,k,p);
                 MP(j).B.butt_Amundson(zcutoff+1,k,p) = (-2*(MP(j).B.Ho(zcutoff+1,k,p)*press*MP(j).B.dVdx(1,k,p))/((MP(j).B.dVdx(1,k,p)/0.3)+MP(j).B.dVdx(1,k,p)))+press*MP(j).B.Ho(zcutoff+1,k,p);
                 clear press;
+
+                % organize seasonal buttressing info to save to a CSV
+
             end
         end
 
@@ -942,6 +947,7 @@ for j = 1:length(MP)
         disp(' ');
 
         %export data as CSVs
+
     end
     
     %loop through the subsetted size distributions and compute seasonal
@@ -1001,7 +1007,7 @@ for j = 1:length(MP)
         clear Hmean Hmax* Hmin*;
         % clear zdist;
     end
-    seas_leg = legend(pz,'DJF','MAM','JJA','SON');
+    seas_leg = legend(pz,season_names);
     set(gca,'fontsize',20); grid on; drawnow;
     set(subz,'xlim',[0,vdist(max([find(sum(sum(~isnan(H_seas),2),3)>0,1,'last'),find(sum(sum(~isnan(vel_seas),2),3)>0,1,'last')]))],...
         'xticklabel',[],'ylim',[floor(min(H_ylim(:,1))/10)*10 ceil(max(H_ylim(:,2))/10)*10]); 

@@ -448,17 +448,17 @@ end
 %write to file (uncomment the if/else statement if you'd prefer to default
 %to outputs in the same format as the centerline & transect profiles)
 % if strcmpi(export_type,'shp')
-%     disp('exporting centerline points at transect intersections as shapefiles');
-%     %centerline
-%     s.Geometry = 'PolyLine';
-%     s.BoundingBox = double([min(AX_X) min(AX_X); max(AX_Y) max(AX_Y)]);
-%     s.X = double(AX_X); s.Y = double(AX_Y);
-%     shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.shp']);
-%     s.CoordinateReferenceSystem = site_crs;
-%     wkt = wktstring(s.CoordinateReferenceSystem);
-%     writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.prj'],'FileType','text', 'QuoteStrings', false);
-%     clear s;
-% 
+    disp('exporting centerline points at transect intersections as shapefiles');
+    %centerline
+    s.Geometry = 'PolyLine';
+    s.BoundingBox = double([min(AX_X) min(AX_X); max(AX_Y) max(AX_Y)]);
+    s.X = double(AX_X); s.Y = double(AX_Y);
+    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.shp']);
+    s.CoordinateReferenceSystem = site_crs;
+    wkt = wktstring(s.CoordinateReferenceSystem);
+    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.prj'],'FileType','text', 'QuoteStrings', false);
+    clear s;
+
 % else
     disp('exporting centerline points at transect intersections as CSVs');
 
