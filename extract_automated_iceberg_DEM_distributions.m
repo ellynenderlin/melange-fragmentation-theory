@@ -374,7 +374,7 @@ close all; drawnow;
 %check if the elevation transects already exist (you've run the code
 %before) and, if they do, prompt the user to decide if they want to re-run
 %this section of code in order to update them
-if exist([output_dir,site_abbrev,'_transects_elevations.csv']) == 2
+if exist([output_dir,site_abbrev,'-transects_elevations.csv']) == 2
     transect_answer = questdlg('Do you want to update the elevation transect CSV file?',...
         'transect update','1) Yes','2) No','2) No');
     switch transect_answer
@@ -431,7 +431,7 @@ if grab_profiles == 1
         [DEMx,DEMy] = meshgrid(M.DEM.x,M.DEM.y);
         h(1).z(:,p) = interp2(DEMx,DEMy,melange,AF.X,AF.Y);
         Taf.(['Elevation_',DEM_dates(p,:),' (m)']) = h(1).z(:,p);
-        writetable(Taf,[output_dir,site_abbrev,'_centerline_elevations.csv']);
+        writetable(Taf,[output_dir,site_abbrev,'-centerline_elevations.csv']);
         
         %extract profiles and add to the data table: like a shapefile, each
         %transect is separated by a NaN for x,y,z values
@@ -441,7 +441,7 @@ if grab_profiles == 1
             z = [z; h(j+1).z(:,p); NaN];
         end
         Txf.(['Elevation_',DEM_dates(p,:),' (m)']) = z;
-        writetable(Txf,[output_dir,site_abbrev,'_transects_elevations.csv']);
+        writetable(Txf,[output_dir,site_abbrev,'-transects_elevations.csv']);
         
         %clear variables and advance to the next date
         disp('Elevation CSVs updated & data added to "h" structure. Moving on to the next date.')
@@ -519,9 +519,9 @@ if grab_profiles == 1
     saveas(elev_fig,[output_dir,site_abbrev,'-elevation-profiles.png'],'png');
     clear h;
     
-    disp(['Completed elevation transect extraction! CSV at ',output_dir,site_abbrev,'_transects_elevations.csv']);
+    disp(['Completed elevation transect extraction! CSV at ',output_dir,site_abbrev,'-transects_elevations.csv']);
 else
-    disp(['Skipping elevation transect extraction b/c CSV already exists at ',output_dir,site_abbrev,'_transects_elevations.csv']);
+    disp(['Skipping elevation transect extraction b/c CSV already exists at ',output_dir,site_abbrev,'-transects_elevations.csv']);
 end
 clear grab_profiles;
 
@@ -737,6 +737,7 @@ for p = 1:length(DEM_mats)
         end
         [xi2,yi2,i2] = polyxpoly(XF(j+1).X,XF(j+1).Y,melpoly_x,melpoly_y);
         
+        %MAY BE REDUNDANT B/C SAVED TRANSECT COORDINATES SHOULD NOW BE CROPPED USING THIS SAME APPROACH:
         %if there are >2 intersections because the fjord curved, filter out
         %the ones farthest from the centerline... the 'first' & 'last' are
         %somewhat arbitrary but prevent double identification of non-unique

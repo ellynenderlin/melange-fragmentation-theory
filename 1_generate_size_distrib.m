@@ -14,7 +14,7 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/',...
 addpath('/Users/ellynenderlin/Research/miscellaneous/melange-fragmentation-code/');
 
 % set paths and glacier to analyze manually:
-site_abbrev = 'UMS'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
+site_abbrev = 'ZIM'; %this should be an abbreviation that is used to name your site-specific sub-directories and will become the filename prefix
 % basepath='/Volumes/Jokulhaup_5T/Greenland-melange/'; %this should be the overarching directory, with site-specific sub-directories
 basepath='/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
 root_dir = basepath; output_dir = [root_dir,site_abbrev,'/'];

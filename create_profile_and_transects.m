@@ -356,6 +356,119 @@ for j = center_points
     clear perp* del_* xp yp xn ynxt yt xi yi;
 end
 
+%% check for overlapping transects and temporarily modify the melange mask to block transect overlap
+
+%identify overlaps
+for j = 1:length(XF)
+    for k = 1:length(XF)
+        if k ~= j
+            [xi,~] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
+            if ~isempty(xi)
+                transect_crosses(j,k) = k;
+            else
+                transect_crosses(j,k) = NaN;
+            end
+        else
+            transect_crosses(j,k) = NaN;
+        end
+    end
+end
+
+%create a temporary melange mask that is modified as needed to provide a
+%barrier for otherwise overlapping transects
+if sum(~isnan(transect_crosses),'all') > 0
+    transect_overlap = 1; %flag that the transects overlap and the melange mask is modifed
+    
+    %find the middle of neighboring intersections
+    for j = 1:length(XF)
+        if ismember(j-1,transect_crosses(j,:)) || ismember(j+1,transect_crosses(j,:))
+            %         neighbor_crosses(j) = sum([ismember(j-1,transect_crosses(j,:)),ismember(j+1,transect_crosses(j,:))]);
+            neighbor_crosses(j) = 1;
+        else
+            neighbor_crosses(j) = 0;
+        end
+    end
+    mid_crosses = round(nanmean(find(neighbor_crosses==1)));
+    
+    %determine what side of the centerline the intersections occur on (assuming
+    %it is just one side!) then find the segment of the fjord polygon that the
+    %transect intersects on that side
+    j = mid_crosses;
+    for k = 1:length(XF)
+        if k ~= j
+            if ~isempty(polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]))
+                [xi(k),yi(k)] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
+            else
+                xi(k) = NaN; yi(k) = NaN;
+            end
+        else
+            xi(k) = NaN; yi(k) = NaN;
+        end
+    end
+    %extend the transect so it intersects the melange outline
+    dx1 = mode(diff(XF(j).X)); dy1 = mode(diff(XF(j).Y));
+    if size(XF(j).X,1) == 1
+        xd = [XF(j).X(1)-dx1,XF(j).X(1:end-1),XF(j).X(end-1)+dx1];
+        yd = [XF(j).Y(1)-dy1,XF(j).Y(1:end-1),XF(j).Y(end-1)+dy1];
+    else
+        xd = [XF(j).X(1)-dx1;XF(j).X(1:end-1);XF(j).X(end-1)+dx1];
+        yd = [XF(j).Y(1)-dy1;XF(j).Y(1:end-1);XF(j).Y(end-1)+dy1];
+    end
+    %find the intersections for the transect and the outline
+    [xs,ys,is] = polyxpoly(xd,yd,melmask.uncropped.x,melmask.uncropped.y);
+    %calculate the distance between each transect intersection point with the
+    %middle of the intersecting transects and each melange edge
+    dists(1,:) = sqrt((xs(1)-xi).^2 + (ys(1)-yi).^2);
+    dists(2,:) = sqrt((xs(2)-xi).^2 + (ys(2)-yi).^2);
+    %find which melange edge is closer to the transect intersections
+    ind = find(dists == min(dists,[],'all')); [row,~] = ind2sub(size(dists),ind);
+    
+    %create a temp melange mask & add the part of the line that has
+    %intersections to the shape
+    melpoly_x = melmask.uncropped.x(1:is(row,2)); melpoly_y = melmask.uncropped.y(1:is(row,2));
+    %only include the transect to the center-most intersection
+    melpoly_x = [melpoly_x; xs(row); xi(find(dists(row,:) == max(dists(row,:)))); xs(row); melmask.uncropped.x(is(row,2)+1:end)];
+    melpoly_y = [melpoly_y; ys(row); yi(find(dists(row,:) == max(dists(row,:)))); ys(row); melmask.uncropped.y(is(row,2)+1:end)];
+    
+else
+    transect_overlap = 0;
+    
+    melpoly_x = melmask.uncropped.x;
+    melpoly_y = melmask.uncropped.y;
+end
+clear *_crosses xi yi xd yd xs ys is dists ind row;
+
+
+%now crop the transects
+for j = 1:length(XF)
+    %find the intersection with the centerline
+    [xij,yij,ij] = polyxpoly([XF(j).X,XF(j).X(end-1)],[XF(j).Y,XF(j).Y(end-1)],AF.X,AF.Y);
+
+    %find intersections with the melange outline
+    dx2 = mode(diff(XF(j).X)); dy2 = mode(diff(XF(j).Y));
+    if size(XF(j).X,1) == 1
+        XF(j).X = [XF(j).X(1)-dx2,XF(j).X(1:end-1),XF(j).X(end-1)+dx2];
+        XF(j).Y = [XF(j).Y(1)-dy1,XF(j).Y(1:end-1),XF(j).Y(end-1)+dy2];
+    else
+        XF(j).X = [XF(j).X(1)-dx2;XF(j).X(1:end-1);XF(j).X(end-1)+dx2];
+        XF(j).Y = [XF(j).Y(1)-dy2;XF(j).Y(1:end-1);XF(j).Y(end-1)+dy2];
+    end
+    [xi,yi,ii] = polyxpoly(XF(j).X,XF(j).Y,melpoly_x,melpoly_y);
+
+    %if there are >2 intersections because the fjord curved, filter out
+    %the ones farthest from the centerline... the 'first' & 'last' are
+    %somewhat arbitrary but prevent double identification of non-unique
+    %intersections where a hinge in the polygons doubles-back
+    if size(ii,1) > 2 %first transect
+        di = ii(:,1)-ij(:,1);
+        ref1a = find(di==max(di(di<0)),1,'last'); ref1b = find(di==min(di(di>0)),1,'first');
+        XF(j).X = XF(j).X(ii(ref1a,1):ii(ref1b,1)); XF(j).Y = XF(j).Y(ii(ref1a,1):ii(ref1b,1));
+        clear xi yi ii di ref1*;
+    end
+
+    clear xij yij ij dx2 dy2
+end
+
 
 %% export the polylines (as a csv or shapefile depending on selection)
 
@@ -378,10 +491,10 @@ if strcmpi(export_type,'shp')
     s.Geometry = 'Polyline';
     s.BoundingBox = double([min(C.X) min(C.Y); max(C.X) max(C.Y)]);
     s.X = double(C.X); s.Y = double(C.Y);
-    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_centerline.shp']);
+    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'-centerline.shp']);
     s.CoordinateReferenceSystem = site_crs;
     wkt = wktstring(s.CoordinateReferenceSystem);
-    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline.prj'],'FileType','text', 'QuoteStrings', false);
+    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'-centerline.prj'],'FileType','text', 'QuoteStrings', false);
     clear s;
 
     %transects
@@ -390,8 +503,8 @@ if strcmpi(export_type,'shp')
         s(j).BoundingBox = double([min(S.X) min(S.Y); max(S.X) max(S.Y)]);
         s(j).X = double(XF(j).X); s(j).Y = double(XF(j).Y);
     end
-    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.shp']);
-    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.prj'],'FileType','text', 'QuoteStrings', false);
+    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'-transects_',num2str(transect_inc),'m.shp']);
+    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'-transects_',num2str(transect_inc),'m.prj'],'FileType','text', 'QuoteStrings', false);
     clear s;
 else
     disp('exporting centerline & transects as CSVs');
@@ -400,7 +513,7 @@ else
     T=table(C.Y,C.X);
     column_names = ["Northing (m)","Easting (m)"];
     T.Properties.VariableNames = column_names;
-    writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline.csv']);
+    writetable(T,[site_dir,'shapefiles/',site_abbrev,'-centerline.csv']);
     clear T;
 
     %transects
@@ -412,7 +525,7 @@ else
     T=table(TY,TX);
     column_names = ["Northing (m)","Easting (m)"];
     T.Properties.VariableNames = column_names;
-    writetable(T,[site_dir,'shapefiles/',site_abbrev,'_transects_',num2str(transect_inc),'m.csv']);
+    writetable(T,[site_dir,'shapefiles/',site_abbrev,'-transects_',num2str(transect_inc),'m.csv']);
     clear T TY TX;
 
 end
@@ -453,10 +566,10 @@ end
     s.Geometry = 'PolyLine';
     s.BoundingBox = double([min(AX_X) min(AX_X); max(AX_Y) max(AX_Y)]);
     s.X = double(AX_X); s.Y = double(AX_Y);
-    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.shp']);
+    shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'-centerline_',num2str(transect_inc),'m-interval.shp']);
     s.CoordinateReferenceSystem = site_crs;
     wkt = wktstring(s.CoordinateReferenceSystem);
-    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.prj'],'FileType','text', 'QuoteStrings', false);
+    writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'-centerline_',num2str(transect_inc),'m-interval.prj'],'FileType','text', 'QuoteStrings', false);
     clear s;
 
 % else
@@ -471,7 +584,7 @@ end
     end
     column_names = ["Northing (m)","Easting (m)"];
     T.Properties.VariableNames = column_names;
-    writetable(T,[site_dir,'shapefiles/',site_abbrev,'_centerline_',num2str(transect_inc),'m-interval.csv']);
+    writetable(T,[site_dir,'shapefiles/',site_abbrev,'-centerline_',num2str(transect_inc),'m-interval.csv']);
     clear T;
 
 % end
