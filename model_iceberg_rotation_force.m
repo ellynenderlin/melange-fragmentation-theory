@@ -62,7 +62,7 @@ for i = 1:length(folderNames)
         end
     end
     cd('shapefiles/')
-    S = shaperead([site_abbrev,'_centerline.shp']);
+    S = shaperead([site_abbrev,'-centerline.shp']);
 
     %read in BedMachine Greenland v5 (elevations referenced to the geoid)
     cd('/Users/ellynenderlin/Research/miscellaneous/elevations/BedMachine/');
