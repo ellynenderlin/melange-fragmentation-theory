@@ -79,6 +79,14 @@ switch answer
             disp('loading existing shapefiles');
             warning('off', 'map:shapefile:missingDBF');
             shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
+            %check if the transect+spacer was increased because the AOI is
+            %huge
+            for j = 1:length(shp_files)
+                if contains(shp_files(j).name,['transects_'])
+                    transect_spacer = str2num(shp_files(j).name(end-8:end-5));
+                end
+            end
+            %load the appropriate files
             for j = 1:length(shp_files)
                 if contains(shp_files(j).name,'centerline.')
                     AF = shaperead([shp_files(j).folder,'/',shp_files(j).name]);

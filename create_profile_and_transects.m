@@ -360,15 +360,17 @@ for j = center_points
 end
 
 %% check for overlapping transects and temporarily modify the melange mask to block transect overlap
+disp('Checking for & fixing transect overlap');
 
 %identify overlaps
 for j = 1:length(XF)
+    disp(['transect ',num2str(j),' of ',num2str(length(XF))]);
     for k = 1:length(XF)
         if k ~= j
             [xi,yi] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
             if ~isempty(xi)
                 transect_crosses(j,k) = k;
-                [xic,yic] = polyxpoly(XF(j).X,XF(j).Y,C.X,C.Y);
+                [xic,yic] = polyxpoly(XF(j).X,XF(j).Y,C.X(center_points),C.Y(center_points));
                 cross_dist(j,k) = sqrt((xi-xic).^2 + (yi-yic).^2);
                 clear xic yix
             else
@@ -385,11 +387,12 @@ end
 %identify the coordinates of the crossing transects that are closest to the centerline
 [mindist,minind] = min(cross_dist,[],'all');
 [j,k] = ind2sub(size(cross_dist),minind);
-[xi,yi] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
+[xi,yi,ii] = polyxpoly(XF(j).X,XF(j).Y,XF(k).X,XF(k).Y);
 split_ind = max([j,k]);
 
 %create a temporary melange mask that is modified as needed to provide a
 %barrier for otherwise overlapping transects
+disp('Truncating transects where a kink causes the most overlap.')
 if sum(~isnan(transect_crosses),'all') > 0
     transect_overlap = 1; %flag that the transects overlap and the melange mask is modifed
     
@@ -407,40 +410,39 @@ if sum(~isnan(transect_crosses),'all') > 0
     %split the intersecting lines to create the transect splitter
     %jth transect
     dxj = mode(diff(XF(j).X)); dyj = mode(diff(XF(j).Y));
-    [xjc1,yjc1,ijc1] = polyxpoly([XF(j).X(1)-dxj,xi],[XF(j).Y(1)-dyj,yi],C.X,C.Y);
-    [xjc2,yjc2,ijc2] = polyxpoly([XF(j).X(end-1)+2*dxj,xi],[XF(j).Y(end-1)+2*dyj,yi],C.X,C.Y);
+    [~,~,ijc1] = polyxpoly([XF(j).X(1)-dxj,xi],[XF(j).Y(1)-dyj,yi],C.X(center_points),C.Y(center_points));
+    [~,~,ijc2] = polyxpoly([XF(j).X(end-1)+2*dxj,xi],[XF(j).Y(end-1)+2*dyj,yi],C.X(center_points),C.Y(center_points));
     %correct vector extending to the polygon edge will not intersect the centerline
-    if isempty(xjc1) 
+    if isempty(ijc1) 
         [xjp,yjp] = polyxpoly([XF(j).X(1)-dxj,xi],[XF(j).Y(1)-dyj,yi],S.X,S.Y); %intersect with the outline
-        XF(j).X = [xi,XF(j).X(ijc2(1,1):end)]; XF(j).Y = [yi,XF(j).Y(ijc2(1,1):end)]; %now crop the transect
+        XF(j).X = [xi,XF(j).X(ii(1)+1:end)]; XF(j).Y = [yi,XF(j).Y(ii(1)+1:end)]; %now crop the transect
     else
         [xjp,yjp] = polyxpoly([xi,XF(j).X(end-1)+2*dxj],[yi,XF(j).Y(end-1)+2*dyj],S.X,S.Y); %intersect with the outline
-        XF(j).X = [XF(j).X(1:ijc1(1,1)),xi]; XF(j).Y = [XF(j).Y(1:ijc1(1,1)),yi]; %now crop the transect
+        XF(j).X = [XF(j).X(1:ii(1)),xi]; XF(j).Y = [XF(j).Y(1:ii(1)),yi]; %now crop the transect
     end
     %kth transect
     dxk = mode(diff(XF(k).X)); dyk = mode(diff(XF(k).Y));
-    [xkc1,ykc1,ikc1] = polyxpoly([XF(k).X(1)-dxk,xi],[XF(k).Y(1)-dyk,yi],C.X,C.Y);
-    [xkc2,ykc2,ikc2] = polyxpoly([XF(k).X(end-1)+2*dxk,xi],[XF(k).Y(end-1)+2*dyk,yi],C.X,C.Y);
+    [~,~,ikc1] = polyxpoly([XF(k).X(1)-dxk,xi],[XF(k).Y(1)-dyk,yi],C.X(center_points),C.Y(center_points));
+    [~,~,ikc2] = polyxpoly([XF(k).X(end-1)+2*dxk,xi],[XF(k).Y(end-1)+2*dyk,yi],C.X(center_points),C.Y(center_points));
     %correct vector extending to the polygon edge will not intersect the centerline
-    if isempty(xkc1) 
+    if isempty(ikc1) 
         [xkp,ykp] = polyxpoly([XF(k).X(1)-dxk,xi],[XF(k).Y(1)-dyk,yi],S.X,S.Y); %intersect with the outline
-        XF(k).X = [xi:XF(k).X(ikc2(1,1):end)]; XF(k).Y = [yi:XF(k).Y(ikc2(1,1):end)]; %now crop the transect
+        XF(k).X = [xi,XF(k).X(ii(2)+1:end)]; XF(k).Y = [yi,XF(k).Y(ii(2)+1:end)]; %now crop the transect
     else
         [xkp,ykp] = polyxpoly([xi,XF(k).X(end-1)+2*dxk],[yi,XF(k).Y(end-1)+2*dyk],S.X,S.Y); %intersect with the outline
-        XF(k).X = [XF(k).X(1:ikc1(1,1)),xi]; XF(k).Y = [XF(k).Y(1:ikc1(1,1)),yi]; %now crop the transect
+        XF(k).X = [XF(k).X(1:ii(2)),xi]; XF(k).Y = [XF(k).Y(1:ii(2)),yi]; %now crop the transect
     end
-    %join the points then extend the lin to be sure it intersects the outline
+    %average the outline intersection points then extend the line to be sure it intersects the outline
     xp = [nanmean([xjp,xkp]),xi]; yp = [nanmean([yjp,ykp]),yi]; 
     dxp = diff(xp); dyp = diff(yp);
     xd = [xp-dxp*0.5, xp]; yd = [yp-dyp*0.5, yp]; 
     %find the intersections for the transect and the outline
     [xs,ys,is] = polyxpoly(xd,yd,S.X,S.Y);
-    %create a temp melange mask & add the part of the line that has
-    %intersections to the shape
+    %update the melange mask to add the projection
     melpoly_x = S.X(1:is(1,2)); melpoly_y = S.Y(1:is(1,2));
     %only include the transect to the center-most intersection
-    melpoly_x = [melpoly_x; xs(1); xi; xs(1); melmask.uncropped.x(is(1,2)+1:end)];
-    melpoly_y = [melpoly_y; ys(1); yi; ys(1); melmask.uncropped.y(is(1,2)+1:end)];
+    melpoly_x = [melpoly_x; xs(1); xi; xs(1); S.X(is(1,2)+1:end)];
+    melpoly_y = [melpoly_y; ys(1); yi; ys(1); S.Y(is(1,2)+1:end)];
 
     
     % %determine what side of the centerline the intersections occur on (assuming
@@ -489,13 +491,16 @@ else
     melpoly_x = S.X;
     melpoly_y = S.Y;
 end
-clear *_crosses xi yi xd yd xs ys is dists ind row dx* dy* x*c1 x*c2 y*c1 y*c2 xkp ykp *xp *yp;
-plot(melpoly_x,melpoly_y,'-k','linewidth',2);
+clear *_crosses xi yi xd yd xs ys is dists ind row dx* dy* x*c1 x*c2 y*c1 y*c2 xkp ykp *xp *yp ii;
+plot(melpoly_x,melpoly_y,'-k','linewidth',2); drawnow;
 
 %now crop the transects
-for j = 12:length(XF)
+disp('Checking for additional overlaps...')
+for j = 1:length(XF)
+    disp(['transect ',num2str(j),' of ',num2str(length(XF))]);
     %find the intersection with the centerline
-    [xij,yij,ij] = polyxpoly([XF(j).X,XF(j).X(end-1)],[XF(j).Y,XF(j).Y(end-1)],AF.X,AF.Y);
+    % [xij,yij,ij] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],C.X(center_points),C.Y(center_points));
+    [~,ij] = min(sqrt((XF(j).X-C.X(center_points(j))).^2 + (XF(j).Y-C.Y(center_points(j))).^2));
 
     %find intersections with the melange outline
     dx2 = mode(diff(XF(j).X)); dy2 = mode(diff(XF(j).Y));
@@ -521,7 +526,7 @@ for j = 12:length(XF)
 
     %now check that the transects don't still intersect, cropping those
     %that come after the hinge as needed
-    if j > split_ind
+    if j > split_ind %THIS IS SPECIFIC TO ZACHARIAE ISSTROM (ZIM) AND MIGHT NEED TO BE REMOVED TO CHECK ALL TRANSECTS IF APPLYING TO NEW SITES
         for k = split_ind+1:j-1
             [xt,~] = polyxpoly([XF(j).X(1),XF(j).X(end-1)],[XF(j).Y(1),XF(j).Y(end-1)],[XF(k).X(1),XF(k).X(end-1)],[XF(k).Y(1),XF(k).Y(end-1)]);
             if ~isempty(xt)
@@ -545,6 +550,7 @@ end
 
 
 %% export the polylines (as a csv or shapefile depending on selection)
+disp('Saving polylines...')
 
 %make a directory to house all shapefiles if it doesn't exist
 if ~isfolder([site_dir,'shapefiles']); mkdir([site_dir,'shapefiles']); end
@@ -576,6 +582,7 @@ if strcmpi(export_type,'shp')
         s(j).Geometry = 'Polyline';
         s(j).BoundingBox = double([min(S.X) min(S.Y); max(S.X) max(S.Y)]);
         s(j).X = double(XF(j).X); s(j).Y = double(XF(j).Y);
+        s(j).CoordinateReferenceSystem = site_crs;
     end
     shapewrite(s,[site_dir,'shapefiles/',site_abbrev,'-transects_',num2str(transect_inc),'m.shp']);
     writematrix(wkt,[site_dir,'shapefiles/',site_abbrev,'-transects_',num2str(transect_inc),'m.prj'],'FileType','text', 'QuoteStrings', false);

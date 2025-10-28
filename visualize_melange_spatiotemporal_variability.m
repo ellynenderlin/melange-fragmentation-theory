@@ -87,9 +87,17 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     load([MP(j).name,'-melange-masks.mat']); %load the melange mask file
     DEM_num = size(melmask.dated,2); term_trace = [];
     
-    %load the shapefile of transect-centerline intersections used to
-    %extract the velocity timeseries & the full centerline to precisely
-    %pinpoint relative movement of the terminus position
+    
+    %extract the transect_inc from the files (only works if only one
+    %version is saved for each site but it's needed to account for adaptive
+    %transect spacing depending on site size)
+    shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
+    for j = 1:length(shp_files)
+        if contains(shp_files(j).name,['transects_'])
+            transect_inc = str2num(shp_files(j).name(end-8:end-5));
+        end
+    end
+    %load the shapefile of transect-centerline intersections 
     C = readtable([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'-centerline_',num2str(transect_inc),'m-interval.csv'],"VariableNamingRule","preserve");
     MP(j).V.X = C.Easting_m_; MP(j).V.Y = C.Northing_m_; clear C;
     clear C;
@@ -680,6 +688,16 @@ saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],
 for j = 1:length(MP)
     close all; drawnow;
     ts_fig = figure; set(ts_fig,'position',[50 50 600 1200]);
+
+    %extract the transect_inc from the files (only works if only one
+    %version is saved for each site but it's needed to account for adaptive
+    %transect spacing depending on site size)
+    shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
+    for j = 1:length(shp_files)
+        if contains(shp_files(j).name,['transects_'])
+            transect_inc = str2num(shp_files(j).name(end-8:end-5));
+        end
+    end
 
     %load the centerline & create a distance vector
     C = shaperead([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'-centerline.shp']);
