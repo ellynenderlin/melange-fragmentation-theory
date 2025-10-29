@@ -1,4 +1,4 @@
-function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(fname, v1, n1, dv1,norm_type, nthresh, tracktime, normalize_exp)
+function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(fname, v1, n1, dv1, norm_type, vthresh, nthresh, tracktime, normalize_exp)
 % This script fits the fragmentation theory function to the iceberg
 % size distribution data n(v). The function is of the form:
 % n(v) = c1*v^{-a}*exp(-v/c2) + c3*dv*exp(-v/c4)
@@ -19,7 +19,8 @@ function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(fname, v1
 %   fname = filename
 %   v1, n1, dv1 = volume bins, counts, and bin spacing for the size distribution
 %   norm_type = specify the norm: 2 = L2 norm, Inf = maximum norm, log = RMSLE
-%   nthresh = threshold on count to remove small fragments
+%   vthresh = threshold on size to remove smallest fragments
+%   nthresh = threshold on count to remove small numbers of fragments
 %   tracktime = 0 to not display processing time, 1 to display
 %   normalize_exp = exponent to modulate normalization of data
 % OUTPUTS: FILL IN
@@ -36,11 +37,13 @@ season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
 
 if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     
-    %remove the very small iceberg fragments of BIG icebergs since those
-    %are simply elevation peaks in the largest icebergs
-    v1 = v1(n1>nthresh); n1 = n1(n1>nthresh);
-    v1 = v1(2:end); n1 = n1(2:end); dv1 = dv1(2:end);
-    v = v1(~isnan(n1)); dv = dv1(~isnan(n1)); n = n1(~isnan(n1)); % NO REMOVAL OF FIRST POINTS
+    %identify the size classes below the threshold
+    bits = find(v1<=vthresh); 
+
+    %remove data based on thresholds for number and size
+    v1 = v1(n1>nthresh); n1 = n1(n1>nthresh); %remove size classes without enough data
+    v1 = v1(max(bits)+1:end); n1 = n1(max(bits)+1:end); dv1 = dv1(max(bits)+1:end); %remove smallest size classes
+    v = v1(~isnan(n1)); dv = dv1(~isnan(n1)); n = n1(~isnan(n1)); 
     
     %begin the search loop - compute error for every combination of i_cut, j_cut
     err_array = 1e12*ones(length(v)); %pre-allocate error array

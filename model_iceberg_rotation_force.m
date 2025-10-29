@@ -15,7 +15,7 @@ Eg = 0.31; %width-to-thickness ratio for grounded terminus
 rho_i = 900; rho_w = 1026; %densities
 
 
-%% Estimate thicknesses using bed and surface elevations
+%% ONLY RUN ONCE: Estimate thicknesses using bed and surface elevations
 H_maxes = []; %dummy variables to hold maximum iceberg thickness estimates
 H_range = []; %dummy variables to hold quartiles & max terminus thickness estimates
 
@@ -202,7 +202,7 @@ load([output_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']);
 load([output_dir,'GrIS-iceberg_buttressing.mat']);
 
 %define seasons
-seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MMA','JJA','SON'};
+seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MAM','JJA','SON'};
 
 %define the fraction of the ice thickness relative to just barely grounded
 float_frac = [0.5,0.9,1];

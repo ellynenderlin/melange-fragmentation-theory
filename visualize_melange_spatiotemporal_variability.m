@@ -15,10 +15,11 @@ root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
 %define custom parameters for size distributions
 transect_inc = 1000; %distance between transects along the centerline (meters)
 ARcomp.best.autoALL = 2; % iceberg aspect ratio 
+zthresh = 3; %cutoff elevation (m)
 
 %customize visualization
 years = 2011:1:2023; yr_cmap = cmocean('matter',length(years)+1); yr_cmap = yr_cmap(2:end,:);
-seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MMA','JJA','SON'};
+seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MAM','JJA','SON'};
 mo_cmap = cmocean('phase',12); close all;
 
 %identify the site folders
@@ -66,15 +67,20 @@ if exist([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']) == 2
             SKIP = 0;
             MP = struct;
     end
+else
+    site_start = 1;
+    SKIP = 0;
+    MP = struct;
 end
 disp('Move on to the next subsection in order to compile data & generate figures.')
 
 %% loop through the folders & extract info
 if SKIP == 0
 
-disp('Creating plots of elevation, velocity, and terminus position...');
+disp('Compiling elevation, velocity, and terminus position...');
 for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     disp(sitenames(j,:)); output_dir = [root_dir,sitenames(j,:),'/'];
+    site_abbrev = sitenames(j,:);
     MP(j).name = sitenames(j,:);
     
     %navigate to the study site directory
@@ -92,13 +98,13 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     %version is saved for each site but it's needed to account for adaptive
     %transect spacing depending on site size)
     shp_files = dir([root_dir,site_abbrev,'/shapefiles/',site_abbrev,'*.shp']);
-    for j = 1:length(shp_files)
-        if contains(shp_files(j).name,['transects_'])
-            transect_inc = str2num(shp_files(j).name(end-8:end-5));
+    for k = 1:length(shp_files)
+        if contains(shp_files(k).name,['transects_'])
+            transect_inc = str2num(shp_files(k).name(end-8:end-5));
         end
     end
     %load the shapefile of transect-centerline intersections 
-    C = readtable([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'-centerline_',num2str(transect_inc),'m-interval.csv'],"VariableNamingRule","preserve");
+    C = readtable([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'-centerline_',num2str(transect_inc),'m-interval.csv']);
     MP(j).V.X = C.Easting_m_; MP(j).V.Y = C.Northing_m_; clear C;
     clear C;
     C = shaperead([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'-centerline.shp']);
@@ -109,8 +115,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
         clear dists;
     end
     
-    %identify which terminus traces are actually the edge of the DEM
-    %(straight lines) then make an overview map that excludes them
+    %load the reference satellite image
     ims = dir([im_dir,'L*.TIF']);
     for k = 1:length(ims)
         if contains(ims(k).name,'B8')
@@ -185,6 +190,11 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     %plot the image
     temp_fig = figure; set(temp_fig,'position',[50 50 1200 1200]);
     for p = 1:size(melmask.dated,2)
+        zdate(p) = convert_to_decimaldate(char(MP(j).Z.date(p)));
+        zdatetime(p) = datetime(MP(j).Z.date{p},'InputFormat','yyyyMMdd');
+        zyrs(p) = year(zdatetime(p)); zmos(p) = month(zdatetime(p));
+
+        %plot the melange mask for the given date
         imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
         set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',20);
         plot(C.X,C.Y,'.k'); hold on;
@@ -212,7 +222,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
         clear answer; cla;
     end
     close(temp_fig);
-    save([root_dir,sitenames(j,:),'/',sitenames(j,:),'-melange-masks.mat'],'melmask','-v7.3');
+    % save([root_dir,sitenames(j,:),'/',sitenames(j,:),'-melange-masks.mat'],'melmask','-v7.3');
 
     %add terminus data from TermPicks
     % load the shapefile
@@ -226,8 +236,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
         sorted_term(k) = term(idx(k));
     end
     clear term; term = sorted_term; clear sorted_term term_date;
-
-    %convert format of dates
+    %convert format of TermPicks dates
     bad_ind = [];
     for k = 1:length(term)
         %convert date to same format as used for elevation data
@@ -244,7 +253,6 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     %remove data with erroneous dates
     term(bad_ind) = [];
     YYYYMMDD(bad_ind) = [];
-
     %find the intersection of each terminus trace with the centerline and save to the structure
     for k = 1:length(term)
         [xis,yis,iis] = polyxpoly(term(k).X,term(k).Y,MP(j).V.X,MP(j).V.Y);
@@ -261,9 +269,26 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     %clear variables
     clear term YYYYMMDD datestr idx site_abbrev;
 
+    %intersect the centerline with each time-stamped terminus position
+    for p = 1:length(MP(j).T.date)
+        try 
+            Tdatetime(p) = datetime(MP(j).T.date{p},'InputFormat','yyyyMMdd');
+        catch
+            MP(j).T.date(p) = string(str2num(MP(j).T.date(p))-1);
+            Tdatetime(p) = datetime(MP(j).T.date{p},'InputFormat','yyyyMMdd');
+        end
+        Tdate(p) = convert_to_decimaldate(char(MP(j).T.date(p)));
+        Tdatetime(p) = datetime(MP(j).T.date{p},'InputFormat','yyyyMMdd');
+        Tyrs(p) = year(Tdatetime(p)); Tmos(p) = month(Tdatetime(p));
+        dists = sqrt((MP(j).T.termX(1,p)-C.X).^2 + (MP(j).T.termY(1,p)-C.Y).^2);
+        [~,term_ind] = min(dists);
+        MP(j).T.termdist(1,p) = centerline_dist(term_ind);
+
+        clear dists term_ind;
+    end
+
     %intersect the centerline with each time-stamped melange outline
     for p = 1:size(melmask.dated,2)
-        zdate(p) = convert_to_decimaldate(char(MP(j).Z.date(p)));
         [xis,yis,iis] = polyxpoly(melmask.dated(p).x,melmask.dated(p).y,MP(j).V.X,MP(j).V.Y);
         MP(j).Z.termX(1,p) = xis(end); MP(j).Z.termY(1,p) = yis(end);
         if term_trace(p) == 1 %terminus was mapped from the DEM
@@ -272,14 +297,36 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
             else
                 MP(j).Z.termdist(1,p) = tran_dist(iis(1,2))+sqrt((MP(j).Z.termX(1,p)-MP(j).V.X(iis(1,2))).^2 + (MP(j).Z.termY(1,p)-MP(j).V.Y(iis(1,2))).^2);
             end
-        else %terminus was cut-off in the DEM so don't record the centerline intersection
+        else %terminus was cut-off in the DEM so didn't record the centerline intersection
             MP(j).Z.termdist(1,p) = NaN;
         end
         clear xis yis iis;
     end
-    term_ref = find(abs(zdate-2020.66) == min(abs(zdate(term_trace==1)-2020.66))); %use terminus delineation closest to Aug. 2020 as the centerline reference
-    tran_reldist = MP(j).Z.termdist(1,term_ref) - tran_dist;
-    centerline_reldist = MP(j).Z.termdist(1,term_ref) - centerline_dist;
+    %compile the data for filling in terminus gaps
+    term_decidates = [Tdate, zdate(term_trace ==1)]; term_dates = [Tdatetime, zdatetime(term_trace ==1)]; 
+    term_X = [MP(j).T.termX, MP(j).Z.termX(term_trace == 1)];
+    term_Y = [MP(j).T.termY, MP(j).Z.termY(term_trace == 1)];
+    term_dists = [MP(j).T.termdist, MP(j).Z.termdist(term_trace ==1)];
+
+    %create relative distance vectors
+    for p = 1:length(term_trace)
+        if term_trace(p) == 0
+            %estimate the terminus position from image-based delineations
+            dts = 365*(zdate(p)-term_decidates);
+            [mindt,minind] = min(abs(dts));
+            if mindt < 30
+                MP(j).Z.termX(p) = term_X(minind); MP(j).Z.termY(p) = term_Y(minind);
+                MP(j).Z.termdist(p) = term_dists(minind);
+                disp(['Filled terminus for ',MP(j).name,' ',char(MP(j).Z.date(p)),' with ',char(term_dates(minind))]);
+            else
+                disp(['Need terminus data for ',MP(j).name,' ',char(MP(j).Z.date(p))]);
+                MP(j).Z.termdist(1,p) = NaN;
+            end
+            clear mindt minind;
+        end
+    end
+    % term_ref = find(abs(zdate-2020.66) == min(abs(zdate(term_trace==1)-2020.66))); %use terminus delineation closest to Aug. 2020 as the centerline reference
+    
 
     %Extract width-averaged elevations from the transects
     %find the NaNs in the coordinate pairs to identify each transect
@@ -299,7 +346,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
             MP(j).Z.centerY(tran_ind,1) = nanmean(table2array(T(1:nan_inds(k)-1,1)));
 
             %calculate the mean elevation for each date
-            ztemp = table2array(T(1:nan_inds(k)-1,3:end)); ztemp(ztemp<3) = NaN;
+            ztemp = table2array(T(1:nan_inds(k)-1,3:end)); ztemp(ztemp<zthresh) = NaN;
             MP(j).Z.transectZavg(tran_ind,:) = nanmean(ztemp); clear ztemp;
 
             %add to a temp matrix for plotting
@@ -317,7 +364,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
                 MP(j).Z.centerY(tran_ind,1) = nanmean(table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,1)));
 
                 %calculate the median elevation for each date
-                ztemp = table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,3:end)); ztemp(ztemp<3) = NaN;
+                ztemp = table2array(T(k+1:nan_inds(find(nan_inds==k)+1)-1,3:end)); ztemp(ztemp<zthresh) = NaN;
                 MP(j).Z.transectZavg(tran_ind,:) = nanmean(ztemp); clear ztemp;
 
                 %add to a temp matrix for plotting
@@ -371,12 +418,17 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
         end
     end
 
-    %plot time-series of the width-averaged elevation profiles
-    figure; set(gcf,'position',[50 50 1200 700]);
-    subZ_yr = subplot(2,3,1); subZ_mo = subplot(2,3,4); 
+    %establish a coordinate system relative to the inland-most melange
+    %elevation observations
     mean_prof = nanmean(zprofs,2); 
     seaward_idx = find(~isnan(mean_prof)==1,1,'first');
     inland_idx = find(~isnan(mean_prof)==1,1,'last');
+    tran_reldist = tran_dist(inland_idx) - tran_dist;
+    centerline_reldist = tran_dist(inland_idx) - centerline_dist;
+
+    %plot time-series of the width-averaged elevation profiles
+    figure; set(gcf,'position',[50 50 1200 700]);
+    subZ_yr = subplot(2,3,1); subZ_mo = subplot(2,3,4); 
     for p = 1:size(zprofs,2)
         %add dummy lines for the legend
         if p == 1
@@ -456,11 +508,11 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     for p = 1:length(MP(j).Z.date)
 %         if term_trace(p) == 1 %don't plot terminus delineations that are the DEM edge, not the true terminus
             mo = str2num(MP(j).Z.date{p}(5:6));
-            plot(tran_dist(seaward_idx)-MP(j).Z.termdist(p),zdate(p),'x','color',mo_cmap(mo,:),'linewidth',2); hold on;
+            plot(tran_dist(inland_idx) - MP(j).Z.termdist(p),zdate(p),'x','color',mo_cmap(mo,:),'linewidth',2); hold on;
             clear mo;
 %         end
     end
-    set(subT,'xlim',[min(tran_dist(seaward_idx)-MP(j).Z.termdist),max(ceil(tran_reldist(seaward_idx:inland_idx)/1000)*1000)],'ylim',[min(years) max(years)]); 
+    set(subT,'xlim',[min(tran_dist(inland_idx) - MP(j).Z.termdist),max(ceil(tran_reldist(seaward_idx:inland_idx)/1000)*1000)],'ylim',[min(years) max(years)]); 
     xlims = get(subT,'xlim'); xticks = get(subT,'xtick');
     set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',20);
     xlabel('Distance from terminus (km)','fontsize',20); ylabel('Year','fontsize',20); 
@@ -480,24 +532,27 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     xlabel('Distance from terminus (km)','fontsize',20); ylabel('Elevation (m)','fontsize',20); 
     subplot(subV_yr);
     set(subV_yr,'xlim',xlims,'xtick',xticks,'xticklabels',[]); 
-    pos = get(subV_yr,'position'); set(subV_yr,'position',[pos(1) pos(2)-0.05 pos(3) pos(4)+0.05]); %slightly stretch y-axis
+    pos = get(subV_yr,'position'); set(subV_yr,'position',[pos(1)+0.02 pos(2)-0.05 pos(3) pos(4)+0.05]); %slightly stretch y-axis
     ylabel('Speed (m/d)','fontsize',20); 
     subplot(subV_mo);
     set(subV_mo,'xlim',xlims,'xtick',xticks,'xticklabels',xticks/1000);  
-    pos = get(subV_mo,'position'); set(subV_mo,'position',[pos(1) pos(2) pos(3) pos(4)+0.05]); %slightly stretch y-axis
+    pos = get(subV_mo,'position'); set(subV_mo,'position',[pos(1)+0.02 pos(2) pos(3) pos(4)+0.05]); %slightly stretch y-axis
     xlabel('Distance from terminus (km)','fontsize',20); ylabel('Speed (m/d)','fontsize',20); 
+    subplot(subT);
+    pos = get(subT,'position'); set(subT,'position',[pos(1)+0.02 pos(2) pos(3) pos(4)]);
     drawnow;
     saveas(gcf,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-centerline-elev-speed-terminus_subplots.png'],'png'); %save the plots
     
     %clear profile variables
-    clear im im_subset LCdir zprofs zdate mean_prof seaward_idx centerline C vel_pts term_trace melmask yrs mos;
+    clear im im_subset LCdir zprofs zdate* mean_prof seaward_idx centerline C vel_pts term_trace melmask* yrs mos zyrs zmos;
     clear DEM_num pm pt py sub* tran_* *xlims xticks *ylims yticks term_ref *_dist *_reldist *pos;
+    clear bergdist dts inland_idx seaward_idx Tdate* term_* Tmos Tyrs;
     
     %save the structure with the centerline data
     save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
 
     %create "climatologies" of seasonal size distributions for each site
-    D = readtable([root_dir,sitenames(j,:),'/',sitenames(j,:),'-iceberg-distribution-timeseries.csv'],"VariableNamingRule","preserve");
+    D = readtable([root_dir,sitenames(j,:),'/',sitenames(j,:),'-iceberg-distribution-timeseries.csv']);
     MP(j).D.area = D.('Area_m_2_');
     MP(j).D.area_binwidth = D.('AreaBinwidth_m_2_');
     %create matrices of the size distributions & their dates
@@ -551,7 +606,7 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
     xlabel('Surface area (m^2)','fontsize',20); 
     subplot(subd2); grid on; drawnow;
     saveas(dist_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-seasonal-iceberg-distribution_loglog.png'],'png'); %save the plot
-    clear D berg_* ps;
+    clear D berg_* ps ;
 
     %save the structure with the seasonal distribution data
     save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
@@ -560,132 +615,11 @@ for j = site_start:length(sitenames) %default: site_start:length(sitenames)
 end
 
 end
-%% create a gif that loops through and plots iceberg size distributions
-%distribution for a site, then adds the fall distribution (if it exists)
-%with arrows showing change between seasons for small (~100 m^2) and big
-%(~10^5 m^2) icebergs
 
-%find size indices for arrows
-si = find(MP(1).D.area <= 100,1,'last');
-bi = find(MP(1).D.area <= 10^5,1,'last');
 
-%create the figure
-dist_fig = figure; set(dist_fig,'position',[50 850 800 600]);
-loglog(MP(1).D.area,MP(sort_ind(1)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20); grid on; 
-xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20); 
-drawnow;
-nimages = 1;
+%% create a combined terminus position timeseries: mostly moved to previous section but can use to plot or uncomment to add more terminus data
 for j = 1:length(MP)
-    if sum(~isnan(MP(sort_ind(j)).D.bergs(2,:))) > 0
-        %plot spring
-        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
-        title(MP(sort_ind(j)).name);
-        drawnow;
-        frame = getframe(dist_fig);
-        gif_im{nimages} = frame2im(frame); nimages = nimages+1;
-        
-        for p = 3:4
-            %plot summer and/or spring then fall depending on data
-            if sum(~isnan(MP(sort_ind(j)).D.bergs(p,:))) > 0
-                loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
-                title(MP(sort_ind(j)).name);
-                drawnow;
-                
-                %later distribution
-                loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(p,:),'-','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
-                drawnow;
-                %             frame = getframe(dist_fig);
-                %             gif_im{nimages} = frame2im(frame); nimages = nimages+1;
-                
-                %add arrows for small iceberg abundance change
-                sp1 = [MP(1).D.area(si) MP(sort_ind(j)).D.bergs(2,si)];
-                sp2 = [MP(1).D.area(si) MP(sort_ind(j)).D.bergs(p,si)];
-                sdp = sp2-sp1;
-                quiver(sp1(1),sp1(2),sdp(1),sdp(2),0,'linewidth',2,'color','k'); hold on;
-                if sdp(2) > 0
-                    plot(sp2(1),sp2(2)-0.2*sp2(2),'^k','markerfacecolor','k'); hold on;
-                else
-                    plot(sp2(1),sp2(2)+0.2*sp2(2),'vk','markerfacecolor','k'); hold on;
-                end
-                clear sp1 sp2 dsp;
-                %add arrows for large iceberg abundance change
-                sp1 = [MP(1).D.area(bi) MP(sort_ind(j)).D.bergs(2,bi)];
-                sp2 = [MP(1).D.area(bi) MP(sort_ind(j)).D.bergs(p,bi)];
-                sdp = sp2-sp1;
-                quiver(sp1(1),sp1(2),sdp(1),sdp(2),0,'linewidth',2,'color','k'); hold on;
-                if sdp(2) > 0
-                    plot(sp2(1),sp2(2)-0.2*sp2(2),'^k','markerfacecolor','k'); hold on;
-                else
-                    plot(sp2(1),sp2(2)+0.2*sp2(2),'vk','markerfacecolor','k'); hold on;
-                end
-                clear sp1 sp2 dsp;
-                drawnow;
-                frame = getframe(dist_fig);
-                gif_im{nimages} = frame2im(frame); nimages = nimages+1;
-                
-                %clear the plot
-                cla;
-            end
-        end
-        cla;
-        title('');
-        frame = getframe(dist_fig);
-        gif_im{nimages} = frame2im(frame); nimages = nimages+1;
-    end
-end
-close;
-
-filename = [root_dir,'Greenland-seasonal-iceberg-size-distributions_timeseries.gif']; % Specify the output file name
-for idx = 1:nimages-1
-    [A,map] = rgb2ind(gif_im{idx},256);
-    if idx == 1
-        imwrite(A,map,filename,"gif",LoopCount=Inf, ...
-                DelayTime=1)
-    else
-        imwrite(A,map,filename,"gif",WriteMode="append", ...
-                DelayTime=1)
-    end
-end
-close all; clear A; clear frame gif_im map;
-
-%plot all the seasonal distributions on a single figure
-dist_fig = figure; set(dist_fig,'position',[50 50 1800 500]);
-sub1 = subplot(1,3,1); sub2 = subplot(1,3,2); sub3 = subplot(1,3,3);
-for j = 1:length(MP)
-        %plot spring
-        subplot(sub1);
-        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
-        drawnow;
-        
-        %plot summer
-        subplot(sub2);
-        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(3,:),'-','color',mo_cmap(3*3-2,:),'linewidth',2); hold on;
-        
-        %plot fall
-        subplot(sub3);
-        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(4,:),'-','color',mo_cmap(4*3-2,:),'linewidth',2); hold on;
-        drawnow;
-
-end
-subplot(sub1);
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20); grid on; 
-text(10^5.8,10^-1,'spring','fontsize',20)
-xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20);
-pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
-subplot(sub2);
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',20); grid on;
-text(10^5.8,10^-1,'summer','fontsize',20)
-pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
-subplot(sub3);
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',20); grid on; 
-text(10^5.8,10^-1,'fall','fontsize',20)
-pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
-drawnow;
-saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],'png'); %save the plot
-
-%% create a combined terminus position timeseries
-for j = 1:length(MP)
+    site_abbrev = MP(j).name;
     close all; drawnow;
     ts_fig = figure; set(ts_fig,'position',[50 50 600 1200]);
 
@@ -721,19 +655,22 @@ for j = 1:length(MP)
 
     %intersect the centerline with each time-stamped melange outline
     for p = 1:length(MP(j).T.date)
+        try 
+            Tdatetime(p) = datetime(MP(j).T.date{p},'InputFormat','yyyyMMdd');
+        catch
+            MP(j).T.date(p) = string(str2num(MP(j).T.date(p))-1);
+            Tdatetime(p) = datetime(MP(j).T.date{p},'InputFormat','yyyyMMdd');
+        end
         Tdate(p) = convert_to_decimaldate(char(MP(j).T.date(p)));
         Tdatetime(p) = datetime(MP(j).T.date{p},'InputFormat','yyyyMMdd');
         Tyrs(p) = year(Tdatetime(p)); Tmos(p) = month(Tdatetime(p));
         dists = sqrt((MP(j).T.termX(1,p)-C.X).^2 + (MP(j).T.termY(1,p)-C.Y).^2);
         [~,term_ind] = min(dists);
-        MP(j).T.termdist(1,p) = centerline_dist(term_ind);
+        % MP(j).T.termdist(1,p) = centerline_dist(term_ind);
 
         clear dists term_ind;
     end
     MP(j).T.termdist(Tyrs < min(years) | Tyrs > max(years)) = NaN;
-    % term_ref = find(abs(zdate-2020.66) == min(abs(zdate(term_trace==1)-2020.66))); %use terminus delineation closest to Aug. 2020 as the centerline reference
-    % tran_reldist = MP(j).Z.termdist(1,term_ref) - tran_dist;
-    % centerline_reldist = MP(j).Z.termdist(1,term_ref) - centerline_dist;
 
     %compile the data for filling in terminus gaps
     term_decidates = [Tdate, zdate(term_trace ==1)]; term_dates = [Tdatetime, zdatetime(term_trace ==1)]; 
@@ -747,21 +684,22 @@ for j = 1:length(MP)
             'color',mo_cmap(Tmos(p),:),'linewidth',2,'markersize',10); hold on;
     end
     for p = 1:length(MP(j).Z.date)
-        if term_trace(p) == 0
+        if term_trace(p) == 0 && isnan(MP(j).Z.termdist(p))
             % MP(j).Z.termX(p) = NaN; MP(j).Z.termY(p) = NaN; MP(j).Z.termdist(p) = NaN;
 
-            dts = 365*(zdate(p)-term_decidates);
-            [mindt,minind] = min(abs(dts));
-            if mindt < 30
-                MP(j).Z.termX(p) = term_X(minind); MP(j).Z.termY(p) = term_Y(minind);
-                MP(j).Z.termdist(p) = term_dists(minind);
-                plot(max([MP(j).T.termdist,MP(j).Z.termdist])-MP(j).Z.termdist(p),zdate(p),'s',...
-                    'color','k','linewidth',1,'markerfacecolor','none','markersize',10); hold on;
-                disp(['Filled terminus for ',MP(j).name,' ',char(MP(j).Z.date(p)),' with ',char(term_dates(minind))]);
-            else
+            % %fill gaps with data
+            % dts = 365*(zdate(p)-term_decidates);
+            % [mindt,minind] = min(abs(dts));
+            % if mindt < 30
+            %     MP(j).Z.termX(p) = term_X(minind); MP(j).Z.termY(p) = term_Y(minind);
+            %     MP(j).Z.termdist(p) = term_dists(minind);
+            %     plot(max([MP(j).T.termdist,MP(j).Z.termdist])-MP(j).Z.termdist(p),zdate(p),'s',...
+            %         'color','k','linewidth',1,'markerfacecolor','none','markersize',10); hold on;
+            %     disp(['Filled terminus for ',MP(j).name,' ',char(MP(j).Z.date(p)),' with ',char(term_dates(minind))]);
+            % else
                 disp(['Need terminus data for ',MP(j).name,' ',char(MP(j).Z.date(p))]);
-            end
-            clear mindt minind;
+            % end
+            % clear mindt minind;
         else
              plot(max([MP(j).T.termdist,MP(j).Z.termdist])-MP(j).Z.termdist(p),zdate(p),'s',...
                  'color',mo_cmap(zmos(p),:),'linewidth',1,'markerfacecolor','none','markersize',10); hold on;
@@ -798,17 +736,20 @@ Hcutoff = round((rho_w/(rho_w-rho_i))*zcutoff); %H threshold for figure naming
 %DEMs to create the seasonal profiles but you can also use all velocities
 %from that season (even if there is no DEM for that season-year combination)
 vfilter = 'annual'; %options: 'annual' OR 'all'
+vdtmax = 30; %maximum image acquisition separation for velocities
+dvterm = 'yes'; %include velocities from the terminus
 
 %decide whether to sample data at (1) fixed locations or (2) relative
 %locations with respect to the terminus positions in the DEMs
 sampling = 'dated'; % options: 'dated' OR 'fixed';
 
-disp(['Creating profile plots ignoring icebergs thinner than ',num2str(Hcutoff),'m & using ',vfilter,' speeds'])
+disp(['Creating profile plots ignoring icebergs thinner than ',num2str(Hcutoff),'m & using ',vfilter,' speeds w/ dt <',num2str(vdtmax),' days'])
 
 %iterate
 for j = 1:length(MP)
     sitenames(j,:) = MP(j).name; seasons = MP(j).D.months;
     disp(sitenames(j,:));
+    transect_inc = round(nanmean(sqrt((diff(MP(j).V.X).^2 + diff(MP(j).V.Y).^2)))/100)*100;
     
     %set-up centerline coordinate system
     C = shaperead([root_dir,sitenames(j,:),'/shapefiles/',sitenames(j,:),'-centerline.shp']);
@@ -897,7 +838,7 @@ for j = 1:length(MP)
             pack_profiles = NaN(length(yr_idx),max(inland_idx)-1);
             for k = 1:length(yr_idx)
                 if ~isnan(inland_idx(yr_idx(k)))
-                    z_temp = flipud(Zfilt(1:inland_idx(yr_idx(k)),yr_idx(k)));
+                    z_temp = flipud(Zfilt(1:inland_idx(yr_idx(k))-1,yr_idx(k)));
                     z_profiles(1:length(z_temp),k) = z_temp; 
                     H_temp = fliplr(Havg(yr_idx(k),1:inland_idx(yr_idx(k))-1));
                     H_profiles(k,1:length(H_temp)) = H_temp; 
@@ -913,7 +854,7 @@ for j = 1:length(MP)
                 % H_seas(:,k,p) = (rho_w./(rho_w-rho_i))*nanmean(z_profiles(:,ismember(mos_yr,seasons(k,:))==1),2);
                 H_seas(:,k,p) = nanmean(H_profiles(ismember(mos_yr,seasons(k,:))==1,:),1)';
                 if ~isempty(inland_idx(ismember(mos_yr,seasons(k,:))==1))
-                    MP(j).B.ref(1,k,p) = mean(inland_idx(ismember(mos_yr,seasons(k,:))==1));
+                    MP(j).B.ref(1,k,p) = mean(inland_idx(ismember(mos_yr,seasons(k,:))==1))-1;
                     MP(j).B.Ho(zcutoff+1,k,p) = nanmean(H_profiles(ismember(mos_yr,seasons(k,:))==1,1),1)';
                     MP(j).B.packing(zcutoff+1,k,p) = nanmean(pack_profiles(ismember(mos_yr,seasons(k,:))==1,1),1)';
                 else
@@ -934,30 +875,64 @@ for j = 1:length(MP)
         clear yr_idx
     end
     z_seas(z_seas==0) = NaN; H_seas(H_seas==0) = NaN; 
-    zdist = 0:transect_inc:(max(inland_idx)-1)*transect_inc; 
-    Hdist = zdist+transect_inc/2;
+    zdist = (transect_inc/2):transect_inc:(max(inland_idx)-1)*transect_inc; 
+    Hdist = zdist-transect_inc/2;
 
-    %load the velocity timeseries for the transect-centerline intersection
-    %points & create seasonally-averaged climatologies for each year
+    %if using all velocities for seasonal profiles, not just from DEM
+    %years, create a timeseries of the inland_idx based off the terminus
+    %delineations
+    for k = 1:length(MP(j).T.termX)
+        try 
+            Tdatetime(k) = datetime(MP(j).T.date{k},'InputFormat','yyyyMMdd');
+        catch
+            MP(j).T.date(k) = string(str2num(MP(j).T.date(k))-1);
+            Tdatetime(k) = datetime(MP(j).T.date{k},'InputFormat','yyyyMMdd');
+        end
+        Tdate(k) = convert_to_decimaldate(char(MP(j).T.date(k)));
+        Tdatetime(k) = datetime(MP(j).T.date{k},'InputFormat','yyyyMMdd');
+        Tyrs(k) = year(Tdatetime(k)); Tmos(k) = month(Tdatetime(k));
+
+        dists = sqrt((MP(j).T.termX(k)-MP(j).V.X).^2 + (MP(j).T.termY(k)-MP(j).V.Y).^2);
+        [~,ia] = sort(dists);
+        term_idx(k) = max(ia(1:2));
+        clear dists ia;
+    end
+    for p = 1:length(years)
+        yr_idx = find(Tyrs == years(p));
+        vterm_idx(p) = round(median(term_idx(yr_idx)));
+    end
+
+
+    %grab velocity timeseries for the transect-centerline intersection
+    %points & create seasonally-averaged climatologies
+    if contains(dvterm,'y')
+        inland_vel = max(inland_idx); %grab data from the terminus
+        ref_adjust = 1; %shift the referencing for the relative coordinate system
+    else
+        inland_vel = max(inland_idx)-1; %only get speeds from the melange
+        ref_adjust = 0;
+    end
+    %loop through the pts
     vel_pts = dir([root_dir,sitenames(j,:),'/velocities/']);
     vel_seas = NaN(max(inland_idx),4,length(years));
     for i = 1:length(vel_pts)
         if contains(vel_pts(i).name,'velocity')
             pt_ref = str2num(vel_pts(i).name(end-5:end-4));
 
-            if pt_ref <= max(inland_idx)
+            if pt_ref <= inland_vel %setting this <= and making rel_ref = inland_idx - pt_ref+1 gives the inland pt on the glacier
 
                 %read the file
                 V = readtable([root_dir,sitenames(j,:),'/velocities/',vel_pts(i).name]);
 
                 %filter out all the velocities based on temporal resolution
-                short_dts = find(V.days_dt<60); %get rid of all velocities with coarse temporal resolution
+                short_dts = find(V.days_dt<vdtmax); %get rid of all velocities with coarse temporal resolution
                 vel_dates = V.mid_date(short_dts); vel_dts = V.days_dt(short_dts);
                 vmos = month(vel_dates); vyrs = year(vel_dates);
                 vels = V.velocity_m_yr_(short_dts); vels(vels == 0) = NaN;
 
                 %calculate seasonal average speeds for each year at the point
                 if contains(vfilter,'all')
+
                     %grab velocities for all years
                     for p = 1:length(years)
                         yr_idx = find(vyrs == years(p));
@@ -973,7 +948,7 @@ for j = 1:length(MP)
                             for k = 1:4
                                 if ~isempty(zmos(zyrs==years(p)))
                                     %use the DEMs from that year to come up with the position wrt the terminus
-                                    rel_ref = round(median(inland_idx(zyrs==years(p))))-pt_ref+1; %edit if monthly terminus positions are available
+                                    rel_ref = vterm_idx(p)-pt_ref+ref_adjust; %edit if monthly terminus positions are available
                                     if rel_ref >=1
                                         vel_seas(rel_ref,k,p) = nanmean(v_temp(ismember(mos_yr,seasons(k,:))==1));
                                     end
@@ -1004,7 +979,7 @@ for j = 1:length(MP)
                                     if ~isempty(zmos(zyrs==years(p) & ismember(zmos,seasons(k,:))))
                                         %use the DEMs from that season to come
                                         %up with the position wrt the terminus
-                                        rel_ref = round(median(inland_idx(zyrs==years(p) & ismember(zmos,seasons(k,:)))))-pt_ref+1; %edit if monthly terminus positions are available
+                                        rel_ref = round(median([inland_idx(zyrs==years(p) & ismember(zmos,seasons(k,:))), term_idx(Tyrs==years(p) & ismember(Tmos,seasons(k,:)))]))-pt_ref+ref_adjust; 
                                         if rel_ref >=1
                                             vel_seas(rel_ref,k,p) = nanmean(v_temp(ismember(mos_yr,seasons(k,:))==1));
                                         end
@@ -1025,7 +1000,7 @@ for j = 1:length(MP)
             clear pt_ref;
         end
     end
-    vdist = 0:transect_inc:(max(inland_idx)-1)*transect_inc; 
+    vdist = (transect_inc/2)-(ref_adjust*transect_inc):transect_inc:(max(inland_idx)-1)*transect_inc+(transect_inc/2); %-(transect_inc/2) start for inland pt on the glacier, (transect_inc/2) start for inland point in the melange
 
     %loop through the subsetted size distributions and compute seasonal
     %averages nearest the terminus & a fixed relative distance down-fjord
@@ -1166,8 +1141,11 @@ for j = 1:length(MP)
         %calculate buttressing
         for p = 1:length(years)
             for k = 1:4
+                %add strain rate profiles to the structure
+                MP(j).V.dVdx = (diff(vel_seas(1+ref_adjust:end,k,p))./diff(vdist(1+ref_adjust:end)))/365;
+
                 % add seasonal buttressing info to the structure
-                MP(j).B.dVdx(1,k,p) = (diff(vel_seas(1:2,k,p))./diff(vdist(1:2)))/365;
+                MP(j).B.dVdx(1,k,p) = (diff(vel_seas(1+ref_adjust:2+ref_adjust,k,p))./diff(vdist(1+ref_adjust:2+ref_adjust)))/365; %shift referencing from velocities as needed
                 press = 0.5*rho_i*(1-(rho_i/rho_w))*9.81*MP(j).B.Ho(zcutoff+1,k,p);
                 MP(j).B.butt_Meng(zcutoff+1,k,p) = press*MP(j).B.packing(zcutoff+1,k,p)*MP(j).B.Ho(zcutoff+1,k,p);
                 MP(j).B.butt_Amundson(zcutoff+1,k,p) = (-2*(MP(j).B.Ho(zcutoff+1,k,p)*press*MP(j).B.dVdx(1,k,p))/((MP(j).B.dVdx(1,k,p)/0.3)+MP(j).B.dVdx(1,k,p)))+press*MP(j).B.Ho(zcutoff+1,k,p);
@@ -1189,15 +1167,17 @@ for j = 1:length(MP)
         disp(['    spring = ',num2str(round(nanmedian(MP(j).B.dVdx(1,2,:)),4)),', summer = ',num2str(round(nanmedian(MP(j).B.dVdx(1,3,:)),4)),', fall = ',num2str(round(nanmedian(MP(j).B.dVdx(1,4,:)),4))]);
         disp(' ');
     end
+    disp('close figure to advance')
     
 
     %save the data and the figure
     save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
-    saveas(af_fig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-speed-size_',num2str(Hcutoff),'m-Hthreshold_',vfilter,'-speeds_',sampling,'-profiles.png'],'png'); %save the plots
-    % uiwait %advance only after figure is closed
+    saveas(af_fig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-speed-size_',num2str(Hcutoff),'m-Hthreshold_',vfilter,'-speeds-lt',num2str(vdtmax),'dt_',sampling,'-profiles.png'],'png'); %save the plots
+    uiwait %advance only after figure is closed
     
     %refresh
     clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* size_classes sub* Zfilt H_* Havg vel_* vels* w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos seas_leg packing;
+    clear leg_* ref_* Tdate* xlims;
     close all; drawnow;
 end
 
@@ -1395,6 +1375,133 @@ for j = 1:length(MP)
     clear xlims ylims pt;
     clear berg_* im* inland_ext LCdir leg* map* melmask zmos on pos ref* seaward_ext size_classes sort_ind T_inds term_* Tyrs Tmos *lims zyrs zdate zseas Tseas tran_cmap colorgrad term;
 end
+
+
+
+%% create a gif that loops through and plots iceberg size distributions
+%distribution for a site, then adds the fall distribution (if it exists)
+%with arrows showing change between seasons for small (~100 m^2) and big
+%(~10^5 m^2) icebergs
+
+%find size indices for arrows
+si = find(MP(1).D.area <= 100,1,'last');
+bi = find(MP(1).D.area <= 10^5,1,'last');
+
+%create the figure
+dist_fig = figure; set(dist_fig,'position',[50 850 800 600]);
+loglog(MP(1).D.area,MP(sort_ind(1)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20); grid on; 
+xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20); 
+drawnow;
+nimages = 1;
+for j = 1:length(MP)
+    if sum(~isnan(MP(sort_ind(j)).D.bergs(2,:))) > 0
+        %plot spring
+        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
+        title(MP(sort_ind(j)).name);
+        drawnow;
+        frame = getframe(dist_fig);
+        gif_im{nimages} = frame2im(frame); nimages = nimages+1;
+        
+        for p = 3:4
+            %plot summer and/or spring then fall depending on data
+            if sum(~isnan(MP(sort_ind(j)).D.bergs(p,:))) > 0
+                loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
+                title(MP(sort_ind(j)).name);
+                drawnow;
+                
+                %later distribution
+                loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(p,:),'-','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
+                drawnow;
+                %             frame = getframe(dist_fig);
+                %             gif_im{nimages} = frame2im(frame); nimages = nimages+1;
+                
+                %add arrows for small iceberg abundance change
+                sp1 = [MP(1).D.area(si) MP(sort_ind(j)).D.bergs(2,si)];
+                sp2 = [MP(1).D.area(si) MP(sort_ind(j)).D.bergs(p,si)];
+                sdp = sp2-sp1;
+                quiver(sp1(1),sp1(2),sdp(1),sdp(2),0,'linewidth',2,'color','k'); hold on;
+                if sdp(2) > 0
+                    plot(sp2(1),sp2(2)-0.2*sp2(2),'^k','markerfacecolor','k'); hold on;
+                else
+                    plot(sp2(1),sp2(2)+0.2*sp2(2),'vk','markerfacecolor','k'); hold on;
+                end
+                clear sp1 sp2 dsp;
+                %add arrows for large iceberg abundance change
+                sp1 = [MP(1).D.area(bi) MP(sort_ind(j)).D.bergs(2,bi)];
+                sp2 = [MP(1).D.area(bi) MP(sort_ind(j)).D.bergs(p,bi)];
+                sdp = sp2-sp1;
+                quiver(sp1(1),sp1(2),sdp(1),sdp(2),0,'linewidth',2,'color','k'); hold on;
+                if sdp(2) > 0
+                    plot(sp2(1),sp2(2)-0.2*sp2(2),'^k','markerfacecolor','k'); hold on;
+                else
+                    plot(sp2(1),sp2(2)+0.2*sp2(2),'vk','markerfacecolor','k'); hold on;
+                end
+                clear sp1 sp2 dsp;
+                drawnow;
+                frame = getframe(dist_fig);
+                gif_im{nimages} = frame2im(frame); nimages = nimages+1;
+                
+                %clear the plot
+                cla;
+            end
+        end
+        cla;
+        title('');
+        frame = getframe(dist_fig);
+        gif_im{nimages} = frame2im(frame); nimages = nimages+1;
+    end
+end
+close;
+
+filename = [root_dir,'Greenland-seasonal-iceberg-size-distributions_timeseries.gif']; % Specify the output file name
+for idx = 1:nimages-1
+    [A,map] = rgb2ind(gif_im{idx},256);
+    if idx == 1
+        imwrite(A,map,filename,"gif",LoopCount=Inf, ...
+                DelayTime=1)
+    else
+        imwrite(A,map,filename,"gif",WriteMode="append", ...
+                DelayTime=1)
+    end
+end
+close all; clear A; clear frame gif_im map;
+
+%plot all the seasonal distributions on a single figure
+dist_fig = figure; set(dist_fig,'position',[50 50 1800 500]);
+sub1 = subplot(1,3,1); sub2 = subplot(1,3,2); sub3 = subplot(1,3,3);
+for j = 1:length(MP)
+        %plot spring
+        subplot(sub1);
+        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(2,:),'-','color',mo_cmap(2*3-2,:),'linewidth',2); hold on;
+        drawnow;
+        
+        %plot summer
+        subplot(sub2);
+        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(3,:),'-','color',mo_cmap(3*3-2,:),'linewidth',2); hold on;
+        
+        %plot fall
+        subplot(sub3);
+        loglog(MP(sort_ind(j)).D.area,MP(sort_ind(j)).D.bergs(4,:),'-','color',mo_cmap(4*3-2,:),'linewidth',2); hold on;
+        drawnow;
+
+end
+subplot(sub1);
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20); grid on; 
+text(10^5.8,10^-1,'spring','fontsize',20)
+xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20);
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
+subplot(sub2);
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',20); grid on;
+text(10^5.8,10^-1,'summer','fontsize',20)
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
+subplot(sub3);
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',20); grid on; 
+text(10^5.8,10^-1,'fall','fontsize',20)
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
+drawnow;
+saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],'png'); %save the plot
+
 
 %% load TermPicks timeseries for each glacier
 % cd(root_dir);
