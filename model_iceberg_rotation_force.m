@@ -180,7 +180,7 @@ for i = 1:length(folderNames)
     disp(['Iceberg common thickness: [',num2str(round(nanmedian(Hiqr(:,1)))),...
             '-',num2str(round(nanmedian(Hiqr(:,2)))),' m]']);
     H_maxes(i,:) = [max(Hmax(:,1)),max(Hmax(:,2)),max(Hmax(:,3))];
-    H_range(i,:) = [nanmedian(Hiqr(:,1)),nanmedian(Hiqr(:,2)),max(Hmax(:,3))];
+    H_range(i,:) = [nanmedian(Hiqr(:,1)),nanmedian(Hiqr(:,2)),max(Hmax(:,2))];
 
     clear site_abbrev mask_dates S BB bed_* DEM_* *_xgrid *_ygrid mask_*ext;
     cd ../..
@@ -213,211 +213,273 @@ float_frac = [0.5,0.9,1];
 
 %initialize a figure
 figure; 
-mo_cmap = cmocean('phase',12); close all;
+mo_cmap = cmocean('phase',12); 
+seas_cmap = [5,113,176; 202,0,32; 244,165,130; 146,197,222]/255; %blue/orange/red 
+close all;
 
-disp('Buttressing force (x10^6 N/m) for...')
-for i = 1:length(MP)
-    site_abbrev = char(folderNames(i));
-    load([output_dir,site_abbrev,'/',site_abbrev,'-iceberg_thicknesses.mat'])
-
-    %isolate the dates for data sorting
-    for p = 1:length(MP(i).Z.date)
-        term_trace(p) = MP(i).Z.termflag(p);
-        % zdate(p) = convert_to_decimaldate(char(MP(i).Z.date(p)));
-        datest = datetime(MP(i).Z.date{p},'InputFormat','yyyyMMdd');
-        zyrs(p) = year(datest); zmos(p) = month(datest);
-        clear datest;
-    end
-
-    %create dummy vectors to hold variables for the CSV output
-    min_ang = NaN(4,9); max_ang = NaN(4,9); 
-
-    %group by season
-    for p = 1:4
-        seas_inds = find(ismember(zmos,seasons(p,:))==1);
-        if ~isempty(seas_inds)
-            H_range(p,:) = [nanmean(Hiqr(seas_inds,1)), nanmean(Hiqr(seas_inds,2)), nanmean(Hmax(seas_inds,2))]; %25th, 75th, 95th percentiles
-        else
-            H_range(p,:) = [NaN, NaN, NaN]; %no data for that season
-        end
-        clear seas_inds;
-
-        %loop through the angles of consideration
-        for j = 1:2
-            disp(['ANGLE = ',num2str(ang_range(j))])
-
-            %loop through the flotation fractions
+%load the textfile containing the buttressing data if it has already been made
+site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site directory as a check if they exist
+if exist([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']) == 2
+    for i = 1:length(MP)
+        site_abbrev = char(folderNames(i));
+        Tfinal = readtable([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']);
+        Fb_Meng = table2array(Tfinal(:,2))';
+        Fb_Amundson = table2array(Tfinal(:,3))';
+        Fbutt_obs(i,:,:) = cat(3,Fb_Meng,Fb_Amundson);
+        min_ang = table2array(Tfinal(:,4:12));
+        max_ang = table2array(Tfinal(:,13:21));
+        %add data to the matrices used to make CSVs
+        for p = 1:4
+            j = 1; %smaller angle
             for k = 1:length(float_frac)
-                if float_frac(k) < 1
-                    calve_mode = 'floating';
-                    E = Ef;
-                else
-                    calve_mode = 'grounded';
-                    E = Eg;
+                % min_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
+                if k == 1
+                    Fbutt_thinminf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+                elseif k == 2
+                    Fbutt_minf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+                elseif k == 3
+                    Fbutt_ming(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
                 end
-
-                %calculate buttressing needed to resist rotation of icebergs of
-                %different sizes
-                for l = 1:3
-                    Fbutt(k,l) = calculate_taus(float_frac(k)*H_range(p,l),ang_range(j),E,rho_i,rho_w,calve_mode);
-                end
-                %display the maximum buttressing needed based on floatation &
-                %bottom-out rotation
-                disp([site_abbrev,': floatation fraction = ',num2str(float_frac(k))]);
-                disp(['maximum bottom-out F_{buttressing}: ',num2str(round(Fbutt(k,l)/10^6,2))])
-                %display typical buttressing IQR for the terminus based on floatation
-                disp([' typical bottom-out F_{buttressing} IQR: ',num2str(round(Fbutt(k,1)/10^6,2)),'-',num2str(round(Fbutt(k,2)/10^6,2))]);
-                % disp([' typical top-out F_{buttressing} IQR: ',num2str(round(Fbutt_top(k,1)/10^6,2)),'-',num2str(round(Fbutt_top(k,2)/10^6,2))]);
 
             end
-
-            %add data to the matrices used to make CSVs
-            if  j == 1 %smaller angle
-                for k = 1:length(float_frac)
-                    min_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
-                    if k == 1
-                        Fbutt_thinminf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
-                    elseif k == 2
-                        Fbutt_minf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
-                    elseif k == 3
-                        Fbutt_ming(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
-                    end
-                    % %plot the data
-                    % if k == 1
-                    %     % errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
-                    %     %     'o','color',mo_cmap(p*3-2,:),'linewidth',1.5); hold on;
-                    % elseif k == 2
-                    %     errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
-                    %         's','color',mo_cmap(p*3-2,:),'linewidth',1.5); hold on;
-                    % else
-                    %     errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
-                    %         'd','color',mo_cmap(p*3-2,:),'linewidth',1.5); hold on;
-                    % end
-                end
-            else %larger angle
-                for k = 1:length(float_frac)
-                    max_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
-                    if k == 1
-                        Fbutt_thinmaxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
-                    elseif k == 2
-                        Fbutt_maxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
-                    elseif k == 3
-                        Fbutt_maxg(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
-                    end
+            j = 2; %larger angle
+            for k = 1:length(float_frac)
+                % max_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
+                if k == 1
+                    Fbutt_thinmaxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+                elseif k == 2
+                    Fbutt_maxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+                elseif k == 3
+                    Fbutt_maxg(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
                 end
             end
+        end
+        clear Tfinal;
 
-            clear Fbutt;
+        %show buttressing stats
+        disp(site_abbrev)
+        disp(['Seasonal average generated buttressing (10^6 N/m): ',num2str(round(nanmean(Fbutt_obs(i,:,:),3),3))]);
+        disp(['90% of GLH_f, 0.1^o rotation, MEDIAN terminus H (10^6 N/m): ',num2str(round(nanmean(Fbutt_minf(i,:,1:2),3),3))]);
+        disp(['90% of GLH_f, 0.1^o rotation, MAX terminus H (10^6 N/m): ',num2str(round(Fbutt_minf(i,:,3),3))]);
+        disp(['GLH_f, 0.1^o rotation, MEDIAN terminus H (10^6 N/m): ',num2str(round(nanmean(Fbutt_ming(i,:,1:2),3),3))]);
+        disp(['GLH_f, 0.1^o rotation, MAX terminus H (10^6 N/m): ',num2str(round(Fbutt_ming(i,:,3),3))]);
+    end
+else
+    disp('Buttressing force (x10^6 N/m) for...')
+    for i = 1:length(MP)
+        site_abbrev = char(folderNames(i));
+        load([output_dir,site_abbrev,'/',site_abbrev,'-iceberg_thicknesses.mat'])
+
+        %isolate the dates for data sorting
+        for p = 1:length(MP(i).Z.date)
+            term_trace(p) = MP(i).Z.termflag(p);
+            % zdate(p) = convert_to_decimaldate(char(MP(i).Z.date(p)));
+            datest = datetime(MP(i).Z.date{p},'InputFormat','yyyyMMdd');
+            zyrs(p) = year(datest); zmos(p) = month(datest);
+            clear datest;
         end
 
-        %average the seasonal melange buttressing estimates across all years
-        Fb_Meng(p,1) = round(nanmean(MP(i).B.butt_Meng(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
-        Fb_Amundson(p,1) = round(nanmean(MP(i).B.butt_Amundson(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
-        Fbutt_obs(i,p,:) = [Fb_Meng(p,1), Fb_Amundson(p,1)];
+        %create dummy vectors to hold variables for the CSV output
+        min_ang = NaN(4,9); max_ang = NaN(4,9);
 
-        % %add the estimated buttressing to the plot
-        % plot(i,Fb_Meng(p,1),'+','color',mo_cmap(p*3-2,:),'linewidth',2,'markersize',16); hold on;
-        % plot(i,Fb_Amundson(p,1),'x','color',mo_cmap(p*3-2,:),'linewidth',2,'markersize',16); hold on;
-        % drawnow;
+        %group by season
+        for p = 1:4
+            seas_inds = find(ismember(zmos,seasons(p,:))==1);
+            if ~isempty(seas_inds)
+                H_range(p,:) = [nanmean(Hiqr(seas_inds,1)), nanmean(Hiqr(seas_inds,2)), nanmean(Hmax(seas_inds,2))]; %25th, 75th, 95th percentiles
+            else
+                H_range(p,:) = [NaN, NaN, NaN]; %no data for that season
+            end
+            clear seas_inds;
+
+            %loop through the angles of consideration
+            for j = 1:2
+                disp(['ANGLE = ',num2str(ang_range(j))])
+
+                %loop through the flotation fractions
+                for k = 1:length(float_frac)
+                    if float_frac(k) < 1
+                        calve_mode = 'floating';
+                        E = Ef;
+                    else
+                        calve_mode = 'grounded';
+                        E = Eg;
+                    end
+
+                    %calculate buttressing needed to resist rotation of icebergs of
+                    %different sizes
+                    for l = 1:3
+                        Fbutt(k,l) = calculate_taus(float_frac(k)*H_range(p,l),ang_range(j),E,rho_i,rho_w,calve_mode);
+                    end
+                    %display the maximum buttressing needed based on floatation &
+                    %bottom-out rotation
+                    disp([site_abbrev,': floatation fraction = ',num2str(float_frac(k))]);
+                    disp(['maximum bottom-out F_{buttressing}: ',num2str(round(Fbutt(k,l)/10^6,2))])
+                    %display typical buttressing IQR for the terminus based on floatation
+                    disp([' typical bottom-out F_{buttressing} IQR: ',num2str(round(Fbutt(k,1)/10^6,2)),'-',num2str(round(Fbutt(k,2)/10^6,2))]);
+                    % disp([' typical top-out F_{buttressing} IQR: ',num2str(round(Fbutt_top(k,1)/10^6,2)),'-',num2str(round(Fbutt_top(k,2)/10^6,2))]);
+
+                end
+
+                %add data to the matrices used to make CSVs
+                if  j == 1 %smaller angle
+                    for k = 1:length(float_frac)
+                        min_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
+                        if k == 1
+                            Fbutt_thinminf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+                        elseif k == 2
+                            Fbutt_minf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+                        elseif k == 3
+                            Fbutt_ming(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+                        end
+                        % %plot the data
+                        % if k == 1
+                        %     % errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
+                        %     %     'o','color',seas_cmap(p,:),'linewidth',1.5); hold on;
+                        % elseif k == 2
+                        %     errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
+                        %         's','color',seas_cmap(p,:),'linewidth',1.5); hold on;
+                        % else
+                        %     errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
+                        %         'd','color',seas_cmap(p,:),'linewidth',1.5); hold on;
+                        % end
+                    end
+                else %larger angle
+                    for k = 1:length(float_frac)
+                        max_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
+                        if k == 1
+                            Fbutt_thinmaxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+                        elseif k == 2
+                            Fbutt_maxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+                        elseif k == 3
+                            Fbutt_maxg(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+                        end
+                    end
+                end
+
+                clear Fbutt;
+            end
+
+            %average the seasonal melange buttressing estimates across all years
+            Fb_Meng(p,1) = round(nanmean(MP(i).B.butt_Meng(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
+            Fb_Amundson(p,1) = round(nanmean(MP(i).B.butt_Amundson(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
+            Fbutt_obs(i,p,:) = [Fb_Meng(p,1), Fb_Amundson(p,1)];
+
+            % %add the estimated buttressing to the plot
+            % plot(i,Fb_Meng(p,1),'+','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+            % plot(i,Fb_Amundson(p,1),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+            % drawnow;
+        end
+        clear H_range Hmax Hiqr;
+
+
+        %combine the results for the different angles & the estimates of actual
+        %melange buttressing in a single CSV
+        Tnames = table(char(season_names')); Tnames.Properties.VariableNames = "Season";
+        T = array2table([Fb_Meng,Fb_Amundson,min_ang,max_ang]);
+        column_names = ["Buttressing F/W - Meng (MN/m)","Buttressing F/W - Amundson (MN/m)",...
+            "Torque (MN/m; 0.1 deg rot, 50% of 25th H)", "Torque (MN/m; 0.1 deg rot, 50% of 75th H)", "Torque (MN/m; 0.1 deg rot, 50% of 95th H)",...
+            "Torque (MN/m; 0.1 deg rot, 90% of 25th H)", "Torque (MN/m; 0.1 deg rot, 90% of 75th H)", "Torque (MN/m; 0.1 deg rot, 90% of 95th H)",...
+            "Torque (MN/m; 0.1 deg rot, 100% of 25th H)", "Torque (MN/m; 0.1 deg rot, 100% of 75th H)", "Torque (MN/m; 0.1 deg rot, 100% of 95th H)",...
+            "Torque (MN/m; 1.0 deg rot, 50% of 25th H)", "Torque (MN/m; 1.0 deg rot, 50% of 75th H)", "Torque (MN/m; 1.0 deg rot, 50% of 95th H)",...
+            "Torque (MN/m; 1.0 deg rot, 90% of 25th H)", "Torque (MN/m; 1.0 deg rot, 90% of 75th H)", "Torque (MN/m; 1.0 deg rot, 90% of 95th H)",...
+            "Torque (MN/m; 1.0 deg rot, 100% of 25th H)", "Torque (MN/m; 1.0 deg rot, 100% of 75th H)", "Torque (MN/m; 1.0 deg rot, 100% of 95th H)"];
+        T.Properties.VariableNames = column_names; %T.Properties.RowNames = season_names';
+        Tfinal = [Tnames,T];
+        writetable(Tfinal,[output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']);
+        disp([site_abbrev, ' buttressing text file written']);
+        disp(' ')
+
+        clear Tnames T Tfinal min_ang max_ang Fb_* term_trace zyrs zmos;
     end
-    clear H_range Hmax Hiqr;
-
-
-    %combine the results for the different angles & the estimates of actual
-    %melange buttressing in a single CSV
-    Tnames = table(char(season_names')); Tnames.Properties.VariableNames = "Season"; 
-    T = array2table([Fb_Meng,Fb_Amundson,min_ang,max_ang]);
-    column_names = ["Buttressing F/W - Meng (MN/m)","Buttressing F/W - Amundson (MN/m)",...
-        "Torque (MN/m; 0.1 deg rot, 50% of 25th H)", "Torque (MN/m; 0.1 deg rot, 50% of 75th H)", "Torque (MN/m; 0.1 deg rot, 50% of 95th H)",...
-        "Torque (MN/m; 0.1 deg rot, 90% of 25th H)", "Torque (MN/m; 0.1 deg rot, 90% of 75th H)", "Torque (MN/m; 0.1 deg rot, 90% of 95th H)",...
-        "Torque (MN/m; 0.1 deg rot, 100% of 25th H)", "Torque (MN/m; 0.1 deg rot, 100% of 75th H)", "Torque (MN/m; 0.1 deg rot, 100% of 95th H)",...
-        "Torque (MN/m; 1.0 deg rot, 50% of 25th H)", "Torque (MN/m; 1.0 deg rot, 50% of 75th H)", "Torque (MN/m; 1.0 deg rot, 50% of 95th H)",...
-        "Torque (MN/m; 1.0 deg rot, 90% of 25th H)", "Torque (MN/m; 1.0 deg rot, 90% of 75th H)", "Torque (MN/m; 1.0 deg rot, 90% of 95th H)",...
-        "Torque (MN/m; 1.0 deg rot, 100% of 25th H)", "Torque (MN/m; 1.0 deg rot, 100% of 75th H)", "Torque (MN/m; 1.0 deg rot, 100% of 95th H)"];
-    T.Properties.VariableNames = column_names; %T.Properties.RowNames = season_names';
-    Tfinal = [Tnames,T];
-    writetable(Tfinal,[output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']);
-    disp([site_abbrev, ' buttressing text file written']);
-    disp(' ')
-
-    clear Tnames T Tfinal min_ang max_ang Fb_* term_trace zyrs zmos;
 end
 %format the data plot
 set(gcf,'position',[50 50 1200 1200]);
-sub1 = subplot(3,1,1); 
-fill([0,5,0,0],[0,5,5,0],'k','FaceAlpha',0.2,'EdgeColor','none'); hold on;
-plot([0,5],[0,5],'--k','linewidth',1.5); hold on;
-text(1.05,1.2,'unbuttressed','fontsize',16,'rotation',22.5); 
-text(1.15,1.0,'buttressed','fontsize',16,'rotation',22.5); 
-sub2 = subplot(3,1,2);
-fill([0,5,0,0],[0,5,5,0],'k','FaceAlpha',0.2,'EdgeColor','none'); hold on;
-text(1.05,1.2,'unbuttressed','fontsize',16,'rotation',22.5); 
-text(1.15,1.0,'buttressed','fontsize',16,'rotation',22.5);  
-plot([0,5],[0,5],'--k','linewidth',1.5); hold on;
-sub3 = subplot(3,1,3);
-fill([0,5,0,0],[0,5,5,0],'k','FaceAlpha',0.2,'EdgeColor','none'); hold on;
-text(1.05,1.2,'unbuttressed','fontsize',16,'rotation',22.5); 
-text(1.15,1.0,'buttressed','fontsize',16,'rotation',22.5);    
-plot([0,5],[0,5],'--k','linewidth',1.5); hold on;
+sub1 = subplot(3,2,1); sub2 = subplot(3,2,3); sub3 = subplot(3,2,5);
+sub4 = subplot(3,2,2); sub5 = subplot(3,2,4); sub6 = subplot(3,2,6);
+for j = 1:6
+    eval(['subplot(sub',num2str(j),')']);
+    fill([0,15,0,0],[0,15,15,0],'k','FaceAlpha',0.2,'EdgeColor','none'); hold on;
+    plot([0,15],[0,15],'--k','linewidth',1.5); hold on;
+    if j <= 3
+        text(0.9,1.1,'unbuttressed','fontsize',16,'rotation',45);
+        text(1.2,1.02,'buttressed','fontsize',16,'rotation',45);
+    else
+        text(1.55,2.35,'unbuttressed','fontsize',16,'rotation',10);
+        text(1.7,0.95,'buttressed','fontsize',16,'rotation',10);
+    end
+end
+%plot the data
 for p = 1:4
     ymid = nanmean(Fbutt_obs(:,p,:),3); yneg_err = ymid - min(Fbutt_obs(:,p,:),[],3); ypos_err = min(Fbutt_obs(:,p,:),[],3) - ymid; 
     
     %needed vs observed: barely grounded (GL)
     subplot(sub1);
     xmid = nanmean(Fbutt_ming(:,p,1:2),3); xneg_err = xmid - min(Fbutt_ming(:,p,1:2),[],3); xpos_err = min(Fbutt_ming(:,p,1:2),[],3) - xmid; 
-    pl(p) = errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_ming(:,p,3),'*','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
+    plot(ymid,Fbutt_ming(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
     clear xmid;
-    % xmid = nanmean(Fbutt_maxg(:,p,1:2),3); xneg_err = xmid - min(Fbutt_maxg(:,p,1:2),[],3); xpos_err = min(Fbutt_maxg(:,p,1:2),[],3) - xmid; 
-    % errorbar(xmid,ymid,yneg_err,yneg_err,xneg_err,xpos_err,'d','color',mo_cmap(p*3-2,:),'linewidth',1); hold on;
-    % plot(Fbutt_maxg(:,p,3),ymid,'+','color',mo_cmap(p*3-2,:),'linewidth',1); hold on;
-    % clear xmid;
+    subplot(sub4);
+    xmid = nanmean(Fbutt_maxg(:,p,1:2),3); xneg_err = xmid - min(Fbutt_maxg(:,p,1:2),[],3); xpos_err = min(Fbutt_maxg(:,p,1:2),[],3) - xmid; 
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'d','color',seas_cmap(p,:),'linewidth',2); hold on;
+    plot(ymid,Fbutt_maxg(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    clear xmid;
 
     %needed vs observed: 90% GL thickness
     subplot(sub2);
     xmid = nanmean(Fbutt_minf(:,p,1:2),3); xneg_err = xmid - min(Fbutt_minf(:,p,1:2),[],3); xpos_err = min(Fbutt_minf(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_minf(:,p,3),'*','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
+    plot(ymid,Fbutt_minf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
     clear xmid;
-    % xmid = nanmean(Fbutt_maxf(:,p,1:2),3); xneg_err = xmid - max(Fbutt_minf(:,p,1:2),[],3); xpos_err = min(Fbutt_maxf(:,p,1:2),[],3) - xmid; 
-    % errorbar(xmid,ymid,yneg_err,yneg_err,xneg_err,xpos_err,'d','color',mo_cmap(p*3-2,:),'linewidth',1); hold on;
-    % plot(Fbutt_maxf(:,p,3),ymid,'+','color',mo_cmap(p*3-2,:),'linewidth',1); hold on;
-    % clear xmid;
+    subplot(sub5);
+    xmid = nanmean(Fbutt_maxf(:,p,1:2),3); xneg_err = xmid - max(Fbutt_minf(:,p,1:2),[],3); xpos_err = min(Fbutt_maxf(:,p,1:2),[],3) - xmid; 
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'d','color',seas_cmap(p,:),'linewidth',2); hold on;
+    plot(ymid,Fbutt_maxf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    clear xmid;
     
     %needed vs observed: 50% GL thickness
     subplot(sub3);
     xmid = nanmean(Fbutt_thinminf(:,p,1:2),3); xneg_err = xmid - min(Fbutt_thinminf(:,p,1:2),[],3); xpos_err = min(Fbutt_thinminf(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_thinminf(:,p,3),'*','color',mo_cmap(p*3-2,:),'linewidth',2); hold on;
+    pl(p) = errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
+    plot(ymid,Fbutt_thinminf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    clear xmid;
+    subplot(sub6);
+    xmid = nanmean(Fbutt_thinmaxf(:,p,1:2),3); xneg_err = xmid - min(Fbutt_thinmaxf(:,p,1:2),[],3); xpos_err = min(Fbutt_thinmaxf(:,p,1:2),[],3) - xmid; 
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
+    plot(ymid,Fbutt_thinmaxf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
     clear xmid;
     
     % %observed for each site
     % subplot(sub1);
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',mo_cmap(p*3-2,:),'linewidth',2,'markersize',16); hold on;
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',mo_cmap(p*3-2,:),'linewidth',2,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
     % subplot(sub2);
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',mo_cmap(p*3-2,:),'linewidth',2,'markersize',16); hold on;
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',mo_cmap(p*3-2,:),'linewidth',2,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
 end
-subplot(sub1); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); 
-pl_leg = legend(pl,season_names);
-text(0.05,2.2,'a) Grounding Line Thickness (GLH)','fontsize',20); 
-subplot(sub2); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); 
-rectangle('Position',[4.0 1.75 0.95 0.65],'FaceColor','none','EdgeColor',[0.5 0.5 0.5],'LineWidth',0.5);
-errorbar(4.15,2.3,0,0,0.1,0.1,'s','color','k','linewidth',2); hold on;
-text(4.3,2.3,'M24-A25 span','fontsize',16);
-errorbar(4.15,2.1,0.1,0.1,'s','color','k','linewidth',2); hold on;
-text(4.3,2.1,'IQR','fontsize',16);
-plot(4.15,1.9,'*','color','k','linewidth',2); hold on;
-text(4.3,1.9,'95th-percentile','fontsize',16);
-text(0.05,2.2,'b) 90% GLH','fontsize',20); 
+subplot(sub1); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+text(0.05,0.935*max(ylims),'a) Grounding Line Thickness (GLH): 0.1^o Rotation','fontsize',16); 
+subplot(sub2); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+rectangle('Position',[3.2 1.75 1.7 0.65],'FaceColor','none','EdgeColor',[0.5 0.5 0.5],'LineWidth',0.5);
+errorbar(3.35,2.3,0,0,0.1,0.1,'s','color','k','linewidth',2); hold on;
+text(3.5,2.3,'M24-A25 span','fontsize',16);
+errorbar(3.35,2.1,0.1,0.1,'s','color','k','linewidth',2); hold on;
+text(3.5,2.1,'IQR','fontsize',16);
+plot(3.35,1.9,'*','color','k','linewidth',2); hold on;
+text(3.5,1.9,'95th-percentile','fontsize',16);
+text(0.05,0.935*max(ylims),'b) 90% GLH: 0.1^o Rotation','fontsize',16); 
 ylabel('Bottom-out calving torque (x10^6 N/m)','fontsize',20);
-subplot(sub3); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); 
-text(0.05,2.2,'c) 50% GLH','fontsize',20); 
-xlabel('Observed buttressing (x10^6 N/m)','fontsize',20);
-% xticklabels = folderNames;
-% set(gca,'xtick',[1:1:length(MP)],'xticklabel',xticklabels,'fontsize',20); 
-% ylabel('Buttressing F/W (x10^6 N/m)','fontsize',20);
+subplot(sub3); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+pl_leg = legend(pl,season_names); pl_leg.FontSize = 16;
+text(0.05,0.935*max(ylims),'c) 50% GLH: 0.1^o Rotation','fontsize',16); 
+xlabel('Generated buttressing (x10^6 N/m)','fontsize',20);
+subplot(sub4); set(gca,'ylim',[0 15],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+text(0.05,0.935*max(ylims),'d) Grounding Line Thickness (GLH): 1.0^o Rotation','fontsize',16); 
+subplot(sub5); set(gca,'ylim',[0 15],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+text(0.05,0.935*max(ylims),'e) 90% GLH: 1.0^o Rotation','fontsize',16); 
+subplot(sub6); set(gca,'ylim',[0 15],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+text(0.05,0.935*max(ylims),'f) 50% GLH: 1.0^o Rotation','fontsize',16); 
+xlabel('Generated buttressing (x10^6 N/m)','fontsize',20);
 saveas(gcf,[output_dir,'GrIS-buttressing-intercomparison-scatterplots.png'],'png'); %save the plots
 
 

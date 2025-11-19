@@ -102,33 +102,7 @@ for p = 1:nfiles
     clear v1 n1 dv1;
 end
 
-%compile subsetted distributions (if they exist)
-subset_csvs = dir([root_dir,site_abbrev,'/',site_abbrev,'*-iceberg-distribution-subsets.csv']);
-if ~isempty(subset_csvs)
-    for p = 1:size(subset_csvs,1)
-        D = readtable([root_dir,site_abbrev,'/',subset_csvs(p).name],"VariableNamingRule","preserve");
-        name_split = split(subset_csvs(p).name,'-',2);
-        berg_dates(p) = datetime(name_split{2},'Inputformat','yyyyMMdd'); clear name_split;
-        yrs(p) = year(berg_dates(p)); mos(p) = month(berg_dates(p));
 
-        %extract size distributions from all bins
-        berg_nos = table2array(D(:,3:end)); berg_nos(berg_nos==0) = NaN;
-        if p == 1
-            v1 = table2array(D(:,1)); dv1 = table2array(D(:,2));
-        end
-        n1 = berg_nos./dv1;
-
-        %stack distributions in a structure
-        binned_n1_stack(:,:,p) = n1;
-        clear n1 berg_nos;
-    end
-    %create seasonal size distributions
-    for k = 1:4
-        n1_seasmean = nanmean(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),3);
-        n1_seasmax = (nanmean(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),3)+std(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),0,3,'omitnan'));
-        n1_seasmin = (nanmean(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),3)-std(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),0,3,'omitnan'));
-    end
-end
 
 % %% 2A) Model-fitting with manual user input
 % norm_type = 2;
@@ -165,7 +139,7 @@ end
 %         a = 2; % hold alpha at 2
 %         
 %         % grab c1 and c4 guesses using EBC_fragmentation curve
-%         [alpha,c1_guess,c2_x,c3_x,c4_guess,data_lims,error] = EBC_fragmentation_curve(name, v1, n1, dv1, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
+%         [alpha,c1_guess,c2_x,c3_x,c4_guess,data_lims,error] = EBC_fragmentation_curve(v1, n1, dv1, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
 %         
 %         c0 = [c1_guess, c2_guess, a, c3_guess, c4_guess]; % initial guess vector
 %         c0 = abs(c0); % make sure initial guess is at least positive in all coeficients   
@@ -196,72 +170,149 @@ params = zeros(nfiles, 8); % matrix to hold filename and resulting parameters
 % (will be NaNs if not used).
 
 % MANUALLY SET THRESHOLDS:
-use_dummy = 1; % if set to 1, the residuals calculated for determining 
+use_dummy = 1; % if set to 1, the residuals calculated for determining
 % whether to account for submarine melt will be with respect to the dummy
 % power law (approx. tangent but doesn't always work well). If not, the
 % E-BC model will be used to calculate residuals.
 
-taperthresh = 0.5; % the threshold value used to determine whether or not 
-% counts taper due to submarine melt. Increase to increase the severity of 
+taperthresh = 0.5; % the threshold value used to determine whether or not
+% counts taper due to submarine melt. Increase to increase the severity of
 % tapering required to be considered sub. melt influence.
 
-dplawthresh = 10^5; % upper bound on the intercept for the dummy power 
+dplawthresh = 10^5; % upper bound on the intercept for the dummy power
 % law fitting. Adjust to improve threshold.
 
 norm_type = 2; % toggle between L2, max, and log norm using 2, Inf, and 'log'
 
 normalize_exp = 1.5; % Increase to weight residuals towards end of the curve, minimum = 1
 
-% LOOP START  
+% LOOP START
 for p = 1:nfiles
-%     if p > 21 % TOGGLE TO SELECT A SINGLE DATE FOR TESTING
+    %START UPDATING HERE TO ASSIMILATE CSVS OR DEMS LIKE ABOVE
+    if contains(name,'-iceberg-distribution-timeseries.csv')
+        name = fnames(p,:);
+        D = readtable([fpath,'/',name],"VariableNamingRule","preserve");
+        for k = 3:size(D,2)
+            berg_datestring(k-2,:) = D.Properties.VariableNames{k}(7:14);
+            try
+                berg_datetime(k-2,:) = datetime(berg_datestring(k-2,:),'InputFormat','yyyyMMdd');
+            catch
+                berg_datetime(k-2,:) = datetime(string(str2num(MP(j).T.date(p))-1),'InputFormat','yyyyMMdd');
+            end
+            berg_mo(k-2) = str2num(berg_datestring(k-2,5:6));
+
+            %load the bins sizes and bin widths
+            if k == 3
+                v1 = table2array(D(:,1)); dv1 = table2array(D(:,2));
+            end
+
+            %extract the size distribution for the given date
+            berg_nos(:,k-2) = table2array(D(:,k))';
+            n1 = berg_nos(:,k-2)./dv1;
+
+            %filter
+            v = v1(n1>nthresh); n = n1(n1>nthresh); dv = dv1(n1>nthresh); % TOGGLE TO REMOVE SMALLEST COUNTS
+            v = v(~isnan(n)); dv = dv(~isnan(n)); n = n(~isnan(n)); % Remove NaNs
+
+            % Fit E-BC fragmentation model to the data and plot
+            [alpha,c1,c2,c3,c4,~,~] = EBC_fragmentation_curve(v1, n1, dv1, norm_type, vthresh, nthresh, 1, normalize_exp); % fit Eq. 1
+            n_mod = EBC_model([c1,c2,alpha,c3,c4],v); % grab model
+
+            %plot the results
+            figure(k-2); set(gcf, 'Position', [500 500 1000 400]); % generate figure
+            subplot(1,2,1); % plot result
+            loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
+            loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on;
+            xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
+            title('Iceberg size distribution'); grid on;
+
+            %calculate residuals
+            res = n1 - n_mod; % calculate residuals from E-BC model (data - model)
+            resp = res(res >= 0); resn = res(res < 0); % split pos. and neg. residuals
+            resp_idx = find(res >= 0); % grab index of positive residuals
+            resn_idx = find(res < 0); % grab index of negative residuals
+
+            % plot residuals
+            subplot(1,2,2);
+            loglog(resp_idx, resp./(n(resp_idx).^normalize_exp), 'rx'); hold on;
+            loglog(resn_idx, abs(resn)./(abs(n(resn_idx)).^normalize_exp), 'kx');
+            legend('positive', 'negative'); set(gca,'FontSize',16);
+            title('Residuals'); grid on;
+            sgtitle(name(1:max(matfile_daterefs))); % plot title
+
+
+            % save the figure
+            if not(isfolder([root_dir,site_abbrev,'/models/']))
+                mkdir([root_dir,site_abbrev,'/models/']) % make models folder if it doesn't exist
+                disp('Models folder created.');
+            end
+            % saveas(gcf,[root_dir,site_abbrev,'/models/',site_abbrev,'-',name(matfile_daterefs),'_model.png']) % save into models folder
+            print([root_dir,site_abbrev,'/models/',site_abbrev,'-',name(matfile_daterefs),'_model.png'],"-dpng","-r600");
+
+            % save the parameters
+            params(k-2,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4];
+
+            % clear variables
+            clearvars -except nfiles fpath fnames season_cmap matfile_daterefs yrref moref nthresh basepath root_dir site_abbrev output_dir use_dummy taperthresh dplawthresh params norm_type normalize_exp
+
+        end
+        
+    else
+            %     if p > 21 % TOGGLE TO SELECT A SINGLE DATE FOR TESTING
         figure(p); set(gcf, 'Position', [500 500 1000 400]); % generate figure
-        name = fnames(p,:); 
-        %START UPDATING HERE TO ASSIMILATE CSVS OR DEMS LIKE ABOVE
+        name = fnames(p,:);
         load([fpath,'/',name],'m');
         disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
-        v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)'); 
+        v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)');
+        n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; % clear m;
+        berg_datetime(p,:) = datetime(fnames(p,matfile_daterefs),'InputFormat','yyyyMMdd');
+        berg_mo = str2num(fnames(p,moref));
+
+        load([fpath,'/',name],'m');
+        disp(['Looping through iceberg distribution #',num2str(p),' of ',num2str(nfiles)]);
+        v1 = double(m.melange.Asurfs(m.melange.bergs~=0)'); dv1 = double(m.melange.binwidth(m.melange.bergs~=0)');
         n1 = double(m.melange.bergs(m.melange.bergs~=0)')./dv1; clear m;
-        
+
         v1 = v1(n1>nthresh); n1 = n1(n1>nthresh); dv1 = dv1(n1>nthresh); % TOGGLE TO REMOVE SMALLEST COUNTS
         v = v1(~isnan(n1)); dv = dv1(~isnan(n1)); n = n1(~isnan(n1)); % Remove NaNs
-        
+
         % Fit E-BC fragmentation model to the data and plot
-        [alpha,c1,c2,c3,c4,~,~] = EBC_fragmentation_curve(name, v1, n1, dv1, norm_type, vthresh, nthresh, 1, normalize_exp); % fit Eq. 1
-        n_mod = EBC_model([c1,c2,alpha,c3,c4],v); % grab model 
+        fprintf(name); fprintf("\n");
+        [alpha,c1,c2,c3,c4,~,~] = EBC_fragmentation_curve(v1, n1, dv1, norm_type, vthresh, nthresh, 1, normalize_exp); % fit Eq. 1
+        n_mod = EBC_model([c1,c2,alpha,c3,c4],v); % grab model
 
         subplot(1,2,1); % plot result
         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
         loglog(v1,n_mod,'LineWidth',2,'Color',season_cmap(str2num(name(moref)),:)); hold on;
         xlabel('surface area [m^2]'); ylabel('count'); set(gca,'FontSize',16);
         title('Iceberg size distribution'); grid on;
-        
+
         % if use_dummy == 1
         %     % Fit dummy power law to determine if sub. melt is affecting the
         %     % smaller bergs in the size distribution:
-        %     subset = 6:length(v1); % set subset of the distribution to fit 
+        %     subset = 6:length(v1); % set subset of the distribution to fit
         %     [error_d, c1_d, c2_d] = powerlaw_fit(v1(subset),n1(subset),1,norm_type,[max(n1) 0],[max(n1)*dplawthresh 1e12]); % fit with bounds, keep close to the first value
         %     nmod_dummy = powerlaw_model([c1_d, c2_d],v1);
         %     loglog(v1, nmod_dummy, '--', 'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); % plot the dummy power law
         %     res = n1 - nmod_dummy; % calculate residuals from dummy power law
         % else % otherwise, use Eq. 1
-            res = n1 - n_mod; % calculate residuals from E-BC model (data - model)
+        res = n1 - n_mod; % calculate residuals from E-BC model (data - model)
         % end
-            
+
         % Use negative residuals to determine if sub. melt is potentially
         % causing a smaller-than-expected number of small icebergs based on
         % fragmentation alone
         resp = res(res >= 0); resn = res(res < 0); % split pos. and neg. residuals
         resp_idx = find(res >= 0); % grab index of positive residuals
         resn_idx = find(res < 0); % grab index of negative residuals
-        
+
         subplot(1,2,2); % plot residuals
-        loglog(resp_idx, resp./(n(resp_idx).^normalize_exp), 'rx'); hold on; 
-        loglog(resn_idx, abs(resn)./(abs(n(resn_idx)).^normalize_exp), 'kx'); 
+        loglog(resp_idx, resp./(n(resp_idx).^normalize_exp), 'rx'); hold on;
+        loglog(resn_idx, abs(resn)./(abs(n(resn_idx)).^normalize_exp), 'kx');
         legend('positive', 'negative'); set(gca,'FontSize',16);
         title('Residuals'); grid on;
         sgtitle(name(1:max(matfile_daterefs))); % plot title
-        
+
         % submarine_melt_influence = 1; % initially assume influence of sub. melt
         % % if there are at least 2 negative residuals in the first 8 points,
         % % and the 1st or 2nd point has a negative residual:
@@ -270,17 +321,17 @@ for p = 1:nfiles
         %     [idxs] = find(diffs == 1); % find where the neg. residual indices are consecutive
         %     idx_sm_start = idxs(1)+1; % grab start index of sub. melt
         %     idx_sm_end = idxs(end)+2; % grab end index of sub. melt
-        % 
+        %
         %     % EVALUATE WHETHER OR NOT THE DATA TAPER IN LOGLOG SPACE
         %     logres = log10(abs(res(idx_sm_start:idx_sm_end))); % log of the absolute value of residuals
         %     if nnz(diff(logres) < -1*taperthresh) > 0.5*length(logres) % if at least 50%
         %         % of the differences in log residal are above the threshold
         %         disp('Possible submarine melt influence discovered.');
-        %     else; submarine_melt_influence = 0; end; % do not account for sub. melt 
+        %     else; submarine_melt_influence = 0; end; % do not account for sub. melt
         % else; submarine_melt_influence = 0; end; % do not account for sub. melt
-        % 
+        %
         % % Model submarine melt separately
-        % if submarine_melt_influence == 1 
+        % if submarine_melt_influence == 1
         %     % separate data affected by sub. melt:
         %     v1_sm = v1(idx_sm_start:idx_sm_end);
         %     n1_sm = n1(idx_sm_start:idx_sm_end);
@@ -288,20 +339,20 @@ for p = 1:nfiles
         %     v1_EBC = [v1(1:idx_sm_start); v1(idx_sm_end:end)];
         %     n1_EBC = [n1(1:idx_sm_start); n1(idx_sm_end:end)];
         %     dv1_EBC = [dv1(1:idx_sm_start); dv1(idx_sm_end:end)];
-        % 
+        %
         %     % fit power law model to data influenced by submarine melt
         %     [error2,c5,c6] = powerlaw_fit(v1_sm, n1_sm, 1, 2,[0 0],[1e12 1e12]);
         %     nmod_sm = powerlaw_model([c5,c6],v1(1:8));
-        % 
+        %
         %     if c1 < c5 % if the sub. melt y-intercept is greater than the original model y-intercept
         %         disp('No submarine melt.');
         %     else % otherwise,
         %         disp('Submarine melt influence confirmed.')
-        % 
+        %
         %         % fit E-BC fragmentation curve to data not influenced by sub. melt
-        %         [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(name, v1_EBC, n1_EBC, dv1_EBC, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
+        %         [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(v1_EBC, n1_EBC, dv1_EBC, norm_type, nthresh, 1, normalize_exp); % fit Eq. 1
         %         nmod_EBC = EBC_model([c1,c2,alpha,c3,c4],v1_EBC);
-        % 
+        %
         %         % plot over 2nd subplot
         %         subplot(1,2,1); % old result
         %         loglog(v1,n1,'+','MarkerSize',6,'LineWidth',1,'Color',season_cmap(str2num(name(moref)),:)); hold on;
@@ -325,7 +376,7 @@ for p = 1:nfiles
         %     c5 = NaN; c6 = NaN;
         %     disp('Distribution not influenced by submarine melt.')
         % end
-        
+
         % save the figure
         if not(isfolder([root_dir,site_abbrev,'/models/']))
             mkdir([root_dir,site_abbrev,'/models/']) % make models folder if it doesn't exist
@@ -337,21 +388,19 @@ for p = 1:nfiles
         % save the parameters
         % params(p,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4, c5, c6];
         params(p,:) = [str2num(name(matfile_daterefs)), c1, c2, alpha, c3, c4];
-        
+
         % clear variables
         clearvars -except nfiles fpath fnames season_cmap matfile_daterefs yrref moref nthresh basepath root_dir site_abbrev output_dir use_dummy taperthresh dplawthresh params norm_type normalize_exp
-        
+
 %     end % TOGGLE TO SELECT A SINGLE FILE FOR TESTING
+    end
+    
 end
 % export parameters to a csv file
 dt = string(datetime('now')); dt = strrep(dt,' ','_');
 dt = strrep(dt,':',''); dtstring = extractBefore(dt(1),17); % grab datetime
 delete_csvs = ['delete ',strcat(root_dir,site_abbrev,'/models/',site_abbrev,'_parameters_*.csv')]; eval(delete_csvs);
 writematrix(params,strcat(root_dir,site_abbrev,'/models/',site_abbrev,'_parameters_',dtstring,'.csv'));
-
-
-%UPDATE: IF BINNED DATA EXIST, FIT CURVES TO THE SEASONAL AVERAGES FOR EACH
-%BIN AND SAVE THE CURVES AND BINNED FITS TO CSVS
 
 
 end

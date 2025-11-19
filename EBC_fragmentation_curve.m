@@ -1,4 +1,4 @@
-function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(fname, v1, n1, dv1, norm_type, vthresh, nthresh, tracktime, normalize_exp)
+function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(v1, n1, dv1, norm_type, vthresh, nthresh, tracktime, normalize_exp)
 % This script fits the fragmentation theory function to the iceberg
 % size distribution data n(v). The function is of the form:
 % n(v) = c1*v^{-a}*exp(-v/c2) + c3*dv*exp(-v/c4)
@@ -16,7 +16,6 @@ function [alpha,c1,c2,c3,c4,data_lims,error] = EBC_fragmentation_curve(fname, v1
 %           Date: 05/12/2020
 
 % INPUTS:
-%   fname = filename
 %   v1, n1, dv1 = volume bins, counts, and bin spacing for the size distribution
 %   norm_type = specify the norm: 2 = L2 norm, Inf = maximum norm, log = RMSLE
 %   vthresh = threshold on size to remove smallest fragments
@@ -35,14 +34,12 @@ season_cmap = 0.75*[0.000	0.000	0.000; 0.251	0.000	0.294; 0.463	0.165	0.514;
 0.851	0.941	0.827; 0.651	0.859	0.627; 0.353	0.682	0.380; 
 0.106	0.471	0.216; 0.000	0.267	0.106; 0.50 0.50 0.50];
 
-if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
+% if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     
-    %identify the size classes below the threshold
-    bits = find(v1<=vthresh); 
 
     %remove data based on thresholds for number and size
     v1 = v1(n1>nthresh); n1 = n1(n1>nthresh); %remove size classes without enough data
-    v1 = v1(max(bits)+1:end); n1 = n1(max(bits)+1:end); dv1 = dv1(max(bits)+1:end); %remove smallest size classes
+    n1 = n1(v1>vthresh); dv1 = dv1(v1>vthresh); v1 = v1(v1>vthresh); %remove smallest size classes
     v = v1(~isnan(n1)); dv = dv1(~isnan(n1)); n = n1(~isnan(n1)); 
     
     %begin the search loop - compute error for every combination of i_cut, j_cut
@@ -55,17 +52,19 @@ if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     if isempty(i_min) || i_min > find(n>0,1,'last')-4
         i_min = find(n>0,1,'last')-4;
     end
+    j_min = i_min-12; if j_min<4; j_min = 4; end
 
     %constrain the more complex/complete model so the power law portion of
     %the curve is fixed based on the initial guess
     for i=4:i_min+4
-        for j=i_min-12:find(n>0,1,'last')-4
+        for j=j_min:find(n>0,1,'last')-4
             %create a function which computes error for parameter a
             %given the cutoff values
             fun = @(a) EBC_fit(v,n,i,j,a,norm_type);
 
             %find for which a the error is minimal
-            a = fminbnd(fun,1.2, 2.0);
+            % a = fminbnd(fun,1.2, 2.0); %used for fjord-wide size distributions 
+            a = fminbnd(fun,1.5, 1.67); %used for size distribution subsets
 
             %find parameters and error for the fit with prescribed a
             [error, c] = EBC_fit(v,n,i,j,a,norm_type);
@@ -90,24 +89,22 @@ if sum((n1.*dv1).*v1) >= 175e3 % if DEM coverage is substantial
     data_lims(:) = [i j]; error = min_val;
     
     %display results
-    fprintf(fname(5:12)); fprintf("\n");
     fprintf("[c1, c2, c3, c4] = [%e %e %e %e]\n",c(1),c(2),c(4),c(5));
     fprintf("alpha = %f\n",c(3));
     fprintf("==========================================\n")
       
     if tracktime == 1; toc; end
     
-else
-    fprintf("==========================================\n")
-    fprintf(fname(4:11)); fprintf("\n");
-    fprintf("DEM covers too small of an area to get reliable data\n")
-    fprintf("==========================================\n")
-    
-    %fill-in NaNs as outputs
-    alpha=NaN;
-    c1 = NaN; c2 = NaN; c3 = NaN; c4 = NaN;
-    data_lims(:) = [NaN NaN]; error = NaN;
-end
+% else
+%     fprintf("==========================================\n")
+%     fprintf("DEM covers too small of an area to get reliable data\n")
+%     fprintf("==========================================\n")
+% 
+%     %fill-in NaNs as outputs
+%     alpha=NaN;
+%     c1 = NaN; c2 = NaN; c3 = NaN; c4 = NaN;
+%     data_lims(:) = [NaN NaN]; error = NaN;
+% end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
