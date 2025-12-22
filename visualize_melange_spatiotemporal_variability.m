@@ -47,12 +47,12 @@ big3 = [{'SEK'},{'HLG'},{'ZIM'}];
 disp('Extract ITS_LIVE velocities via Import_itslive_point_timeseries.ipynb & save locally before continuing!')
 
 %% option to reload the existing data if any data have been saved
-if exist([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']) == 2
+if exist([root_dir,'GrIS-melange-characteristics.mat']) == 2
     reload = questdlg('Reload the existing centerline data & start from there?',...
         'data reload','1) Yes: reload','2) No: start fresh','1) Yes: reload');
     switch reload
         case '1) Yes: reload'
-            load([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']);
+            load([root_dir,'GrIS-melange-characteristics.mat']);
             if length(MP) < size(sitenames,1)
                 site_start = length(MP)+1;
                 SKIP = 0;
@@ -83,13 +83,25 @@ disp('Move on to the next subsection in order to compile data & generate figures
 
 %% loop through the folders & extract info
 if SKIP == 0
+    % %redoing everything other than flagging terminus positions... load old data
+    % cd(root_dir);
+    % load GrIS-melange_centerline-elev-speed-terminus.mat;
+    % for j = 1:length(MP)
+    %     t(j).flag = MP(j).Z.termflag;
+    % end
+    % MP = rmfield(MP,{'Z','V'}); 
+    % for j = 1:length(MP)
+    %     MP(j).Z.termflag = t(j).flag;
+    % end
+    % clear t;
 
     disp('Compiling elevation, velocity, and terminus position...');
     for j = site_start:length(sitenames) %default: site_start:length(sitenames)
         disp(sitenames(j,:)); output_dir = [root_dir,sitenames(j,:),'/'];
         site_abbrev = sitenames(j,:);
-        MP(j).name = sitenames(j,:);
-
+        MP(j).name = sitenames(j,:); 
+        % term_trace = MP(j).Z.termflag;
+        
         %navigate to the study site directory
         cd([root_dir,sitenames(j,:)]);
         LCdir = dir([root_dir,sitenames(j,:),'/LC*']); im_dir = [LCdir(1).folder,'/',LCdir(1).name,'/']; %Landsat 8 or 9 unzipped image directory for mapping
@@ -197,7 +209,7 @@ if SKIP == 0
         %plot the image
         tebergAfig = figure; set(tebergAfig,'position',[50 50 1200 1200]);
         imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
-        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',20);
+        set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',16);
         for p = 1:size(melmask.dated,2)
             zdate(p) = convert_to_decimaldate(char(MP(j).Z.date(p)));
             zdatetime(p) = datetime(MP(j).Z.date{p},'InputFormat','yyyyMMdd');
@@ -210,7 +222,7 @@ if SKIP == 0
 
                     %plot the melange mask for the given date
                     imagesc(im.x(min(xlims):max(xlims)),im.y(min(ylims):max(ylims)),imadjust(im_subset)); axis xy equal; colormap gray; drawnow; hold on;
-                    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',20);
+                    set(gca,'xlim',[min(melmask.uncropped.x) max(melmask.uncropped.x)],'ylim',[min(melmask.uncropped.y) max(melmask.uncropped.y)],'fontsize',16);
                     plot(C.X,C.Y,'.k'); hold on;
                     plot(melmask.dated(p).x,melmask.dated(p).y,'-m','linewidth',2); drawnow;
 
@@ -250,11 +262,7 @@ if SKIP == 0
         %add manual delineations from images
         cd([root_dir,site_abbrev,'/termini/']);
         % termfiles = dir('*term*.shp');
-        if contains(site_abbrev,'KBG') %skip looking for manual delineations other than termpicks for KBG
-            termfile_names = {[site_abbrev,'_termpicks.shp']}; %specify consistent data sources
-        else
-            termfile_names = {[site_abbrev,'_termpicks.shp'],[site_abbrev,'-termini-EPSG3413_2019-2023.shp']}; %specify consistent data sources
-        end
+        termfile_names = {[site_abbrev,'_termpicks.shp'],[site_abbrev,'-termini-EPSG3413_2019-2023.shp']}; %specify consistent data sources
         for l = 1:length(termfile_names)
             % load the shapefile
             % if ismember(termfiles(l).name,termfile_names)
@@ -304,14 +312,13 @@ if SKIP == 0
             if l == 1
                 start_ref = 0;
                 MP(j).T = rmfield(MP(j).T,{'date','termX','termY'});
-                % MP(j).T.date = []; MP(j).T.termX = []; MP(j).T.termY =
-                % []; MP(j).T.termdist = [];
+                % MP(j).T.date = []; MP(j).T.termX = []; MP(j).T.termY = []; MP(j).T.termdist = [];
             else
                 start_ref = length(MP(j).T.date);
             end
             for k = 1:length(term)
                 [xis,yis,iis] = polyxpoly(term(k).X,term(k).Y,MP(j).V.X,MP(j).V.Y);
-                MP(j).T.date(start_ref+k) = {YYYYMMDD(k)};
+                MP(j).T.date(start_ref+k) = {char(YYYYMMDD(k))};
                 if ~isempty(xis)
                     MP(j).T.termX(1,start_ref+k) = xis(end); MP(j).T.termY(1,start_ref+k) = yis(end);
                 else
@@ -522,13 +529,13 @@ if SKIP == 0
         pos = get(subZ_yr,'position');
         leg_yr = legend(py,num2str(years')); leg_yr.Location = 'eastoutside';
         set(subZ_yr,'position',[pos(1)-0.05 pos(2) pos(3) pos(4)]); %shift plot back to pre-legend location
-        set(gca,'fontsize',20); grid on; drawnow;
+        set(gca,'fontsize',16); grid on; drawnow;
         subplot(subZ_mo);
         plot(tran_reldist(seaward_idx:end)',mean_prof(seaward_idx:end),'-','color','k','linewidth',3); hold on;
         pos = get(subZ_mo,'position');
         leg_mo = legend(pm,num2str([1:1:12]')); leg_mo.Location = 'eastoutside';
         set(subZ_mo,'position',[pos(1)-0.05 pos(2) pos(3) pos(4)]); %shift plot back to pre-legend location
-        set(gca,'fontsize',20); grid on; drawnow;
+        set(gca,'fontsize',16); grid on; drawnow;
         Zxlims = get(subZ_mo,'xlim');
 
         %create velocity profile plots
@@ -553,10 +560,10 @@ if SKIP == 0
         subplot(subV_yr);
         plot(tran_reldist(seaward_idx:end)',nanmean(MP(j).V.V(seaward_idx:end,:),2)./365,'-','color','k','linewidth',3); hold on;
         title([sitenames(j,:),' velocity profiles'])
-        set(gca,'fontsize',20); grid on; drawnow;
+        set(gca,'fontsize',16); grid on; drawnow;
         subplot(subV_mo);
         plot(tran_reldist(seaward_idx:end)',nanmean(MP(j).V.V(seaward_idx:end,:),2)./365,'-','color','k','linewidth',3); hold on;
-        set(gca,'fontsize',20); grid on; drawnow;
+        set(gca,'fontsize',16); grid on; drawnow;
         Vxlims = get(subV_mo,'xlim');
 
         %create a terminus position timeseries
@@ -571,8 +578,8 @@ if SKIP == 0
         end
         set(subT,'xlim',[min(tran_dist(inland_idx) - MP(j).Z.termdist),max(ceil(tran_reldist(seaward_idx:inland_idx)/1000)*1000)],'ylim',[min(years) max(years)]);
         xlims = get(subT,'xlim'); xticks = get(subT,'xtick');
-        set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',20);
-        xlabel('Distance from terminus (km)','fontsize',20); ylabel('Year','fontsize',20);
+        set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',16);
+        xlabel('Distance from terminus (km)','fontsize',16); ylabel('Year','fontsize',16);
         grid on; drawnow;
         %     Txlims = get(gca,'xlim');
 
@@ -582,19 +589,19 @@ if SKIP == 0
         subplot(subZ_yr);
         set(subZ_yr,'xlim',xlims,'xtick',xticks,'xticklabels',[]);
         pos = get(subZ_yr,'position'); set(subZ_yr,'position',[pos(1) pos(2)-0.05 pos(3) pos(4)+0.05]); %slightly stretch y-axis
-        ylabel('Elevation (m)','fontsize',20);
+        ylabel('Elevation (m)','fontsize',16);
         subplot(subZ_mo);
         set(subZ_mo,'xlim',xlims,'xtick',xticks,'xticklabels',xticks/1000);
         pos = get(subZ_mo,'position'); set(subZ_mo,'position',[pos(1) pos(2) pos(3) pos(4)+0.05]); %slightly stretch y-axis
-        xlabel('Distance from terminus (km)','fontsize',20); ylabel('Elevation (m)','fontsize',20);
+        xlabel('Distance from terminus (km)','fontsize',16); ylabel('Elevation (m)','fontsize',16);
         subplot(subV_yr);
         set(subV_yr,'xlim',xlims,'xtick',xticks,'xticklabels',[]);
         pos = get(subV_yr,'position'); set(subV_yr,'position',[pos(1)+0.02 pos(2)-0.05 pos(3) pos(4)+0.05]); %slightly stretch y-axis
-        ylabel('Speed (m/d)','fontsize',20);
+        ylabel('Speed (m/d)','fontsize',16);
         subplot(subV_mo);
         set(subV_mo,'xlim',xlims,'xtick',xticks,'xticklabels',xticks/1000);
         pos = get(subV_mo,'position'); set(subV_mo,'position',[pos(1)+0.02 pos(2) pos(3) pos(4)+0.05]); %slightly stretch y-axis
-        xlabel('Distance from terminus (km)','fontsize',20); ylabel('Speed (m/d)','fontsize',20);
+        xlabel('Distance from terminus (km)','fontsize',16); ylabel('Speed (m/d)','fontsize',16);
         subplot(subT);
         pos = get(subT,'position'); set(subT,'position',[pos(1)+0.02 pos(2) pos(3) pos(4)]);
         drawnow;
@@ -606,7 +613,7 @@ if SKIP == 0
         clear bergdist dts inland_idx seaward_idx Tdate* term_* Tmos Tyrs;
 
         %save the structure with the centerline data
-        save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
+        save([root_dir,'GrIS-melange-characteristics.mat'],'MP','-v7.3');
 
         %create "climatologies" of seasonal size distributions for each site
         D = readtable([root_dir,sitenames(j,:),'/',sitenames(j,:),'-iceberg-distribution-timeseries.csv']);
@@ -656,17 +663,17 @@ if SKIP == 0
             clear mo_ref;
         end
         seas_leg = legend(ps,'DJF','MAM','JJA','SON');
-        set(subd1,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20);
-        xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20);
+        set(subd1,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',16);
+        xlabel('Surface area (m^2)','fontsize',16); ylabel('Normalized iceberg count','fontsize',16);
         subplot(subd1); grid on; drawnow;
-        set(subd2,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20);
-        xlabel('Surface area (m^2)','fontsize',20);
+        set(subd2,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',16);
+        xlabel('Surface area (m^2)','fontsize',16);
         subplot(subd2); grid on; drawnow;
         saveas(dist_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-seasonal-iceberg-distribution_loglog.png'],'png'); %save the plot
         clear D berg_* ps ;
 
         %save the structure with the seasonal distribution data
-        save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
+        save([root_dir,'GrIS-melange-characteristics.mat'],'MP','-v7.3');
         close all;
 
     end
@@ -775,16 +782,16 @@ for j = 1:length(MP)
     end
     set(gca,'xlim',[0,max([MP(j).T.termdist,MP(j).Z.termdist])-min([MP(j).T.termdist,MP(j).Z.termdist])],'ylim',[min(years) max(years)]);
     xlims = get(gca,'xlim'); xticks = get(gca,'xtick');
-    set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',20);
+    set(gca,'xtick',xticks,'xticklabels',xticks/1000,'fontsize',16);
     term_leg = legend(pterm,season_names,'Location','northoutside',...
             'Orientation','horizontal');
-    xlabel('Distance from most-retreated terminus (km)','fontsize',20); ylabel('Year','fontsize',20);
+    xlabel('Distance from most-retreated terminus (km)','fontsize',16); ylabel('Year','fontsize',16);
     grid on; drawnow;
     
     %save the figure & updated terminus positions
-    % save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
+    % save([root_dir,'GrIS-melange-characteristics.mat'],'MP','-v7.3');
     saveas(ts_fig,[root_dir,MP(j).name,'/',MP(j).name,'-terminus-timeseries-plot.png'],'png'); %save the plots
-    uiwait %advance only after figure is closed
+    % uiwait %advance only after figure is closed
 
     clear C centerline_dist dts inland_idx seaward_idx mean_prof Tdate* term_* Tmos tran_dist Tyrs zdate* zmos zyrs;
 end
@@ -794,8 +801,13 @@ disp('Done plotting terminus timeseries');
 
 %% extract melange attributes & estimate buttressing
 close all; drawnow;
-rows = 9; cols = 2; %9 sites in west Greenland
-plot_locs = [1,3,5,7,9,11,13,15,17,18,16,14,12,2];
+
+%REDO PLOTS TO HAVE 3 COLUMNS & 7 ROWS(?), LEAVING A BIG HOLE IN THE MIDDLE
+%FOR THE MAP AND A GAP ALONG THE RIGHT EDGE FOR THE EAST COAST
+% rows = 9; cols = 2; %9 sites in west Greenland
+% plot_locs = [1,3,5,7,9,11,13,15,17,18,16,14,12,2];
+rows = 7; cols = 3; %9 sites in west Greenland
+plot_locs = [2,1,4,7,10,13,16,19,20,21,18,15,12,3];
 
 %Thickness parameters:
 zcutoff = 3; %elevation threshold below which to ignore iceberge (m)
@@ -827,14 +839,15 @@ sampling = 'dated'; % options: 'dated' OR 'fixed';
 
 % create summary figures
 Hfig = figure; set(Hfig,'position',[50 50 1200 1200]);
-Vfig = figure; set(Vfig,'position',[150 50 1200 1200]);
+% Vfig = figure; set(Vfig,'position',[150 50 1200 1200]);
 for j = 1:length(plot_locs)
     figure(Hfig);
     eval(['subH',num2str(geo_ind(j)),'=subplot(',num2str(rows),',',num2str(cols),',',num2str(plot_locs(j)),');']);
-    figure(Vfig);
-    eval(['subV',num2str(geo_ind(j)),'=subplot(',num2str(rows),',',num2str(cols),',',num2str(plot_locs(j)),');']);
+    % figure(Vfig);
+    % eval(['subV',num2str(geo_ind(j)),'=subplot(',num2str(rows),',',num2str(cols),',',num2str(plot_locs(j)),');']);
 end
-missfig = figure; set(missfig,'position',[950 50 600 600]);
+missfig = figure; set(missfig,'position',[950 50 600 500]); 
+% subm1 = subplot(2,1,1); subm2 = subplot(2,1,2);
 
 % %If adding new dates, profiles need to be removed from the structure
 % %because the inland reference may have changed
@@ -918,9 +931,10 @@ for j = 1:length(MP)
                 end
             end
         end
-        seaward_idx = inland_idx-(inland_meanidx-seaward_meanidx);
+        % seaward_idx = inland_idx-(inland_meanidx-seaward_meanidx);
+        seaward_idx = inland_idx-floor(nanmean(inland_idx-seaward_ext));
     else
-        error('Profile sampling strategy is not properly defined: sampling but be ''fixed'' or ''dated''')
+        error('Profile sampling strategy is not properly defined: sampling must be ''fixed'' or ''dated''')
     end
     tran_reldist = (tran_dist(inland_meanidx) - tran_dist)+transect_inc/2;
     centerline_reldist = (tran_dist(inland_meanidx) - centerline_dist)+transect_inc/2;
@@ -1231,11 +1245,9 @@ for j = 1:length(MP)
     end
     disp('Done extracting size distribution information')
 
-    %PLOTS
-    %plot a figure of seasonally-averaged elevations on top, velocities in the middle,
-    %& subsetted seasonal size distributions on the bottom
-    sitefig = figure; set(sitefig,'position',[50 850 1200 600]);
-    subz = subplot(3,2,[1:2]); subv = subplot(3,2,[3:4]); 
+    %Site-specific plots
+    sitefig = figure; set(sitefig,'position',[50 850 1200 1000]);
+    subz = subplot(4,2,[1:2]); subv = subplot(4,2,[3:4]); 
     max_xlim = max([Hdist(find(sum(sum(~isnan(H_seas),2),3)>0,1,'last'))]);
     plot_ind = find(geo_ind == j);
 
@@ -1266,7 +1278,12 @@ for j = 1:length(MP)
             %regional fig
             figure(Hfig);
             if ~isempty(plot_ind)
+                %navigate to the subplot
                 eval(['subplot(subH',num2str(j),');']);
+                ax1 = gca;
+
+                %plot the thickness profiles
+                yyaxis left
                 fill([Hdist(Hmax_idx), fliplr(Hdist(Hmin_idx))]',[Hmax(Hmax_idx); flipud(Hmin(Hmin_idx))],...
                     seas_cmap(k,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
                 pH(k) = plot(Hdist(~isnan(Hmean))',Hmean(~isnan(Hmean)),'-','color',seas_cmap(k,:),'linewidth',3); hold on;
@@ -1285,7 +1302,7 @@ for j = 1:length(MP)
     %format the thickness subplot in the site figure
     figure(sitefig); subplot(subz);
     seas_leg = legend(pz,season_names);
-    set(gca,'fontsize',20); grid on; drawnow;
+    set(gca,'fontsize',16); drawnow; grid on; 
     set(subz,'xlim',[0,max_xlim],...
         'xticklabel',[],'ylim',[floor(min(H_ylim(:,1))/10)*10 ceil(max(H_ylim(:,2))/10)*10]); 
     ylims = get(gca,'ylim'); 
@@ -1296,36 +1313,35 @@ for j = 1:length(MP)
     end
     % set(subz,'xlim',[0,floor(tran_reldist(seaward_idx)/1000)*1000+500],'xticklabel',[],'ylim',[0 ceil(max(H_ylim)/50)*50]); 
     clear ylims;
-    ylabel('Thickness (m)','fontsize',20); %xlabel('Distance from terminus (km)','fontsize',20); 
+    ylabel('Thickness (m)','fontsize',16); %xlabel('Distance from terminus (km)','fontsize',16); 
     subz_pos = get(subz,'position'); 
     seas_leg.Location = 'northoutside'; seas_leg.Orientation = 'horizontal'; %move the legend
     set(subz,'position',subz_pos); %resize the subplot
     %format the site subplot in the thickness figure
     if ~isempty(plot_ind)
         figure(Hfig); eval(['subplot(subH',num2str(j),');']);
+        yyaxis left;
         set(gca,'xlim',[0, 25000],'xticklabel',[],...
-            'ylim',[20 ceil(max(H_ylim(:,2))/10)*10],'fontsize',20); grid on; drawnow;
+            'ylim',[0 ceil(max(H_ylim(:,2))/10)*10],'fontsize',16); drawnow;
         gca_pos = get(gca,'position'); ylims = get(gca,'ylim'); 
-        if max(ylims) <= 40
-            set(gca,'ylim',[20,40],'ytick',[20:10:40]);
-        elseif max(ylims) <= 60
-            set(gca,'ylim',[20,60],'ytick',[20:20:60]);
-        elseif max(ylims) <= 80
-            set(gca,'ylim',[20,80],'ytick',[20:30:80]);
+        if max(ylims) <= 55
+            set(gca,'ylim',[-10,55],'ytick',[25:10:55]);
         else
-            set(gca,'ylim',[20,100],'ytick',[20:40:100]);
+            set(gca,'ylim',[-50,100],'ytick',[25:25:100]);
         end
-        yticks = get(gca,'ytick');
+        % yticks = get(gca,'ytick'); set(gca,'ytick',yticks(2:end),'yticklabel',yticks(2:end));
+        ax1.YAxis(1).Color = 'k'; plot([0, 25000],[25,25],'-k','linewidth',1.5);
+        set(ax1,'box','on'); ax1.LineWidth = 1.5;
         %add labels
-        if plot_locs(plot_ind) >= rows*cols - 1
+        if plot_locs(plot_ind) >= rows*cols - (cols-1) || (plot_locs(plot_ind) >= 2 && plot_locs(plot_ind) <= 3)
             xticks = get(gca,'xtick'); set(gca,'xticklabel',xticks/1000); clear xticks;
-            set(gca,'yticklabel',yticks);
-            xlabel('Distance from terminus (km)','fontsize',20); 
-            if plot_locs(plot_ind) == rows*cols - 1
-                ylabel('Thickness (m)','fontsize',20);
+            % set(gca,'yticklabel',yticks);
+            xlabel('Distance from terminus (km)','fontsize',16); 
+            if plot_locs(plot_ind) == rows*cols - (cols-1)
+                ax1.YAxis(1).Label.String = 'Thickness (m)';
+                ax1.YAxis(1).Label.Position = [-2.7066e3 260 -1];
+                % ylabel('Thickness (m)','fontsize',16);
             end
-        else
-            set(gca,'ytick',yticks(2:end),'yticklabel',yticks(2:end));
         end
         clear ylims yticks;
         %add a legend
@@ -1333,7 +1349,7 @@ for j = 1:length(MP)
             H_leg = legend(pH,season_names);
             subH_pos = get(gca,'position');
             H_leg.Orientation = 'horizontal'; %move the legend
-            H_leg.Position = [0.375 0.945 0.25 0.035]; 
+            H_leg.Position = [0.39 0.24 0.25 0.035]; 
             set(gca,'position',subH_pos); %resize the subplot
             drawnow;
         end
@@ -1367,9 +1383,15 @@ for j = 1:length(MP)
             pv(k) = plot(vdist(~isnan(vmean))',vmean(~isnan(vmean)),'-','color',seas_cmap(k,:),'linewidth',3); hold on;
 
             %regional fig
-            figure(Vfig);
+            figure(Hfig);
+            % figure(Vfig);
             if ~isempty(plot_ind)
-                eval(['subplot(subV',num2str(j),');']);
+                %navigate to the subplot
+                eval(['subplot(subH',num2str(j),');']);
+                % eval(['subplot(subV',num2str(j),');']);
+
+                %plot the thickness profiles
+                yyaxis right;
                 fill([vdist(vmax_idx), fliplr(vdist(vmin_idx))]',[vmax(vmax_idx); flipud(vmin(vmin_idx))],...
                     seas_cmap(k,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
                 if k >= 2
@@ -1388,7 +1410,7 @@ for j = 1:length(MP)
     end
     %format the speed subplot in the site figure
     figure(sitefig); subplot(subv);
-    set(gca,'fontsize',20); grid on; drawnow;
+    set(gca,'fontsize',16); grid on; drawnow;
     set(subv,'xlim',[0,max_xlim]);
     xticks = get(subv,'xtick'); set(subv,'xticklabel',xticks/1000); clear xticks;
     % set(subv,'xlim',[0,floor(tran_reldist(seaward_idx)/1000)*1000+500]); 
@@ -1402,75 +1424,77 @@ for j = 1:length(MP)
         end
     end
     clear ylims yticks;
-    xlabel('Distance from terminus (km)','fontsize',20); ylabel('Speed (m/d)','fontsize',20);
-    pos = get(subv,'position'); set(subv,'position',[pos(1) pos(2)+0.05 pos(3) pos(4)]);
+    xlabel('Distance from terminus (km)','fontsize',16); ylabel('Speed (m/d)','fontsize',16);
+    pos = get(subv,'position'); %set(subv,'position',[pos(1) pos(2)+0.05 pos(3) pos(4)]);
     %format the site subplot in the speed figure
     if ~isempty(plot_ind)
-        figure(Vfig); eval(['subplot(subV',num2str(j),');']);
-        set(gca,'xlim',[0,25000],'xticklabel',[],'fontsize',20); grid on; drawnow;
-        gca_pos = get(gca,'position');
+        figure(Hfig); eval(['subplot(subH',num2str(j),');']); yyaxis right;
+        % figure(Vfig); eval(['subplot(subV',num2str(j),');']);
+        set(gca,'xlim',[0,25000],'xticklabel',[],'fontsize',16); drawnow;
+        % gca_pos = get(gca,'position');
         ylims = get(gca,'ylim'); set(gca,'ylim',[0 max(ylims)]);
-        if max(ylims) <= 20
-            set(gca,'ylim',[0,20],'ytick',[0:10:20]);
-        elseif max(ylims) <= 40
-            set(gca,'ylim',[0,40],'ytick',[0:20:40]);
+        if max(ylims) <= 35
+            set(gca,'ylim',[0,70],'ytick',[0:10:30]);
+        % elseif max(ylims) <= 40
+        %     set(gca,'ylim',[0,40],'ytick',[0:20:40]);
         else
-            set(gca,'ylim',[0,60],'ytick',[0:30:60]);
+            set(gca,'ylim',[0,140],'ytick',[0:20:60]);
         end
-        yticks = get(gca,'ytick');
-        if plot_locs(plot_ind) >= rows*cols - 1
+        yticks = get(gca,'ytick'); 
+        ax1.YAxis(2).Color = 'k'; 
+        if plot_locs(plot_ind) >= rows*cols - (cols-1)
             xticks = get(gca,'xtick'); set(gca,'xticklabel',xticks/1000); clear xticks;
             set(gca,'yticklabel',yticks);
-            xlabel('Distance from terminus (km)','fontsize',20);
-            if plot_locs(plot_ind) == rows*cols - 1
-                ylabel('Speed (m/d)','fontsize',20);
+            xlabel('Distance from terminus (km)','fontsize',16);
+            if plot_locs(plot_ind) == rows*cols
+                ax1.YAxis(2).Label.String = 'Speed (m/d)';
+                ax1.YAxis(2).Label.Position = [2.7559e4 530 -1];
+                % ylabel('Speed (m/d)','fontsize',16);
             end
-        else
-            set(gca,'ytick',yticks(2:end),'yticklabel',yticks(2:end));
         end
         clear ylims yticks;
-        %add a legend
-        figure(Vfig); eval(['subplot(subV',num2str(j),');']);
-        if j == length(MP)
-            V_leg = legend(pV,season_names(2:end));
-            subV_pos = get(gca,'position');
-            V_leg.Orientation = 'horizontal'; %move the legend
-            V_leg.Position = [0.4 0.945 0.2 0.035]; 
-            set(gca,'position',subV_pos); %resize the subplot
-            drawnow;
-        end
-        set(gca,'position',[gca_pos(1) gca_pos(2) gca_pos(3) 0.07]);
+        % %add a legend
+        % figure(Vfig); eval(['subplot(subV',num2str(j),');']);
+        % if j == length(MP)
+        %     V_leg = legend(pV,season_names(2:end));
+        %     subV_pos = get(gca,'position');
+        %     V_leg.Orientation = 'horizontal'; %move the legend
+        %     V_leg.Position = [0.4 0.945 0.2 0.035]; 
+        %     set(gca,'position',subV_pos); %resize the subplot
+        %     drawnow;
+        % end
+        % set(gca,'position',[gca_pos(1) gca_pos(2) gca_pos(3) 0.07]);
     end
+    gca_pos = get(gca,'position');
+    set(gca,'position',[gca_pos(1) gca_pos(2) gca_pos(3) 1.5*gca_pos(4)]);
     drawnow; clear plot_ind pv pV;
     
     %add subplots beneath the figure that generally show the location of the size distributions
     %inland bin
-    figure(sitefig); subplot(3,2,5);
+    figure(sitefig); subplot(4,2,5);
     for k = 1:4
         loglog(MP(j).D.area,bergdist_seas(k,:,2),'-','color',seas_cmap(k,:),'linewidth',2); hold on;
     end
     set(gca,'ylim',[10^-10 10^-1],'xlim',[10^1 10^7],...
         'ytick',[10^-9,10^-5,10^-1],...
-        'xtick',[10^2,10^4,10^6],'xticklabel',[10^2,10^4,10^6],'fontsize',20); grid on;
-    xlabel('Surface area (m^2)','fontsize',20); ylabel('Iceberg count','fontsize',20);
-    text(10000,10^-2,'near-terminus','fontsize',20);
-
+        'xtick',[10^2,10^4,10^6],'xticklabel',[10^2,10^4,10^6],'fontsize',16); grid on;
+    xlabel('Surface area (m^2)','fontsize',16); ylabel('Iceberg count','fontsize',16);
+    text(10000,10^-2,'near-terminus','fontsize',16);
     %seaward bin
-    subplot(3,2,6);
+    subplot(4,2,6);
     for k = 1:4
         loglog(MP(j).D.area,bergdist_seas(k,:,1),'-','color',seas_cmap(k,:),'linewidth',2); hold on;
     end
     set(gca,'ylim',[10^-10 10^-1],'xlim',[10^1 10^7],...
         'ytick',[10^-9,10^-5,10^-1],...
-        'xtick',[10^2,10^4,10^6],'xticklabel',[10^2,10^4,10^6],'fontsize',20); grid on;
-    xlabel('Surface area (m^2)','fontsize',20);
-    text(10000,10^-2,'seaward','fontsize',20);
+        'xtick',[10^2,10^4,10^6],'xticklabel',[10^2,10^4,10^6],'fontsize',16); grid on;
+    xlabel('Surface area (m^2)','fontsize',16);
+    text(10000,10^-2,'seaward','fontsize',16);
     drawnow;
-
     
     %estimate buttressing
     if contains(vfilter,'annual')
-        %loop through seasons
+        %seasonal averages
         for k = 1:4
             %add seasonal strain rate profiles to the structure
             dvdist_temp = diff(vdist);
@@ -1493,13 +1517,22 @@ for j = 1:length(MP)
                 clear press dvdist_temp;
             end
         end
+
+        %CALCULATE BUTTRESSING FOR EACH INDIVIDUAL DATE 
+        % (to create probability density functions showing
+        %the full suite of buttressing estimates)
+
+
     end
 
     %plot seasonal profiles of melange characteristics
-    bergAfig = figure; set(gcf,'position',[50 50 1200 400]); clear pz;
+    % bergAfig = figure; set(gcf,'position',[50 50 1200 400]); 
+    figure(sitefig); subplot(4,2,[7,8]);
+    clear pz;
     for k = 1:4
         %site figure
-        figure(bergAfig);
+        % figure(bergAfig);
+        figure(sitefig); 
         ax2 = gca;
         yyaxis left
         % add dummy data for legend beneath real data
@@ -1524,7 +1557,6 @@ for j = 1:length(MP)
             plot(Hdist(~isnan(Hmean))',packmean(~isnan(Hmean)),'--','color',seas_cmap(k,:),'linewidth',3); hold on;
             ax2.YLim = [0,100]; 
         end
-        clear Hmean;
 
         %format the site figure
         ax2.YAxis(1).Color = 'k'; ax2.YAxis(2).Color = 'k'; 
@@ -1532,22 +1564,50 @@ for j = 1:length(MP)
         ax2.YAxis(2).Label.String = 'Packing density (%)';
 
         %scatterplot of bergy bit misfits vs packing density for all sites
-        figure(missfig);
+        figure(missfig); set(gca,'box','on');
         if ismember(MP(j).name,big3)
-            plot(res_A(k,:),packmean,'d','MarkerFaceColor','none',...
-                'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',13,'LineWidth',1.5); hold on;
+            %plot all data along the profiles
+            scatter(res_A(k,:),packmean,200-sqrt(Hdist),'d','MarkerFaceColor','none',...
+                'MarkerEdgeColor',seas_cmap(k,:),'LineWidth',1.5); hold on;
+
+            % %plot only data from at the terminus & seaward margins
+            % %inland
+            % subplot(subm1);
+            % plot(res_A(k,1),packmean(1),'d','MarkerFaceColor','none',...
+            %     'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',13,'LineWidth',1.5); hold on;
+            % 
+            % %seaward
+            % subplot(subm2);
+            % plot(res_A(k,max(inland_idx)-seaward_meanidx+1),packmean(max(inland_idx)-seaward_meanidx+1),'d','MarkerFaceColor','none',...
+            %     'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',13,'LineWidth',1.5); hold on;
         else
-            plot(res_A(k,:),packmean,'s','MarkerFaceColor','none',....
-                'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',14,'LineWidth',1.5); hold on;
+            %plot all data along the profiles
+            scatter(res_A(k,:),packmean,200-sqrt(Hdist),'s','MarkerFaceColor','none',...
+                'MarkerEdgeColor',seas_cmap(k,:),'LineWidth',1.5); hold on;
+            % plot(res_A(k,:),packmean,'s','MarkerFaceColor','none',....
+            %     'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',14,'LineWidth',1.5); hold on;
+
+            % %plot only data from at the terminus & seaward margins
+            % %inland
+            % subplot(subm1);
+            % plot(res_A(k,1),packmean(1),'s','MarkerFaceColor','none',...
+            %     'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',13,'LineWidth',1.5); hold on;
+            % 
+            % %seaward
+            % subplot(subm2);
+            % plot(res_A(k,max(inland_idx)-seaward_meanidx+1),packmean(max(inland_idx)-seaward_meanidx+1),'s','MarkerFaceColor','none',...
+            %     'MarkerEdgeColor',seas_cmap(k,:),'MarkerSize',13,'LineWidth',1.5); hold on;
         end
-        drawnow; clear packmean;
+        disp(['Min bergy bit plot symbol size: ',num2str(min(200-sqrt(Hdist)))]);
+        drawnow; clear packmean Hmean;
     end
     %format the site figure
-    figure(bergAfig);
-    pos = get(gca,'position');
-    set(gca,'fontsize',20); set(gca,'xlim',[0,max_xlim]);
+    % figure(bergAfig);
+    figure(sitefig); 
+    % pos = get(gca,'position');
+    set(gca,'fontsize',16); set(gca,'xlim',[0,max_xlim]); 
     xticks = get(gca,'xtick'); set(gca,'xticklabel',xticks/1000); clear xticks;
-    xlabel('Distance from terminus (km)','fontsize',20); 
+    xlabel('Distance from terminus (km)','fontsize',16); 
     yyaxis left
     plot([0,max_xlim],[0,0],'-k','linewidth',1); hold on; %add zero misfit line
     % %add a dummy legend for line types
@@ -1558,13 +1618,19 @@ for j = 1:length(MP)
     % text(0.90*max_xlim,0.81*max(get(gca,'ylim')),'left axis','fontsize',18);
     % text(0.90*max_xlim,0.61*max(get(gca,'ylim')),'right axis','fontsize',18);
     %plot a seasonal legend
-    seas_leg = legend(ps,season_names); set(seas_leg,'location','northoutside','orientation','horizontal');
-    leg_pos = get(seas_leg,'position'); set(seas_leg,'position',[leg_pos(1) 0.94 leg_pos(3) leg_pos(4)]);
+    % seas_leg = legend(ps,season_names); set(seas_leg,'location','northoutside','orientation','horizontal');
+    % leg_pos = get(seas_leg,'position'); set(seas_leg,'position',[leg_pos(1) 0.94 leg_pos(3) leg_pos(4)]);
     % set(gca,'position',[pos(1) pos(2) pos(3) pos(4)+0.05]);
     %format the scatterplot
     figure(missfig);
-    set(gca,'fontsize',20); grid on; drawnow;
-    xlabel('Bergy bit misprediction (% Area)','fontsize',20); ylabel('Packing density (%)','fontsize',20); 
+    % subplot(subm1);
+    % set(gca,'fontsize',16); grid on; drawnow;
+    % set(gca,'xlim',[-1,1.5],'ylim',[0,100]);
+    % ylabel('Packing density (%)','fontsize',16); 
+    % subplot(subm2);
+    set(gca,'fontsize',16); grid on; drawnow;
+    set(gca,'xlim',[-1,1.5],'ylim',[0,100]);
+    xlabel('Bergy bit misprediction (% Area)','fontsize',16); ylabel('Packing density (%)','fontsize',16); 
     clear pz ps *_leg pos;
 
     %display characteristics
@@ -1589,7 +1655,7 @@ for j = 1:length(MP)
     disp(['    winter = ',num2str(round(365*Vterm(1),0)),', spring = ',num2str(round(365*Vterm(2),0)),', summer = ',num2str(round(365*Vterm(3),0)),', fall = ',num2str(round(365*Vterm(4),0))]);
     disp(' Near-Terminus Strain Rate: (m/yr)/m')
     disp(['    winter = ',num2str(round(365*dVdxterm(1),4)),', spring = ',num2str(round(365*dVdxterm(2),4)),', summer = ',num2str(round(365*dVdxterm(3),4)),', fall = ',num2str(round(365*dVdxterm(4),4))]);
-    disp([' Seaward size distribution reference location = ',num2str(round(((max(inland_idx)-1-seaward_meanidx)*transect_inc)/1000,1)),'km']);
+    disp([' Seaward size distribution reference location = ',num2str(round(((max(inland_idx)-seaward_meanidx+1)*transect_inc)/1000,1)),'km']);
     disp(' ');
     disp(' Near-Terminus Packing Density: fractional area')
     disp(['    winter = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,1,:)),2)),', spring = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,2,:)),2)),', summer = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,3,:)),2)),', fall = ',num2str(round(nanmedian(MP(j).B.packing(zcutoff+1,4,:)),2))]);
@@ -1608,30 +1674,31 @@ for j = 1:length(MP)
     disp(' ');
 
     %save the data and the figure
-    % save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
+    save([root_dir,'GrIS-melange-characteristics.mat'],'MP','-v7.3');
     saveas(sitefig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-speed-size_',num2str(Hcutoff),'m-Hthreshold_',num2str(vdtmin),'-',num2str(vdtmax),'dt-',vfilter,'-speeds_',sampling,'-profiles.png'],'png'); %save the plots
-    saveas(bergAfig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-melange-properties_profiles.png'],'png'); %save the plots
+    % saveas(bergAfig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-melange-properties_profiles.png'],'png'); %save the plots
     disp(['Done with #',num2str(j),': ',MP(j).name]);
-    disp('Close misfit/packing density figure to advance'); disp(' ');
-    figure(bergAfig);
+    % figure(bergAfig);
+    % disp('Close misfit/packing density figure to advance'); disp(' ');
     % uiwait %advance only after figure is closed
     
     %refresh
     clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* size_classes Zfilt H_* Havg vel_* vels* w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos seas_leg packing;
     clear leg_* ref_* Tdate* xlims Tslopes res* Tres size_plslope bin* column_names dv1 v1 n1* *_seas ax ax2 max_xlim width_prof Vterm dVdxterm subv subz*;
+    clear ax1 ax2;
     close(sitefig); 
-    close(bergAfig); 
+    % close(bergAfig); 
     drawnow; 
 end
-%save the GrIS-wide plots
+% %save the GrIS-wide plots
 saveas(Hfig,[root_dir,'GrIS-melange-thickness_profiles.png'],'png'); 
-saveas(Vfig,[root_dir,'GrIS-melange-speed_profiles.png'],'png'); 
+% saveas(Vfig,[root_dir,'GrIS-melange-speed_profiles.png'],'png'); 
 saveas(missfig,[root_dir,'GrIS-bergybit_scatterplot.png'],'png'); 
 
 
 %% create overview maps for each site
 cd(root_dir);
-load([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']);
+load([root_dir,'GrIS-melange-characteristics.mat']);
 
 for j = 1:length(MP)
     close all; drawnow;
@@ -1831,8 +1898,8 @@ for j = 1:length(MP)
     for k = 1:p+1
         elev_cmap(k,:) = white_end-(k-1)*colorgrad;
     end
-    elev_cmap = flipud(elev_cmap);
-    elev_cmap(1,:) = [0 0 0]; %black
+    % elev_cmap = flipud(elev_cmap); elev_cmap(1,:) = [0 0 0]; %black
+    elev_cmap(1,:) = [1 1 1]; %white
 
     %plot the time-averaged DEM & redraw the melange mask
     % figure1 = figure; set(gcf,'position',[50 50 1600 600]);
@@ -1858,6 +1925,7 @@ for j = 1:length(MP)
     [~,maxind] = max(termdists); [~,minind] = min(termdists);
     plot(melmask.dated(minind).x,melmask.dated(minind).y,'-','color',[90,174,97]/255,'linewidth',3); hold on;
     plot(melmask.dated(maxind).x,melmask.dated(maxind).y,'-','color',[90,174,97]/255,'linewidth',3); hold on;
+    disp('plotted min & max centerline terminus positions in green');
     % for p = 1:size(melmask.dated,2)
     %     if term_trace(p) == 1
     %         plot(melmask.dated(p).x,melmask.dated(p).y,'-','color',...
@@ -1883,8 +1951,8 @@ for j = 1:length(MP)
     ylims = [min(MP(j).Z.transectY(min(seaward_ext):max(inland_ext)+1,:),[],'all'), max(MP(j).Z.transectY(min(seaward_ext):max(inland_ext)+1,:),[],'all')];
     set(ax1,'xlim',xlims,'ylim',ylims);
     xticks = get(ax1,'xtick'); yticks = get(ax1,'ytick');
-    set(ax1,'xticklabels',xticks/1000,'yticklabels',yticks/1000,'fontsize',20);
-    xlabel(ax1,'Easting (km)','fontsize',20); ylabel(ax1,'Northing (km)','fontsize',20);
+    set(ax1,'xticklabels',xticks/1000,'yticklabels',yticks/1000,'fontsize',16);
+    xlabel(ax1,'Easting (km)','fontsize',16); ylabel(ax1,'Northing (km)','fontsize',16);
     pos = get(gca,'position');
     if range(xlims) > 1.05*range(ylims) %short and fat map so plot the legend below
         % map_leg = legend(pt,season_names,'Location','southoutside',...
@@ -1911,15 +1979,15 @@ for j = 1:length(MP)
         set(ax2,'position',[pos(1)-0.05 pos(2) pos(3) pos(4)]); drawnow;
     end
     saveas(map_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-site-map.png'],'png'); %save the image
-    uiwait %advance only after figure is closed
+    % uiwait %advance only after figure is closed
 
     clear xlims ylims pt elev_cmap maskedz meltrans mel_data termdists maxind minind;
     clear berg_* im* inland_ext LCdir leg* map* melmask zmos on pos ref* seaward_ext size_classes sort_ind T T_inds term_* Tyrs Tmos *lims zyrs zdate zseas Tseas tran_cmap colorgrad term;
 end
+disp('Done creating site maps');
 
 
-
-%% create a gif that loops through and plots iceberg size distributions
+%% plot iceberg size distributions as a gif & as subplots
 %distribution for a site, then adds the fall distribution (if it exists)
 %with arrows showing change between seasons for small (~100 m^2) and big
 %(~10^5 m^2) icebergs
@@ -1931,8 +1999,8 @@ bi = find(MP(1).D.area <= 10^5,1,'last');
 %create the figure
 dist_fig = figure; set(dist_fig,'position',[50 850 800 600]);
 loglog(MP(1).D.area,MP(geo_ind(1)).D.bergs(2,:),'-','color',seas_cmap(2,:),'linewidth',2); hold on;
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20); grid on; 
-xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20); 
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',16); grid on; 
+xlabel('Surface area (m^2)','fontsize',16); ylabel('Normalized iceberg count','fontsize',16); 
 drawnow;
 nimages = 1;
 for j = 1:length(geo_ind)
@@ -1995,7 +2063,7 @@ for j = 1:length(geo_ind)
 end
 close;
 
-filename = [root_dir,'Greenland-seasonal-iceberg-size-distributions_timeseries.gif']; % Specify the output file name
+filename = [root_dir,'GrIS-melange_seasonal-iceberg-size-distributions_timeseries.gif']; % Specify the output file name
 for idx = 1:nimages-1
     [A,map] = rgb2ind(gif_im{idx},256);
     if idx == 1
@@ -2028,34 +2096,260 @@ for j = 1:length(geo_ind)
 
 end
 subplot(sub1);
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',20); grid on; 
-text(10^5.8,10^-1,'spring','fontsize',20)
-xlabel('Surface area (m^2)','fontsize',20); ylabel('Normalized iceberg count','fontsize',20);
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'fontsize',16); grid on; 
+text(10^5.8,10^-1,'spring','fontsize',16)
+xlabel('Surface area (m^2)','fontsize',16); ylabel('Normalized iceberg count','fontsize',16);
 pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
 subplot(sub2);
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',20); grid on;
-text(10^5.8,10^-1,'summer','fontsize',20)
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',16); grid on;
+text(10^5.8,10^-1,'summer','fontsize',16)
 pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
 subplot(sub3);
-set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',20); grid on; 
-text(10^5.8,10^-1,'fall','fontsize',20)
+set(gca,'ylim',[10^-12 1],'xlim',[10^1 10^7],'yticklabel',[],'fontsize',16); grid on; 
+text(10^5.8,10^-1,'fall','fontsize',16)
 pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2)+0.03 1.2*pos(3) pos(4)]);
 drawnow;
-saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],'png'); %save the plot
+saveas(dist_fig,[root_dir,'GrIS-melange_iceberg-distribution_loglog.png'],'png'); %save the plot
+close all;
+
+%% 
+
+%Size distribution parameters
+nthresh = 1e-6; % set small number bin cutoff (n1 must be greater than this value)
+zthresh = 3; %set small size bin cutoff (freeboard must exceed this value)
+rho_i = 900; rho_sw = 1026; %density of ice and sea water in kg/m^3 (constant)
+ARcomp.best.autoALL = 2; % iceberg aspect ratio 
+vthresh = (1/4)*pi*((rho_sw/(rho_sw-rho_i))*ARcomp.best.autoALL.*zthresh).^2; %don't include this bin size or smaller in curve fitting
+dplawthresh = 10^5; % upper bound on the intercept for the dummy powerlaw
+norm_type = 2; % toggle between L2, max, and log norm using 2, Inf, and 'log'
+normalize_exp = 1.5; % Increase to weight residuals towards end of the curve, minimum = 1
 
 %create a similar seasonal profile figure but with a top row containing
 %profiles near the terminus and a bottom row containing seaward profiles
+subdist_fig = figure; set(subdist_fig,'position',[50 50 1200 1200]);
+%subplots for inland sample location
+subia = subplot(2,3,1); subib = subplot(2,3,2); subic = subplot(2,3,3); 
+%subplots for seaward sample location
+subsa = subplot(2,3,4); subsb = subplot(2,3,5); subsc = subplot(2,3,6); 
+%letters for the plots
+alphabet = ['a','b','c','d','e','f'];
+for j = 1:length(geo_ind)
+    seasons = MP(geo_ind(j)).D.months; site_abbrev = MP(geo_ind(j)).name;
+    % disp(sitenames(geo_ind(j),:)); 
+    
+    %isolate the dates for data sorting
+    for p = 1:length(MP(geo_ind(j)).Z.date)
+        term_trace(p) = MP(geo_ind(j)).Z.termflag(p);
+        % zdate(p) = convert_to_decimaldate(char(MP(geo_ind(j)).Z.date(p)));
+        % datest = datetime(MP(geo_ind(j)).Z.date{p},'InputFormat','yyyyMMdd');
+        % zyrs(p) = year(datest); zmos(p) = month(datest);
+        % clear datest;
+    end
 
+    %loop through subset size distributions & find the first and last
+    %non-NaN columns to identify melange extent
+    Dsubs = dir([root_dir,MP(geo_ind(j)).name,'/',MP(geo_ind(j)).name,'*-iceberg-distribution-subsets.csv']);
+    size_classes = [];
+    for p = 1:length(Dsubs)
+        D = readtable([root_dir,MP(geo_ind(j)).name,'/',Dsubs(p).name],"VariableNamingRule","preserve");
+        name_split = split(Dsubs(p).name,'-',2);
+        berg_dates(p) = datetime(name_split{2},'Inputformat','yyyyMMdd'); clear name_split;
+        mos(p) = month(berg_dates(p));
 
+        %identify observational limits along the centerline
+        berg_nos = table2array(D(:,3:end)); berg_nos(berg_nos==0) = NaN;
+        size_classes(p,:) = sum(~isnan(berg_nos),1);
+        seaward_ext(p) = find(size_classes(p,:)>0,1,'first');
+        inland_ext(p) = find(size_classes(p,:)>0,1,'last')+1; inland_idx(p) = inland_ext(p);
+        clear berg_nos;
+
+        %fill-in inland boundary reference based on terminus observations
+        %from images if DEM did not overlap the terminus
+        if term_trace(p) == 0
+            if ~isnan(MP(geo_ind(j)).Z.termdist(p))
+                dists = sqrt((MP(geo_ind(j)).Z.termX(p)-MP(geo_ind(j)).V.X).^2 + (MP(geo_ind(j)).Z.termY(p)-MP(geo_ind(j)).V.Y).^2);
+                [~,ia] = sort(dists);
+                inland_idx(p) = max(ia(1:2)); term_trace(p) = 1; %use terminus traces from imagery
+                clear dists ia;
+            else
+                inland_idx(p) = NaN;
+                disp(['Need terminus data for ',MP(geo_ind(j)).name,' ',char(MP(geo_ind(j)).Z.date(p))])
+            end
+        end
+
+    end
+
+    %now analyze the ize distributions
+    for p = 1:length(Dsubs)
+        D = readtable([root_dir,MP(geo_ind(j)).name,'/',Dsubs(p).name],"VariableNamingRule","preserve");
+
+        %extract size distribution profiles
+        if p == 1 %initialize the data compilation
+            v1 = table2array(D(:,1)); dv1 = table2array(D(:,2));
+        end
+        %first 2 columns are area & bin width, so 3+ are data from points along the centerline
+        n1 = NaN(length(v1),max(inland_idx)-1);
+        if ~isnan(inland_idx(p))
+            berg_nos = fliplr(table2array(D(:,3:(inland_idx(p)-1)+2)));
+            berg_nos(berg_nos==0) = NaN;
+            n1(:,1:size(berg_nos,2)) = berg_nos./dv1;
+        end
+        clear D;
+        %stack distributions in a structure
+        binned_n1_stack(:,:,p) = n1;
+        clear n1 berg_nos;
+    end
+
+    %assign seaward & inland sampling limits based on the selected sampling
+    %strategy (sampling = ['fixed','dated']
+    inland_meanidx = round(mean(inland_ext(term_trace==1)));
+    seaward_meanidx = round(mean(seaward_ext));
+    seaward_idx = inland_meanidx-seaward_meanidx;
+
+    %create seasonal average distributions for each fjord bin
+    for k = 1:4
+        % disp([char(season_names{k}),': parameters starting from the terminus & moving seaward...']);
+
+        %stack the profiles
+        n1_seasmean(:,:,k) = nanmean(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),3);
+        % n1_seasmax(:,:,k) = (nanmean(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),3)+std(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),0,3,'omitnan'));
+        % n1_seasmin(:,:,k) = (nanmean(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),3)-std(binned_n1_stack(:,:,ismember(mos,seasons(k,:))==1),0,3,'omitnan'));
+
+        for l = [1,seaward_idx]
+            n1 = n1_seasmean(:,l,k);
+            if l == 1
+                n1_inlandseas(:,j,k) = n1;
+            else
+                n1_seawardseas(:,j,k) = n1;
+            end
+            clear n1;
+        end
+
+        % %plot the seasonal profiles at each location
+        % if k == 2; subplot(subia); elseif k == 3; subplot(subib); else; subplot(subic); end
+        % loglog(v1,n1_inlandseas(:,j,k),'-','LineWidth',1,'Color',seas_cmap(k,:)); hold on;
+        % if k == 2; subplot(subsa); elseif k == 3; subplot(subsb); else; subplot(subsc); end
+        % loglog(v1,n1_seawardseas(:,j,k),'-','LineWidth',1,'Color',seas_cmap(k,:)); hold on;
+
+    end
+    %concatenate the profiles for each season so that they can be plotted
+    %as filled polygons instead of individual lines
+    %seaward
+    n1wi(:,j,1) = n1_seawardseas(:,j,1); n1sp(:,j,1) = n1_seawardseas(:,j,2); 
+    n1su(:,j,1) = n1_seawardseas(:,j,3); n1fa(:,j,1) = n1_seawardseas(:,j,4);
+    %inland
+    n1wi(:,j,2) = n1_inlandseas(:,j,1); n1sp(:,j,2) = n1_inlandseas(:,j,2); 
+    n1su(:,j,2) = n1_inlandseas(:,j,3); n1fa(:,j,2) = n1_inlandseas(:,j,4);
+
+    clear berg_dates mos berg_nos size_classes seaward_* inland_* binned_n1_stack n1_seasmean term_trace;
+end
+%plot a filled polygon to bound the observed size distributions
+log_v = log(v1); 
+subplot(subia); %inland, spring
+log_n = log(n1sp); maxn = max(log_n(:,:,2),[],1); minn = min(log_n(:,:,2),[],1); 
+fill([log_v, flipud(log_v)],[maxn; flipud(minn)],...
+    seas_cmap(2,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
+clear log_n maxn minn;
+subplot(subsa); %seaward, spring
+maxn = max(log_n(:,:,1),[],1); minn = min(log_n(:,:,1),[],1); 
+fill([log_v, flipud(log_v)],[maxn; flipud(minn)],...
+    seas_cmap(2,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
+clear log_n maxn minn;
+subplot(subib); %inland, summer
+log_n = log(n1su); maxn = max(log_n(:,:,2),[],1); minn = min(log_n(:,:,2),[],1); 
+fill([log_v, flipud(log_v)],[maxn; flipud(minn)],...
+    seas_cmap(3,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
+clear log_n maxn minn;
+subplot(subsb); %seaward, summer
+maxn = max(log_n(:,:,1),[],1); minn = min(log_n(:,:,1),[],1); 
+fill([log_v, flipud(log_v)],[maxn; flipud(minn)],...
+    seas_cmap(3,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
+clear log_n maxn minn;
+subplot(subic); %inland, fall
+log_n = log(n1fa); maxn = max(log_n(:,:,2),[],1); minn = min(log_n(:,:,2),[],1); 
+fill([log_v, flipud(log_v)],[maxn; flipud(minn)],...
+    seas_cmap(4,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
+clear log_n maxn minn;
+subplot(subsc); %seaward, fall
+maxn = max(log_n(:,:,1),[],1); minn = min(log_n(:,:,1),[],1); 
+fill([log_v, flipud(log_v)],[maxn; flipud(minn)],...
+    seas_cmap(4,:),'FaceAlpha',fill_alpha,'EdgeColor','none'); hold on;
+clear log_n maxn minn;
+drawnow;
 %apply the EBC fit function to the average of all seasonal profiles in each
 %location & plot the result as a dashed line
+for l = 1:2
+    if l == 1
+        disp('plotting profiles for near-terminus sample location')
+    else
+        disp('plotting profiles for seaward sample location')
+    end
 
+    for k = 2:4
+        if l == 1
+            n1 = nanmean(n1_inlandseas(:,:,k),2);
+        else
+            n1 = nanmean(n1_seawardseas(:,:,k),2);
+        end
 
+        %filter to decide if there are enough points to fit lines
+        v = v1(n1>nthresh); n = n1(n1>nthresh); dv = dv1(n1>nthresh); % TOGGLE TO REMOVE SMALLEST COUNTS
+        n = n(v>vthresh); dv = dv(v>vthresh); v = v(v>vthresh); %remove smallest size classes
+        v = v(~isnan(n)); dv = dv(~isnan(n)); n = n(~isnan(n)); % Remove NaNs
 
+        % Fit E-BC fragmentation model to the data and plot
+        if sum(~isnan(v)) > 12
+            %enter unfiltered data into model (filtering happens there)
+            tempfig = figure;
+            [alpha,c1,c2,c3,c4,~,~] = EBC_fragmentation_curve(v1, n1, dv1, norm_type, vthresh, nthresh, 1, normalize_exp); % fit Eq. 1
+            n1_mod = EBC_model([c1,c2,alpha,c3,c4],v1); % grab model
+            close(tempfig);
+
+            %plot the size distribution fit
+            figure(subdist_fig);
+            if l == 1
+                if k == 2; subplot(subia); elseif k == 3; subplot(subib); else; subplot(subic); end
+                
+                %plot the data
+                loglog([v1(zthresh+1),v1(zthresh+1)],[10^-12 10^3],'-','LineWidth',1,'Color',[0.5 0.5 0.5]); hold on;
+                loglog(v1,n1,'.-','LineWidth',2,'Color','k'); hold on;
+                loglog(v1,n1_mod,'--','LineWidth',2,'Color','k'); hold on;
+
+                %format the subplot
+                set(gca,'ylim',[10^-10 10^3],'xlim',[10^1 10^7],'xtick',[10^2, 10^4, 10^6],'fontsize',16); grid on;
+                text(10^5,10^2,[alphabet(k*l-1),') ',char(season_names(k))],'fontsize',16)
+                if k == 2
+                    ylabel('Normalized iceberg count','fontsize',16);
+                end
+
+            else
+                if k == 2; subplot(subsa); elseif k == 3; subplot(subsb); else; subplot(subsc); end
+                
+                %plot the data
+                loglog([v1(zthresh+1),v1(zthresh+1)],[10^-12 10^3],'-','LineWidth',1,'Color',[0.5 0.5 0.5]); hold on;
+                loglog(v1,n1,'.-','LineWidth',2,'Color','k'); hold on;
+                loglog(v1,n1_mod,'--','LineWidth',2,'Color','k'); hold on;
+
+                %format the subplot
+                set(gca,'ylim',[10^-10 10^3],'xlim',[10^1 10^7],'xtick',[10^2, 10^4, 10^6],'fontsize',16); grid on;
+                text(10^5,10^2,[alphabet((k-1)+3),') ',char(season_names(k))],'fontsize',16)
+                xlabel('Surface area (m^2)','fontsize',16);
+                if k == 2
+                    ylabel('Normalized iceberg count','fontsize',16);
+                end
+            end
+
+            clear n1_mod v dv n n1 alpha c1 c2 c3 c4;
+        end
+        drawnow;
+    end
+    disp('moving on')
+end
+saveas(subdist_fig,[root_dir,'GrIS-melange_iceberg-distribution-subsets_loglog.png'],'png'); %save the plot
 
 %% load TermPicks timeseries for each glacier
 % cd(root_dir);
-% load([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']);
+% load([root_dir,'GrIS-melange-characteristics.mat']);
 % 
 % for j = 1:length(MP)
 %     site_abbrev = MP(j).name;
@@ -2107,7 +2401,7 @@ saveas(dist_fig,[root_dir,'Greenland-seasonal-iceberg-distribution_loglog.png'],
 %     MP(j).T.termY(isnan(MP(j).T.termX)) = []; MP(j).T.termX(isnan(MP(j).T.termX)) = []; 
 % 
 %     %save to the structure
-%     save([root_dir,'GrIS-melange_centerline-elev-speed-terminus.mat'],'MP','-v7.3');
+%     save([root_dir,'GrIS-melange-characteristics.mat'],'MP','-v7.3');
 % 
 %     %clear variables
 %     clear term YYYYMMDD datestr idx site_abbrev;
