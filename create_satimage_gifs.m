@@ -1,19 +1,21 @@
 %% Create gifs of satellite images
-
+clearvars; close all;
+addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/');
 % download S2 images with preautorift then make gifs
 %identfy the files (run this section for each study site, specifying
 %site-specific parameters below before each rerun)
 
 %site-specific info
 root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
-site_abbrev = 'ZIM'; site_name = 'Zachariae Isstrom';
-ref_image = 'S2A_27XWH_20200802_3_L2A_B08_clipped.tif'; %Alison = 'S2A_21XWC_20200731_1_L2A_B08_clipped.tif'
+site_abbrev = 'ASG'; site_name = 'Alison';
+ref_image = 'S2A_21XWC_20180304_0_L2A_B08_clipped.tif'; %Alison = 'S2A_21XWC_20200731_1_L2A_B08_clipped.tif', %Zachariae = 'S2A_27XWH_20200802_3_L2A_B08_clipped.tif'
 
 %load the data
 load([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat']); %load the melange mask file
 ims = dir([root_dir,site_abbrev,'/images/S2/','S*B08_clipped.tif']); im_refs = []; im_dates = [];
 for k = 1:length(ims)
-    if contains(ims(k).name,'_2019') || contains(ims(k).name,'_2020')
+    % if contains(ims(k).name,'_2019') || contains(ims(k).name,'_2020')
+    if contains(ims(k).name,'_2018')
 %         ref_image = [ims(k).folder,'/',ims(k).name];
         im_refs = [im_refs; k]; im_dates = [im_dates;ims(k).name(11:18);];
     end

@@ -13,7 +13,7 @@ ang_range = [0.1,1]; %range of angles from vertical
 Ef = 0.31; %width-to-thickness ratio for floating terminus
 Eg = 0.31; %width-to-thickness ratio for grounded terminus
 rho_i = 900; rho_w = 1026; %densities
-
+years = 2011:1:2023; seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MAM','JJA','SON'};
 
 %% ONLY RUN ONCE: Estimate thicknesses using bed and surface elevations
 H_maxes = []; %dummy variables to hold maximum iceberg thickness estimates
@@ -219,52 +219,52 @@ close all;
 
 %load the textfile containing the buttressing data if it has already been made
 site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site directory as a check if they exist
-if exist([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']) == 2
-    for i = 1:length(MP)
-        site_abbrev = char(folderNames(i));
-        Tfinal = readtable([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']);
-        Fb_Meng = table2array(Tfinal(:,2))';
-        Fb_Amundson = table2array(Tfinal(:,3))';
-        Fbutt_obs(i,:,:) = cat(3,Fb_Meng,Fb_Amundson);
-        min_ang = table2array(Tfinal(:,4:12));
-        max_ang = table2array(Tfinal(:,13:21));
-        %add data to the matrices used to make CSVs
-        for p = 1:4
-            j = 1; %smaller angle
-            for k = 1:length(float_frac)
-                % min_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
-                if k == 1
-                    Fbutt_thinminf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
-                elseif k == 2
-                    Fbutt_minf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
-                elseif k == 3
-                    Fbutt_ming(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
-                end
-
-            end
-            j = 2; %larger angle
-            for k = 1:length(float_frac)
-                % max_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
-                if k == 1
-                    Fbutt_thinmaxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
-                elseif k == 2
-                    Fbutt_maxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
-                elseif k == 3
-                    Fbutt_maxg(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
-                end
-            end
-        end
-        clear Tfinal;
-
-        %show buttressing stats
-        disp(site_abbrev)
-        disp(['Seasonal average generated buttressing (10^6 N/m): ',num2str(round(nanmean(Fbutt_obs(i,:,:),3),3))]);
-        disp(['90% of GLH_f, 0.1^o rotation, MEDIAN terminus H (10^6 N/m): ',num2str(round(nanmean(Fbutt_minf(i,:,1:2),3),3))]);
-        disp(['90% of GLH_f, 0.1^o rotation, MAX terminus H (10^6 N/m): ',num2str(round(Fbutt_minf(i,:,3),3))]);
-        disp(['GLH_f, 0.1^o rotation, MEDIAN terminus H (10^6 N/m): ',num2str(round(nanmean(Fbutt_ming(i,:,1:2),3),3))]);
-        disp(['GLH_f, 0.1^o rotation, MAX terminus H (10^6 N/m): ',num2str(round(Fbutt_ming(i,:,3),3))]);
-    end
-else
+% if exist([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']) == 2
+%     for i = 1:length(MP)
+%         site_abbrev = char(folderNames(i));
+%         Tfinal = readtable([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']);
+%         Fb_Meng = table2array(Tfinal(:,2))';
+%         Fb_Amundson = table2array(Tfinal(:,3))';
+%         Fbutt_obs(i,:,:) = cat(3,Fb_Meng,Fb_Amundson);
+%         min_ang = table2array(Tfinal(:,4:12));
+%         max_ang = table2array(Tfinal(:,13:21));
+%         %add data to the matrices used to make CSVs
+%         for p = 1:4
+%             j = 1; %smaller angle
+%             for k = 1:length(float_frac)
+%                 % min_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
+%                 if k == 1
+%                     Fbutt_thinminf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+%                 elseif k == 2
+%                     Fbutt_minf(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+%                 elseif k == 3
+%                     Fbutt_ming(i,p,1:3) = min_ang(p,3*(k-1)+1:3*(k-1)+3);
+%                 end
+% 
+%             end
+%             j = 2; %larger angle
+%             for k = 1:length(float_frac)
+%                 % max_ang(p,3*(k-1)+1:3*(k-1)+3) = round(Fbutt(k,:)/10^6,2);
+%                 if k == 1
+%                     Fbutt_thinmaxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+%                 elseif k == 2
+%                     Fbutt_maxf(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+%                 elseif k == 3
+%                     Fbutt_maxg(i,p,1:3) = max_ang(p,3*(k-1)+1:3*(k-1)+3);
+%                 end
+%             end
+%         end
+%         clear Tfinal;
+% 
+%         %show buttressing stats
+%         disp(site_abbrev)
+%         disp(['Seasonal average generated buttressing (10^6 N/m): ',num2str(round(nanmean(Fbutt_obs(i,:,:),3),3))]);
+%         disp(['90% of GLH_f, 0.1^o rotation, MEDIAN terminus H (10^6 N/m): ',num2str(round(nanmean(Fbutt_minf(i,:,1:2),3),3))]);
+%         disp(['90% of GLH_f, 0.1^o rotation, MAX terminus H (10^6 N/m): ',num2str(round(Fbutt_minf(i,:,3),3))]);
+%         disp(['GLH_f, 0.1^o rotation, MEDIAN terminus H (10^6 N/m): ',num2str(round(nanmean(Fbutt_ming(i,:,1:2),3),3))]);
+%         disp(['GLH_f, 0.1^o rotation, MAX terminus H (10^6 N/m): ',num2str(round(Fbutt_ming(i,:,3),3))]);
+%     end
+% else
     disp('Buttressing force (x10^6 N/m) for...')
     for i = 1:length(MP)
         site_abbrev = char(folderNames(i));
@@ -286,7 +286,20 @@ else
         for p = 1:4
             seas_inds = find(ismember(zmos,seasons(p,:))==1);
             if ~isempty(seas_inds)
-                H_range(p,:) = [nanmean(Hiqr(seas_inds,1)), nanmean(Hiqr(seas_inds,2)), nanmean(Hmax(seas_inds,2))]; %25th, 75th, 95th percentiles
+                mos_yr = zyrs(seas_inds);
+
+                %calculate seasonal averages for each year
+                H_seas = NaN(length(years),3);
+                for k = 1:length(years)
+                    if sum(ismember(mos_yr,years(k))) ~= 0
+                        H_seas(k,:) = [nanmean(Hiqr(ismember(mos_yr,years(k))==1,1)), nanmean(Hiqr(ismember(mos_yr,years(k))==1,2)),...
+                            nanmax(Hiqr(ismember(mos_yr,years(k))==1,2))];
+                    end
+                end
+
+                %average the seasonal means across all years
+                H_range(p,:) = [nanmean(H_seas(:,1)), nanmean(H_seas(:,2)), nanmean(H_seas(:,3))]; %25th, 75th, 95th percentiles
+                clear H_seas mos_yr;
             else
                 H_range(p,:) = [NaN, NaN, NaN]; %no data for that season
             end
@@ -392,7 +405,8 @@ else
 
         clear Tnames T Tfinal min_ang max_ang Fb_* term_trace zyrs zmos;
     end
-end
+% end
+
 %format the data plot
 set(gcf,'position',[50 50 1200 1200]);
 sub1 = subplot(3,2,1); sub2 = subplot(3,2,3); sub3 = subplot(3,2,5);
@@ -458,8 +472,10 @@ for p = 1:4
     % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
 end
 subplot(sub1); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
-text(0.05,0.935*max(ylims),'a) Grounding Line Thickness (GLH): 0.1^o Rotation','fontsize',16); 
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
+text(0.05,0.935*max(ylims),'d) Grounded Thickness (GH): 0.1^o Rotation','fontsize',20); 
 subplot(sub2); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
 rectangle('Position',[3.2 1.75 1.7 0.65],'FaceColor','none','EdgeColor',[0.5 0.5 0.5],'LineWidth',0.5);
 errorbar(3.35,2.3,0,0,0.1,0.1,'s','color','k','linewidth',2); hold on;
 text(3.5,2.3,'M24-A25 span','fontsize',16);
@@ -467,18 +483,22 @@ errorbar(3.35,2.1,0.1,0.1,'s','color','k','linewidth',2); hold on;
 text(3.5,2.1,'IQR','fontsize',16);
 plot(3.35,1.9,'*','color','k','linewidth',2); hold on;
 text(3.5,1.9,'95th-percentile','fontsize',16);
-text(0.05,0.935*max(ylims),'b) 90% GLH: 0.1^o Rotation','fontsize',16); 
+text(0.05,0.935*max(ylims),'e) 90% GH: 0.1^o Rotation','fontsize',20); 
 ylabel('Bottom-out calving torque (x10^6 N/m)','fontsize',20);
 subplot(sub3); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
 pl_leg = legend(pl,season_names); pl_leg.FontSize = 16;
-text(0.05,0.935*max(ylims),'c) 50% GLH: 0.1^o Rotation','fontsize',16); 
+text(0.05,0.935*max(ylims),'f) 50% GH: 0.1^o Rotation','fontsize',20); 
 xlabel('Generated buttressing (x10^6 N/m)','fontsize',20);
 subplot(sub4); set(gca,'ylim',[0 15],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
-text(0.05,0.935*max(ylims),'d) Grounding Line Thickness (GLH): 1.0^o Rotation','fontsize',16); 
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
+text(0.05,0.935*max(ylims),'g) Grounded Thickness (GH): 1.0^o Rotation','fontsize',20); 
 subplot(sub5); set(gca,'ylim',[0 15],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
-text(0.05,0.935*max(ylims),'e) 90% GLH: 1.0^o Rotation','fontsize',16); 
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
+text(0.05,0.935*max(ylims),'h) 90% GH: 1.0^o Rotation','fontsize',20); 
 subplot(sub6); set(gca,'ylim',[0 15],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
-text(0.05,0.935*max(ylims),'f) 50% GLH: 1.0^o Rotation','fontsize',16); 
+pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
+text(0.05,0.935*max(ylims),'i) 50% GH: 1.0^o Rotation','fontsize',20); 
 xlabel('Generated buttressing (x10^6 N/m)','fontsize',20);
 saveas(gcf,[output_dir,'GrIS-buttressing-intercomparison-scatterplots.png'],'png'); %save the plots
 
