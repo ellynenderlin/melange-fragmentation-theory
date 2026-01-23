@@ -14,6 +14,8 @@ Ef = 0.31; %width-to-thickness ratio for floating terminus
 Eg = 0.31; %width-to-thickness ratio for grounded terminus
 rho_i = 900; rho_w = 1026; %densities
 years = 2011:1:2023; seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MAM','JJA','SON'};
+big3 = [{'SEK'},{'HLG'},{'ZIM'}];
+
 
 %% ONLY RUN ONCE: Estimate thicknesses using bed and surface elevations
 H_maxes = []; %dummy variables to hold maximum iceberg thickness estimates
@@ -189,8 +191,120 @@ for i = 1:length(folderNames)
 end
 clear mel;
 
+
+%% summarize terminus width & bed depth info
+
+% read in the melange data
+load([output_dir,'GrIS-melange_centerline-elev-speed-terminus.mat']);
+for i = 1:length(MP)
+    mel(i).termflag = MP(i).Z.termflag;
+end
+clear MP;
+
+% loop through each site and grab floatation-based thickness estimates
+cd(output_dir);
+contents = dir(output_dir);
+folders = contents([contents.isdir]);
+validFolders = folders(~ismember({folders.name}, {'.', '..'}));
+folderNames = {validFolders.name};
+% load('GrIS-iceberg_buttressing.mat'); %reload data
+
+for i = 1:length(folderNames)
+    site_abbrev = char(folderNames(i));
+    cd([output_dir,site_abbrev]);
+    disp(site_abbrev);
+
+    %account for different date location in file name depending on length of site abbreviation
+    if length(site_abbrev) == 3
+        matfile_daterefs = [5:12];
+    elseif length(site_abbrev) == 2
+        matfile_daterefs = [4:11];
+    else
+        error('Using a non-standard naming format! Switch to a 2- or 3-letter site abbreviation.');
+    end
+
+    %load supporting data to identify the terminus position along the centerline
+    load([site_abbrev,'-melange-masks.mat']); %created using create_melange_masks
+    mask_dates = '';
+    for p = 1:length(melmask.dated)
+        mask_dates(p,:) = melmask.dated(p).datestring;
+        if mel(i).termflag(p) == 1
+            mask_xext(p,:) = [min(melmask.dated(p).x), max(melmask.dated(p).x)];
+            mask_yext(p,:) = [min(melmask.dated(p).y), max(melmask.dated(p).y)];
+        else
+            mask_xext(p,:) = [NaN, NaN];
+            mask_yext(p,:) = [NaN, NaN];
+        end
+    end
+    cd('shapefiles/')
+    S = shaperead([site_abbrev,'-centerline.shp']);
+
+    %read in BedMachine Greenland v5 (elevations referenced to the geoid)
+    cd('/Users/ellynenderlin/Research/miscellaneous/elevations/BedMachine/');
+    bx = ncread('BedMachineGreenland-v5.nc','x');
+    by = ncread('BedMachineGreenland-v5.nc','y');
+    bz = ncread('BedMachineGreenland-v5.nc','bed'); %bed elevations
+    bze = ncread('BedMachineGreenland-v5.nc','errbed'); %bed elevations
+    bzs = ncread('BedMachineGreenland-v5.nc','source'); %data interp (0-2 = direct & mass conservation)
+
+    %subset the bedmap to the melange area
+    BB = [min(mask_xext(:,1))-200,min(mask_yext(:,1)-200); min(mask_xext(:,1))-200,max(mask_yext(:,2)+200);...
+        max(mask_xext(:,2)+200),max(mask_yext(:,2)+200); max(mask_xext(:,2)+200),min(mask_yext(:,1)-200)];
+    bed_xind = [find(bx<=min(BB(:,1)),1,'last'),find(bx>=max(BB(:,1)),1,'first')];
+    bed_yind = [find(by>=max(BB(:,2)),1,'last'),find(by<=min(BB(:,2)),1,'first')];
+    bed_xsub = bx(min(bed_xind):max(bed_xind)); bed_ysub = by(min(bed_yind):max(bed_yind));
+    bed_zsub = bz(min(bed_xind):max(bed_xind),min(bed_yind):max(bed_yind))'; %rotate so rows are y, columns are x
+    bed_zesub = bze(min(bed_xind):max(bed_xind),min(bed_yind):max(bed_yind))';
+    bed_sourcesub = bzs(min(bed_xind):max(bed_xind),min(bed_yind):max(bed_yind))';
+    
+    %filter wonky data from bad interpolation 
+    bed_sourcefilt = bed_zsub; bed_sourcefilt(bed_sourcesub>2) = NaN;
+    bed_errfilt = bed_zsub; bed_errfilt(bed_zesub>=200) = NaN;
+    [b_xgrid,b_ygrid] = meshgrid(bed_xsub,bed_ysub);
+    clear bg bx by bz*;
+
+    %loop through the dates to grab terminus thickness estimates
+    cd([output_dir,site_abbrev,'/DEMs/']);
+    DEM_mats = dir([site_abbrev,'*_melange-DEMfilled.mat']); DEM_dates = ''; %DEMs
+    bmax = NaN(length(DEM_mats),1); tw = NaN(length(DEM_mats),1);
+    for p = 1:length(DEM_mats)
+        DEM_dates(p,:) = DEM_mats(p).name(matfile_daterefs);
+        
+        %get rid of the melange polygon points that are not over the terminus
+        [~,on] = inpolygon(melmask.dated(p).x,melmask.dated(p).y,melmask.uncropped.x,melmask.uncropped.y);
+        melmask.dated(p).x(on) = []; melmask.dated(p).y(on) = [];
+        clear on;
+        tw(p) = sqrt((melmask.dated(p).x(2)-melmask.dated(p).x(end-1)).^2 + (melmask.dated(p).y(2)-melmask.dated(p).y(end-1)).^2);
+
+        %interpolate to the same grid
+        bt_interp = abs(single(interp2(single(b_xgrid),single(b_ygrid),double(bed_sourcefilt),melmask.dated(p).x,melmask.dated(p).y,'linear')));
+        if sum(~isnan(bt_interp)) == 0
+            bt_interp = abs(single(interp2(single(b_xgrid),single(b_ygrid),double(bed_zsub),melmask.dated(p).x,melmask.dated(p).y,'linear')));
+        end
+
+        %only save data from the "terminus" if the inland boundary is
+        %actually the terminus and not just the DEM edge
+        if mel(i).termflag(p) == 1
+            bmed(p) = prctile(bt_interp,[50],"all");
+            bmax(p) = prctile(bt_interp,[95],"all");
+        end
+        clear *_interp;
+    end
+    disp(['average median grounding line depth (m): ',num2str(round(mean(bmed,"omitnan")))]);
+    disp(['average max grounding line depth (m): ',num2str(round(mean(bmax,"omitnan")))]);
+    disp(['terminus width (m): ',num2str(round(mean(tw,"omitnan")))]);
+
+    clear site_abbrev mask_dates S BB bed_* DEM_* *_xgrid *_ygrid mask_*ext;
+    clear bmax bmed tw;
+    cd ../..
+
+end
+% clear mel;
+
+
 %% Calculate buttressing 
 warning off; close all; drawnow;
+disp('Calculating buttressing needed to resist calving...')
 
 %load the data
 cd(output_dir);
@@ -221,6 +335,7 @@ close all;
 site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site directory as a check if they exist
 % if exist([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']) == 2
 %     for i = 1:length(MP)
+%         sitenames(i,:) = MP(i).name;
 %         site_abbrev = char(folderNames(i));
 %         Tfinal = readtable([output_dir,site_abbrev,'/',site_abbrev,'-buttressing-forces.csv']);
 %         Fb_Meng = table2array(Tfinal(:,2))';
@@ -267,6 +382,7 @@ site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site direc
 % else
     disp('Buttressing force (x10^6 N/m) for...')
     for i = 1:length(MP)
+        sitenames(i,:) = MP(i).name;
         site_abbrev = char(folderNames(i));
         load([output_dir,site_abbrev,'/',site_abbrev,'-iceberg_thicknesses.mat'])
 
@@ -348,13 +464,13 @@ site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site direc
                         % %plot the data
                         % if k == 1
                         %     % errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
-                        %     %     'o','color',seas_cmap(p,:),'linewidth',1.5); hold on;
+                        %     %     'o','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
                         % elseif k == 2
                         %     errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
-                        %         's','color',seas_cmap(p,:),'linewidth',1.5); hold on;
+                        %         's','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
                         % else
                         %     errorbar(i,nanmean(min_ang(p,3*(k-1)+1:3*(k-1)+2)),min_ang(p,3*(k-1)+1),min_ang(p,3*(k-1)+2),...
-                        %         'd','color',seas_cmap(p,:),'linewidth',1.5); hold on;
+                        %         'd','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
                         % end
                     end
                 else %larger angle
@@ -373,14 +489,19 @@ site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site direc
                 clear Fbutt;
             end
 
+            
             %average the seasonal melange buttressing estimates across all years
             Fb_Meng(p,1) = round(nanmean(MP(i).B.butt_Meng(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
             Fb_Amundson(p,1) = round(nanmean(MP(i).B.butt_Amundson(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
-            Fbutt_obs(i,p,:) = [Fb_Meng(p,1), Fb_Amundson(p,1)];
+            if ~contains(string(sitenames(i,:)),'KBG')
+                Fbutt_obs(i,p,:) = [Fb_Meng(p,1), Fb_Amundson(p,1)];
+            else
+                Fbutt_obs(i,p,:) = [NaN, NaN];
+            end
 
             % %add the estimated buttressing to the plot
-            % plot(i,Fb_Meng(p,1),'+','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
-            % plot(i,Fb_Amundson(p,1),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+            % plot(i,Fb_Meng(p,1),'+','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5,'markersize',16); hold on;
+            % plot(i,Fb_Amundson(p,1),'x','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5,'markersize',16); hold on;
             % drawnow;
         end
         clear H_range Hmax Hiqr;
@@ -414,7 +535,7 @@ sub4 = subplot(3,2,2); sub5 = subplot(3,2,4); sub6 = subplot(3,2,6);
 for j = 1:6
     eval(['subplot(sub',num2str(j),')']);
     fill([0,15,0,0],[0,15,15,0],'k','FaceAlpha',0.2,'EdgeColor','none'); hold on;
-    plot([0,15],[0,15],'--k','linewidth',1.5); hold on;
+    plot([0,15],[0,15],'--k','linewidth',1,'markersize',8.5); hold on;
     if j <= 3
         text(0.9,1.1,'unbuttressed','fontsize',16,'rotation',45);
         text(1.2,1.02,'buttressed','fontsize',16,'rotation',45);
@@ -423,53 +544,83 @@ for j = 1:6
         text(1.7,0.95,'buttressed','fontsize',16,'rotation',10);
     end
 end
+
+%find the references for the big3 sites
+big_idx = find(ismember(sitenames,big3)==1);
+norm_idx = find(ismember(sitenames,big3)==0 & ~ismember(sitenames,{'KBG'}));
+
 %plot the data
 for p = 1:4
     ymid = nanmean(Fbutt_obs(:,p,:),3); yneg_err = ymid - min(Fbutt_obs(:,p,:),[],3); ypos_err = min(Fbutt_obs(:,p,:),[],3) - ymid; 
-    
+    disp([num2str(sum(~isnan(ymid))),' sites']);
+
     %needed vs observed: barely grounded (GL)
     subplot(sub1);
     xmid = nanmean(Fbutt_ming(:,p,1:2),3); xneg_err = xmid - min(Fbutt_ming(:,p,1:2),[],3); xpos_err = min(Fbutt_ming(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_ming(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'.','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    plot(ymid(norm_idx),xmid(norm_idx),'s','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid(big_idx),xmid(big_idx),'d','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid,Fbutt_ming(:,p,3),'*','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    disp(['Cannot resist barely-grounded iceberg calving for 0.1^o rotation for ',char(season_names(p)),' at :']);
+    disp(sitenames(Fbutt_ming(:,p,3)>ymid,:));
     clear xmid;
     subplot(sub4);
     xmid = nanmean(Fbutt_maxg(:,p,1:2),3); xneg_err = xmid - min(Fbutt_maxg(:,p,1:2),[],3); xpos_err = min(Fbutt_maxg(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'d','color',seas_cmap(p,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_maxg(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'.','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    plot(ymid(norm_idx),xmid(norm_idx),'s','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid(big_idx),xmid(big_idx),'d','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid,Fbutt_maxg(:,p,3),'*','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on; 
+    disp(['Cannot resist barely-grounded iceberg calving for 1^o rotation for ',char(season_names(p)),' at :']);
+    disp(sitenames(Fbutt_maxg(:,p,3)>ymid,:));
     clear xmid;
 
     %needed vs observed: 90% GL thickness
     subplot(sub2);
     xmid = nanmean(Fbutt_minf(:,p,1:2),3); xneg_err = xmid - min(Fbutt_minf(:,p,1:2),[],3); xpos_err = min(Fbutt_minf(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_minf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'.','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    plot(ymid(norm_idx),xmid(norm_idx),'s','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid(big_idx),xmid(big_idx),'d','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid,Fbutt_minf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    disp(['Cannot resist thick floating iceberg calving for 0.1^o rotation for ',char(season_names(p)),' at :']);
+    disp(sitenames(Fbutt_minf(:,p,3)>ymid,:));
     clear xmid;
     subplot(sub5);
     xmid = nanmean(Fbutt_maxf(:,p,1:2),3); xneg_err = xmid - max(Fbutt_minf(:,p,1:2),[],3); xpos_err = min(Fbutt_maxf(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'d','color',seas_cmap(p,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_maxf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'.','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    plot(ymid(norm_idx),xmid(norm_idx),'s','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid(big_idx),xmid(big_idx),'d','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid,Fbutt_maxf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    disp(['Cannot resist thick floating iceberg calving for 1^o rotation for ',char(season_names(p)),' at :']);
+    disp(sitenames(Fbutt_maxf(:,p,3)>ymid,:));
     clear xmid;
     
     %needed vs observed: 50% GL thickness
     subplot(sub3);
     xmid = nanmean(Fbutt_thinminf(:,p,1:2),3); xneg_err = xmid - min(Fbutt_thinminf(:,p,1:2),[],3); xpos_err = min(Fbutt_thinminf(:,p,1:2),[],3) - xmid; 
-    pl(p) = errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_thinminf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    pl(p) = errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'.','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    plot(ymid(norm_idx),xmid(norm_idx),'s','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid(big_idx),xmid(big_idx),'d','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid,Fbutt_thinminf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    disp(['Cannot resist thin floating iceberg calving for 0.1^o rotation for ',char(season_names(p)),' at :']);
+    disp(sitenames(Fbutt_thinminf(:,p,3)>ymid,:));
     clear xmid;
     subplot(sub6);
     xmid = nanmean(Fbutt_thinmaxf(:,p,1:2),3); xneg_err = xmid - min(Fbutt_thinmaxf(:,p,1:2),[],3); xpos_err = min(Fbutt_thinmaxf(:,p,1:2),[],3) - xmid; 
-    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'s','color',seas_cmap(p,:),'linewidth',2); hold on;
-    plot(ymid,Fbutt_thinmaxf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',2); hold on;
+    errorbar(ymid,xmid,xneg_err,xpos_err,yneg_err,yneg_err,'.','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    plot(ymid(norm_idx),xmid(norm_idx),'s','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid(big_idx),xmid(big_idx),'d','MarkerFaceColor',seas_cmap(p,:),'MarkerEdgeColor',seas_cmap(p,:),'linewidth',1,'markersize',8); hold on;
+    plot(ymid,Fbutt_thinmaxf(:,p,3),'*','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5); hold on;
+    disp(['Cannot resist thin floating iceberg calving for 1^o rotation for ',char(season_names(p)),' at :']);
+    disp(sitenames(Fbutt_thinmaxf(:,p,3)>ymid,:));
     clear xmid;
     
     % %observed for each site
     % subplot(sub1);
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5,'markersize',16); hold on;
     % subplot(sub2);
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
-    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',2,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,1),'+','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5,'markersize',16); hold on;
+    % plot([1:1:length(MP)],Fbutt_obs(:,p,2),'x','color',seas_cmap(p,:),'linewidth',1,'markersize',8.5,'markersize',16); hold on;
 end
 subplot(sub1); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
 pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
@@ -477,11 +628,11 @@ text(0.05,0.935*max(ylims),'d) Grounded Thickness (GH): 0.1^o Rotation','fontsiz
 subplot(sub2); set(gca,'ylim',[0 2.5],'xlim',[0 5],'fontsize',20); ylims = get(gca,'ylim');
 pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(4)]);
 rectangle('Position',[3.2 1.75 1.7 0.65],'FaceColor','none','EdgeColor',[0.5 0.5 0.5],'LineWidth',0.5);
-errorbar(3.35,2.3,0,0,0.1,0.1,'s','color','k','linewidth',2); hold on;
+errorbar(3.35,2.3,0,0,0.1,0.1,'s','color','k','linewidth',1,'markersize',8.5); hold on;
 text(3.5,2.3,'M24-A25 span','fontsize',16);
-errorbar(3.35,2.1,0.1,0.1,'s','color','k','linewidth',2); hold on;
+errorbar(3.35,2.1,0.1,0.1,'s','color','k','linewidth',1,'markersize',8.5); hold on;
 text(3.5,2.1,'IQR','fontsize',16);
-plot(3.35,1.9,'*','color','k','linewidth',2); hold on;
+plot(3.35,1.9,'*','color','k','linewidth',1,'markersize',8.5); hold on;
 text(3.5,1.9,'95th-percentile','fontsize',16);
 text(0.05,0.935*max(ylims),'e) 90% GH: 0.1^o Rotation','fontsize',20); 
 ylabel('Bottom-out calving torque (x10^6 N/m)','fontsize',20);
@@ -501,6 +652,7 @@ pos = get(gca,'position'); set(gca,'position',[pos(1) pos(2) 1.1*pos(3) 1.1*pos(
 text(0.05,0.935*max(ylims),'i) 50% GH: 1.0^o Rotation','fontsize',20); 
 xlabel('Generated buttressing (x10^6 N/m)','fontsize',20);
 saveas(gcf,[output_dir,'GrIS-buttressing-intercomparison-scatterplots.png'],'png'); %save the plots
+exportgraphics(gcf,[output_dir,'GrIS-buttressing-intercomparison-scatterplots.tif'],Resolution=600);
 
 
 function [Ft] = calculate_taus(H,ang,E,rho_i,rho_w,calve_mode)

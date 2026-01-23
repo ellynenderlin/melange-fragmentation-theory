@@ -915,6 +915,7 @@ term_leg = legend(pl,geo_names(site_ind));
 set(gca,'xlim',[1,13],'xtick',[1:12],'fontsize',16); grid on;
 xlabel('Month','fontsize',16); ylabel('Normalized seasonal terminus anomaly','fontsize',16);
 saveas(seasterm_fig,[root_dir,'GrIS-terminus-seasonal-anomalies_plot.png'],'png'); %save the plots
+exportgraphics(seasterm_fig,[root_dir,'GrIS-terminus-seasonal-anomalies_plot.tif'],Resolution=600);
 close all; 
 clear pl term_cmap site_ind;
 disp('Done plotting terminus timeseries');
@@ -923,8 +924,8 @@ disp('Done plotting terminus timeseries');
 %% extract melange attributes, estimate buttressing, & make overview plots
 close all; drawnow;
 
-%REDO PLOTS TO HAVE 3 COLUMNS & 7 ROWS(?), LEAVING A BIG HOLE IN THE MIDDLE
-%FOR THE MAP AND A GAP ALONG THE RIGHT EDGE FOR THE EAST COAST
+%set up site-aggregated plots to be arranged somewhat geographically but
+%with a hole for the site map to be inserted
 % rows = 9; cols = 2; %9 sites in west Greenland
 % plot_locs = [1,3,5,7,9,11,13,15,17,18,16,14,12,2];
 rows = 7; cols = 3; %9 sites in west Greenland
@@ -951,7 +952,7 @@ for j = 1:length(plot_locs)
     % figure(Vfig);
     % eval(['subV',num2str(geo_ind(j)),'=subplot(',num2str(rows),',',num2str(cols),',',num2str(plot_locs(j)),');']);
 end
-missfig = figure; set(missfig,'position',[950 50 450 500]); 
+missfig = figure; set(missfig,'position',[1050 50 450 500]); 
 % subm1 = subplot(2,1,1); subm2 = subplot(2,1,2);
 
 % %If adding new dates, profiles need to be removed from the structure
@@ -962,8 +963,11 @@ missfig = figure; set(missfig,'position',[950 50 450 500]);
 %     MP(j).V = rmfield(MP(j).V,{'dist','Vseas','dVdx'});
 % end
 
-disp(['Creating profile plots ignoring icebergs thinner than ',num2str(Hcutoff),'m & using ',vfilter,' speeds w/ dt ~',num2str(round([vdtmin,vdtmax])),' days'])
+%create dummy vectors to hold all buttressing data for histogram plotting
+BM_annual = []; BM_character = []; BA_annual = []; BA_character = [];
+site_naming = []; PS_X = []; PS_Y = []; sp_stats = [];
 
+disp(['Creating profile plots ignoring icebergs thinner than ',num2str(Hcutoff),'m & using ',vfilter,' speeds w/ dt ~',num2str(round([vdtmin,vdtmax])),' days']);
 %iterate
 for j = 1:length(MP)
     sitenames(j,:) = MP(j).name; seasons = MP(j).D.months;
@@ -1698,7 +1702,7 @@ for j = 1:length(MP)
         'ytick',[10^-9,10^-5,10^-1],...
         'xtick',[10^2,10^4,10^6],'xticklabel',[10^2,10^4,10^6],'fontsize',16); grid on;
     xlabel('Surface area (m^2)','fontsize',16); ylabel('Iceberg count','fontsize',16);
-    text(10000,10^-2,'near-terminus','fontsize',16);
+    % text(10000,10^-2,'near-terminus','fontsize',16);
     %seaward bin
     subplot(4,2,6);
     for k = 1:4
@@ -1708,7 +1712,7 @@ for j = 1:length(MP)
         'ytick',[10^-9,10^-5,10^-1],...
         'xtick',[10^2,10^4,10^6],'xticklabel',[10^2,10^4,10^6],'fontsize',16); grid on;
     xlabel('Surface area (m^2)','fontsize',16);
-    text(10000,10^-2,'seaward','fontsize',16);
+    % text(10000,10^-2,'seaward','fontsize',16);
     drawnow;
     
     %estimate buttressing
@@ -1730,6 +1734,9 @@ for j = 1:length(MP)
             for p = 1:length(years)
                 % add seasonal buttressing info to the structure
                 MP(j).B.dVdx(1,k,p) = (diff(vel_seas(1+ref_adjust:2+ref_adjust,k,p))./diff(vdist(1+ref_adjust:2+ref_adjust)))/365; %shift referencing from velocities as needed
+                %if no velocity for the first melange point, look one
+                %further down-fjord
+                if isnan(MP(j).B.dVdx(1,k,p)); MP(j).B.dVdx(1,k,p) = (diff([vel_seas(1+ref_adjust,k,p),vel_seas(3+ref_adjust,k,p)])./diff([vdist(1+ref_adjust),vdist(3+ref_adjust)]))/365; end
                 press = 0.5*rho_i*(1-(rho_i/rho_w))*9.81*MP(j).B.Ho(zcutoff+1,k,p);
                 MP(j).B.butt_Meng(zcutoff+1,k,p) = press*MP(j).B.packing(zcutoff+1,k,p)*MP(j).B.Ho(zcutoff+1,k,p);
                 MP(j).B.butt_Amundson(zcutoff+1,k,p) = (-2*(MP(j).B.Ho(zcutoff+1,k,p)*press*MP(j).B.dVdx(1,k,p))/((MP(j).B.dVdx(1,k,p)/0.3)+MP(j).B.dVdx(1,k,p)))+press*MP(j).B.Ho(zcutoff+1,k,p);
@@ -1737,6 +1744,7 @@ for j = 1:length(MP)
             end
         end
     end
+    MP(j).B.butt_Meng(MP(j).B.butt_Meng==0) = NaN; MP(j).B.butt_Amundson(MP(j).B.butt_Amundson==0) = NaN; 
 
     %plot seasonal profiles of melange characteristics
     % bergAfig = figure; set(gcf,'position',[50 50 1200 400]); 
@@ -1782,7 +1790,7 @@ for j = 1:length(MP)
 
         %format the site figure
         ax2.YAxis(1).Color = 'k'; ax2.YAxis(2).Color = 'k'; 
-        ax2.YAxis(1).Label.String = 'Bergy bit misprediction';
+        ax2.YAxis(1).Label.String = 'Bergy bit misprediction (%)';
         ax2.YAxis(2).Label.String = 'Packing density (%)';
 
         %scatterplot of bergy bit misfits vs packing density for all sites
@@ -1897,6 +1905,7 @@ for j = 1:length(MP)
     xlabel('Distance from terminus (km)','fontsize',16); 
     yyaxis left
     plot([0,max_xlim],[0,0],'-k','linewidth',1); hold on; %add zero misfit line
+    set(gca,'ylim',[-1,1],'ytick',[-1:0.5:1],'yticklabel',[-100:50:100]); %adjust labeling to percents
     % %add a dummy legend for line types
     % rectangle(gca,'Position',[0.85*max_xlim, 0.5*max(get(gca,'ylim')), 0.14*max_xlim, 0.45*max(get(gca,'ylim'))],...
     %     'FaceColor','w','EdgeColor','k');
@@ -1916,7 +1925,7 @@ for j = 1:length(MP)
     % ylabel('Packing density (%)','fontsize',16); 
     % subplot(subm2);
     set(gca,'fontsize',12); grid on; drawnow;
-    set(gca,'xlim',[-1,1.5],'ylim',[0,100]);
+    set(gca,'xlim',[-1,1],'xtick',[-1:0.5:1],'xticklabel',[-100:50:100],'ylim',[0,100]);
     xlabel('Bergy bit misprediction (% Area)','fontsize',12); ylabel('Packing density (%)','fontsize',12); 
     clear pz ps *_leg pos;
 
@@ -1959,6 +1968,19 @@ for j = 1:length(MP)
     disp('   Amundson Eqn (thickness- & strainrate-based): x10^6 N/m');
     disp(['    winter = ',num2str(round(nanmean(MP(j).B.butt_Amundson(zcutoff+1,1,:))/10^6,2)),', spring = ',num2str(round(nanmean(MP(j).B.butt_Amundson(zcutoff+1,2,:))/10^6,2)),', summer = ',num2str(round(nanmean(MP(j).B.butt_Amundson(zcutoff+1,3,:))/10^6,2)),', fall = ',num2str(round(nanmean(MP(j).B.butt_Amundson(zcutoff+1,4,:))/10^6,2))]);
     disp(' ');
+    BM_annual = [BM_annual; squeeze(MP(j).B.butt_Meng(zcutoff+1,1,:))./10^6, squeeze(MP(j).B.butt_Meng(zcutoff+1,2,:))./10^6, squeeze(MP(j).B.butt_Meng(zcutoff+1,3,:))./10^6, squeeze(MP(j).B.butt_Meng(zcutoff+1,4,:))./10^6];
+    BM_character = [BM_character; nanmean(MP(j).B.butt_Meng(zcutoff+1,1,:))/10^6, nanmean(MP(j).B.butt_Meng(zcutoff+1,2,:))/10^6, nanmean(MP(j).B.butt_Meng(zcutoff+1,3,:))/10^6, nanmean(MP(j).B.butt_Meng(zcutoff+1,4,:))/10^6];
+    BA_annual = [BA_annual; squeeze(MP(j).B.butt_Amundson(zcutoff+1,1,:))./10^6, squeeze(MP(j).B.butt_Amundson(zcutoff+1,2,:))./10^6, squeeze(MP(j).B.butt_Amundson(zcutoff+1,3,:))./10^6, squeeze(MP(j).B.butt_Amundson(zcutoff+1,4,:))./10^6];
+    BA_character = [BA_character; nanmean(MP(j).B.butt_Amundson(zcutoff+1,1,:))/10^6, nanmean(MP(j).B.butt_Amundson(zcutoff+1,2,:))/10^6, nanmean(MP(j).B.butt_Amundson(zcutoff+1,3,:))/10^6, nanmean(MP(j).B.butt_Amundson(zcutoff+1,4,:))/10^6];
+
+    %combine site names, coordinates, and spring thickness+buttressing into a matrix
+    %for exporting as a site summary CSV
+    if ~contains(MP(j).name,'KBG')
+        site_naming = [site_naming; geo_order(find(geo_ind==j)), geo_names(find(geo_ind==j))];
+        PS_X = [PS_X; nanmean(MP(j).Z.termX)]; PS_Y = [PS_Y; nanmean(MP(j).Z.termY)];
+        sp_stats = [sp_stats; nanmean(MP(j).B.Ho(zcutoff+1,2,:)),...
+            nanmean(cat(3,MP(j).B.butt_Meng(zcutoff+1,2,~isnan(MP(j).B.butt_Amundson(zcutoff+1,2,:))),MP(j).B.butt_Amundson(zcutoff+1,2,~isnan(MP(j).B.butt_Amundson(zcutoff+1,2,:)))),"all")/10^6];
+    end
 
     %export the data to tables
     yrs_temp = []; seas_temp = [];
@@ -2024,28 +2046,92 @@ for j = 1:length(MP)
     %save the data and the figure
     save([root_dir,'GrIS-melange-characteristics.mat'],'MP','-v7.3');
     saveas(sitefig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-speed-size_',num2str(Hcutoff),'m-Hthreshold_',num2str(vdtmin),'-',num2str(vdtmax),'dt-',vfilter,'-speeds_',sampling,'-profiles.png'],'png'); %save the plots
+    exportgraphics(sitefig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-speed-size_',num2str(Hcutoff),'m-Hthreshold_',num2str(vdtmin),'-',num2str(vdtmax),'dt-',vfilter,'-speeds_',sampling,'-profiles.tif'],Resolution=600);
     % saveas(bergAfig,[root_dir,MP(j).name,'/',MP(j).name,'-seasonal-melange-properties_profiles.png'],'png'); %save the plots
     disp(['Done with #',num2str(j),': ',MP(j).name]);
-    % figure(bergAfig);
-    % disp('Close misfit/packing density figure to advance'); disp(' ');
-    % uiwait %advance only after figure is closed
-    
+    % % figure(sitefig);
+    % % disp('Close the site figure to advance'); disp(' ');
+    % % uiwait %advance only after figure is closed
+    % saveas(missfig,[root_dir,MP(j).name,'/',MP(j).name,'-bergybit_scatterplot.png'],'png'); 
+    % exportgraphics(missfig,[root_dir,MP(j).name,'/',MP(j).name,'-bergybit_scatterplot.tif'],Resolution=600);
+    % clf(missfig); %clear everything from the bergy bit misfit figure so you can look at data for each site
+    close(sitefig); %close(bergAfig);
+    drawnow; 
+
     %refresh
     clear berg_* bergdist* berg_normdist* C centerline* D Dsubs *idx seaward_* inland_* term_* tran_* size_classes Zfilt H_* Havg vel_* vels* v_mean w zdate berg_mo bins bin_no z_* pos pz pv *dist *yrs *mos seas_leg packing;
     clear leg_* ref_* Tdate* xlims Tslopes res* Tres size_plslope bin* column_names dv1 v1 n1* *_seas ax ax2 max_xlim width_prof Vterm dVdxterm subv subz*;
     clear ax1 ax2;
-    close(sitefig); 
-    % close(bergAfig); 
-    drawnow; 
+
 end
 figure(missfig); miss_leg = legend(pm,'terminus','10 km','20 km'); set(miss_leg,'location','southeast');
+saveas(missfig,[root_dir,'GrIS-bergybit_scatterplot.png'],'png'); 
+exportgraphics(missfig,[root_dir,'GrIS-bergybit_scatterplot.tif'],Resolution=600);
 clear pm;
 
-% %save the GrIS-wide plots
+
+%save the GrIS-wide profiles
 saveas(Hfig,[root_dir,'GrIS-melange_thickness-speed_profiles.png'],'png'); 
+exportgraphics(Hfig,[root_dir,'GrIS-melange_thickness-speed_profiles.tif'],Resolution=600);
 % saveas(Hfig,[root_dir,'GrIS-melange-thickness_profiles.png'],'png'); 
 % saveas(Vfig,[root_dir,'GrIS-melange-speed_profiles.png'],'png'); 
-saveas(missfig,[root_dir,'GrIS-bergybit_scatterplot.png'],'png'); 
+
+
+%create histograms of buttressing
+buttfig = figure; set(buttfig,'position',[450 50 900 900]); 
+for k = [2,3,4,1]
+    subplot(2,2,1);
+    hM(k) = histogram(BM_annual(~isnan(BM_annual(:,k)),k),'BinEdges',[0.1:0.1:12],'FaceColor',seas_cmap(k,:),'EdgeColor',seas_cmap(k,:),...
+        'EdgeAlpha',1,'LineWidth',1); hold on;
+    set(gca,'fontsize',16,'ylim',[0,17],'xlim',[0,12],'box','on'); ylabel('Count','fontsize',16); xlabel('Buttressing (x10^6 N/m)','fontsize',16);
+    text(0.15,0.95*17,'a) annual packing-based buttressing','fontsize',16);
+    subplot(2,2,2);
+    hA(k) = histogram(BA_annual(~isnan(BA_annual(:,k)),k),'BinEdges',[0.1:0.1:12],'FaceColor',seas_cmap(k,:),'EdgeColor',seas_cmap(k,:),...
+        'EdgeAlpha',1,'LineWidth',1); hold on;
+    set(gca,'fontsize',16,'ylim',[0,17],'xlim',[0,12],'box','on'); xlabel('Buttressing (x10^6 N/m)','fontsize',16);
+    text(0.15,0.95*17,'b) annual strain rate-based buttressing','fontsize',16);
+    subplot(2,2,3);
+    histogram(BM_character(~isnan(BM_character(:,k)),k),'BinEdges',[0.1:0.1:7],'FaceColor',seas_cmap(k,:),'EdgeColor',seas_cmap(k,:),...
+        'EdgeAlpha',1,'LineWidth',1); hold on;
+    set(gca,'fontsize',16,'ylim',[0,6],'xlim',[0,7],'box','on'); ylabel('Count','fontsize',16); xlabel('Buttressing (x10^6 N/m)','fontsize',16);
+    text(0.1,0.95*6,'c) characteristic packing-based buttressing','fontsize',16);
+    subplot(2,2,4);
+    histogram(BA_character(~isnan(BA_character(:,k)),k),'BinEdges',[0.1:0.1:7],'FaceColor',seas_cmap(k,:),'EdgeColor',seas_cmap(k,:),...
+        'EdgeAlpha',1,'LineWidth',1); hold on;
+    set(gca,'fontsize',16,'ylim',[0,6],'xlim',[0,7],'box','on'); xlabel('Buttressing (x10^6 N/m)','fontsize',16);
+    text(0.1,0.95*6,'d) characteristic strain rate-based buttressing','fontsize',16);
+
+    %display medians across all sites for the season
+    disp(['Median Meng buttressing estimate for ',char(season_names(k)),' = ',num2str(round(nanmedian(BM_character(:,k),"all"),2)),'x10^6 N/m']);
+    disp(['Median Amundson buttressing estimate for ',char(season_names(k)),' = ',num2str(round(nanmedian(BA_character(:,k),"all"),2)),'x10^6 N/m']);
+end
+subplot(2,2,1); pos = get(gca,'position'); set(gca,'position',[pos(1)-0.03 pos(2) 1.15*pos(3) 1.05*pos(4)]);
+subplot(2,2,2); pos = get(gca,'position'); set(gca,'position',[pos(1)-0.03 pos(2) 1.15*pos(3) 1.05*pos(4)]);
+subplot(2,2,3); pos = get(gca,'position'); set(gca,'position',[pos(1)-0.03 pos(2) 1.15*pos(3) 1.05*pos(4)]);
+subplot(2,2,4); pos = get(gca,'position'); set(gca,'position',[pos(1)-0.03 pos(2) 1.15*pos(3) 1.05*pos(4)]);
+disp(['Mean difference between Meng & Amundson buttressing estimates = ',num2str(round(nanmean(BM_annual-BA_annual,"all"),2)),'x10^6 N/m']);
+disp(['Mean PERCENT difference between Meng & Amundson buttressing estimates = ',num2str(round(100*nanmean((BM_annual-BA_annual)./nanmean(cat(3,BM_annual,BA_annual),3),"all"),0)),'%']);
+%display medians across spring & summer using only sites with data from both seasons
+disp('Seasonal Meng & Amundson buttressing omitting sites with spring-only data:')
+disp(['Medians for ',char(season_names(2)),' = ',num2str(round(nanmedian(BM_character(~isnan(BM_character(:,3)),2),"all"),2)),...
+    ' and ',num2str(round(nanmedian(BA_character(:,2),"all"),2)),'x10^6 N/m']);
+disp(['Medians for ',char(season_names(3)),' = ',num2str(round(nanmedian(BM_character(~isnan(BM_character(:,3)),3),"all"),2)),...
+    ' and ',num2str(round(nanmedian([BA_character(~isnan(BA_character(:,3)),3); zeros(sum(~isnan(BM_character(~isnan(BM_character(:,3)),2)))-sum(~isnan(BA_character(:,3))),1)],"all"),2)),'x10^6 N/m']);
+disp('Seasonal Meng & Amundson buttressing omitting sites with spring-only data AND without strain rate-based estimates:')
+disp(['Medians for ',char(season_names(2)),' = ',num2str(round(nanmedian(BM_character(~isnan(BM_character(:,3)) & ~isnan(BA_character(:,3)),2),"all"),2)),...
+    ' and ',num2str(round(nanmedian(BA_character(~isnan(BM_character(:,3)) & ~isnan(BA_character(:,3)),2),"all"),2)),'x10^6 N/m']);
+disp(['Medians for ',char(season_names(3)),' = ',num2str(round(nanmedian(BM_character(~isnan(BM_character(:,3)) & ~isnan(BA_character(:,3)),3),"all"),2)),...
+    ' and ',num2str(round(nanmedian(BA_character(~isnan(BM_character(:,3)) & ~isnan(BA_character(:,3)),3),"all"),2)),'x10^6 N/m']);
+%save the buttressing plot
+saveas(buttfig,[root_dir,'GrIS-melange_buttressing_histograms.png'],'png'); 
+exportgraphics(buttfig,[root_dir,'GrIS-melange_buttressing_histograms.tif'],Resolution=600);
+
+%export overview data to a CSV (used for plotting sitemap in QGIS)
+TS = [array2table(site_naming(:,2)), array2table(PS_X), array2table(PS_Y), array2table(sp_stats)];
+column_names = ["Site Name","X (m)", "Y (m)","Melange thickness (m)","Melange buttressing (x10^6 N/m)"]; TS.Properties.VariableNames = column_names;
+writetable(TS,[root_dir,'GrIS-melange-sites.csv']);
+clear TS;
+
 
 
 %% create overview maps for each site
@@ -2353,6 +2439,7 @@ for j = 1%:length(MP)
         set(ax2,'position',[pos(1) pos(2) pos(3) pos(4)]); drawnow;
     end
     saveas(map_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-',suffix,'.png'],'png'); %save the image
+    exportgraphics(map_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-',suffix,'.tif'],Resolution=600);
     % uiwait %advance only after figure is closed
 
     %for Alison Glacier for 20110610, create a two subpanel figure to
@@ -2465,7 +2552,9 @@ for j = 1%:length(MP)
         % set(subp,'position',[map_pos(1) plot_pos(2) map_pos(3) map_pos(4)]);
         set(subp,'position',[0.185 0.11 0.7 0.34]);
 
+        %save the figure
         saveas(ex_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-bergy-bit_example-subplots.png'],'png'); %save the image
+        exportgraphics(ex_fig,[root_dir,sitenames(j,:),'/',sitenames(j,:),'-bergy-bit_example-subplots.tif'],Resolution=600);
         close(ex_fig);
         clear inland_idx v n dv n1 v1 dv1;
     end
@@ -2945,6 +3034,8 @@ for l = 1:2
 end
 set(seas_leg,'position',[0.43 0.94 0.2,0.03]);
 saveas(subdist_fig,[root_dir,'GrIS-melange_iceberg-distribution-variability_',suffix,'.png'],'png'); %save the plot
+exportgraphics(subdist_fig,[root_dir,'GrIS-melange_iceberg-distribution-variability_',suffix,'.tif'],Resolution=600);
+
 
 %% load TermPicks timeseries for each glacier
 % cd(root_dir);
@@ -3007,8 +3098,4 @@ saveas(subdist_fig,[root_dir,'GrIS-melange_iceberg-distribution-variability_',su
 % end
 
 
-
-%% CALCULATE BUTTRESSING FOR EACH INDIVIDUAL DATE 
-% (to create probability density functions showing
-%the full suite of buttressing estimates)
 

@@ -6,30 +6,34 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/');
 %site-specific parameters below before each rerun)
 
 %site-specific info
-root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
-site_abbrev = 'ASG'; site_name = 'Alison';
-ref_image = 'S2A_21XWC_20180304_0_L2A_B08_clipped.tif'; %Alison = 'S2A_21XWC_20200731_1_L2A_B08_clipped.tif', %Zachariae = 'S2A_27XWH_20200802_3_L2A_B08_clipped.tif'
+root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/art/';
+im_dir = [root_dir,'S2/'];
+site_abbrev = 'SEK'; site_name = 'Sermeq Kujalleq';
+% ref_image = 'S2A_21XWC_20180304_0_L2A_B08_clipped.tif'; %Alison = 'S2A_21XWC_20200731_1_L2A_B08_clipped.tif', %Zachariae = 'S2A_27XWH_20200802_3_L2A_B08_clipped.tif'
+ref_image  = 'S2B_22WEB_20190221_1_L2A_B08_clipped.tif'; %SEK
 
 %load the data
-load([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat']); %load the melange mask file
-ims = dir([root_dir,site_abbrev,'/images/S2/','S*B08_clipped.tif']); im_refs = []; im_dates = [];
+% load([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat']); %load the melange mask file
+% ims = dir([im_dir,'S*B08_clipped.tif']); im_refs = []; im_dates = [];
+ims = dir([im_dir,'S*B08_clipped.tif']); im_refs = []; im_dates = [];
 for k = 1:length(ims)
-    % if contains(ims(k).name,'_2019') || contains(ims(k).name,'_2020')
-    if contains(ims(k).name,'_2018')
+    im_dates = [im_dates; ims(k).name(11:18)];
+    if contains(ims(k).name,'_2019') || contains(ims(k).name,'_2020') || contains(ims(k).name,'_2021')
+    % if contains(ims(k).name,'_2018')
 %         ref_image = [ims(k).folder,'/',ims(k).name];
-        im_refs = [im_refs; k]; im_dates = [im_dates;ims(k).name(11:18);];
+        im_refs = [im_refs; k]; 
     end
 end
 
 %sort the images by date
 for k = 1:length(im_refs)
-    decidate(k,1) = convert_to_decimaldate(im_dates(k,:)); 
+    decidate(k,1) = convert_to_decimaldate(im_dates(im_refs(k),:)); 
 end
 [sorted_dates,date_refs] = sort(decidate);
 
 %load a good reference image from late July 2020 (time period used as the
 %reference for terminus delineations)
-[I,R] = readgeoraster([root_dir,site_abbrev,'/images/S2/',ref_image]);
+[I,R] = readgeoraster([im_dir,ref_image]);
 im.x = linspace(R.XWorldLimits(1),R.XWorldLimits(2),R.RasterSize(2));
 im.y = linspace(R.YWorldLimits(2),R.YWorldLimits(1),R.RasterSize(1));
 im.z = double(I);
@@ -50,7 +54,7 @@ for j = 1:length(date_refs)
     %decide whether to plot the image
     if j == 1
         %load the image for the specified date
-        [I,R] = readgeoraster([root_dir,site_abbrev,'/images/S2/',ims(im_refs(date_refs(j))).name]);
+        [I,R] = readgeoraster([im_dir,ims(im_refs(date_refs(j))).name]);
         im.x = linspace(R.XWorldLimits(1),R.XWorldLimits(2),R.RasterSize(2));
         im.y = linspace(R.YWorldLimits(2),R.YWorldLimits(1),R.RasterSize(1));
         im.z = double(I);
@@ -68,7 +72,7 @@ for j = 1:length(date_refs)
     else
         if sorted_dates(j)-last_date >= 7/365
             %load the image for the specified date
-            [I,R] = readgeoraster([root_dir,site_abbrev,'/images/S2/',ims(im_refs(date_refs(j))).name]);
+            [I,R] = readgeoraster([im_dir,ims(im_refs(date_refs(j))).name]);
             im.x = linspace(R.XWorldLimits(1),R.XWorldLimits(2),R.RasterSize(2));
             im.y = linspace(R.YWorldLimits(2),R.YWorldLimits(1),R.RasterSize(1));
             im.z = double(I);
@@ -94,7 +98,7 @@ for j = 1:length(date_refs)
 end
 close;
 
-filename = [root_dir,site_abbrev,'/',site_abbrev,'-Sentinel2-images.gif']; % Specify the output file name
+filename = [im_dir,site_abbrev,'-Sentinel2-images.gif']; % Specify the output file name
 for idx = 1:nimages-1
     [A,map] = rgb2ind(gif_im{idx},256);
     if idx == 1
