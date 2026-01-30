@@ -6,21 +6,20 @@ addpath('/Users/ellynenderlin/Research/miscellaneous/general-code/');
 %site-specific parameters below before each rerun)
 
 %site-specific info
-root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/art/';
-im_dir = [root_dir,'S2/'];
-site_abbrev = 'SEK'; site_name = 'Sermeq Kujalleq';
+root_dir = '/Users/ellynenderlin/Research/NSF_GrIS-Freshwater/melange/';
+site_abbrev = 'MGG'; site_name = 'Midgard';
+im_dir = [root_dir,site_abbrev,'/images/S2/'];
 % ref_image = 'S2A_21XWC_20180304_0_L2A_B08_clipped.tif'; %Alison = 'S2A_21XWC_20200731_1_L2A_B08_clipped.tif', %Zachariae = 'S2A_27XWH_20200802_3_L2A_B08_clipped.tif'
-ref_image  = 'S2B_22WEB_20190221_1_L2A_B08_clipped.tif'; %SEK
+% ref_image  = 'S2A_22WEB_20190216_0_L2A_B08_clipped.tif'; %SEK
+disp(['Creating S2 image gif for ',site_abbrev]);
 
 %load the data
 % load([root_dir,site_abbrev,'/',site_abbrev,'-melange-masks.mat']); %load the melange mask file
 % ims = dir([im_dir,'S*B08_clipped.tif']); im_refs = []; im_dates = [];
-ims = dir([im_dir,'S*B08_clipped.tif']); im_refs = []; im_dates = [];
+ims = dir([im_dir,'S*_clipped.tif']); im_refs = []; im_dates = [];
 for k = 1:length(ims)
     im_dates = [im_dates; ims(k).name(11:18)];
-    if contains(ims(k).name,'_2019') || contains(ims(k).name,'_2020') || contains(ims(k).name,'_2021')
-    % if contains(ims(k).name,'_2018')
-%         ref_image = [ims(k).folder,'/',ims(k).name];
+    if contains(ims(k).name,'_2019') || str2num(ims(k).name(11:14)) >= 2020
         im_refs = [im_refs; k]; 
     end
 end
@@ -33,7 +32,8 @@ end
 
 %load a good reference image from late July 2020 (time period used as the
 %reference for terminus delineations)
-[I,R] = readgeoraster([im_dir,ref_image]);
+% [I,R] = readgeoraster([im_dir,ref_image]);
+[I,R] = readgeoraster([im_dir,ims(im_refs(date_refs(1))).name]);
 im.x = linspace(R.XWorldLimits(1),R.XWorldLimits(2),R.RasterSize(2));
 im.y = linspace(R.YWorldLimits(2),R.YWorldLimits(1),R.RasterSize(1));
 im.z = double(I);

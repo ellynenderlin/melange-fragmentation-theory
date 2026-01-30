@@ -15,6 +15,7 @@ Eg = 0.31; %width-to-thickness ratio for grounded terminus
 rho_i = 900; rho_w = 1026; %densities
 years = 2011:1:2023; seasons = [12,1,2;3,4,5;6,7,8;9,10,11]; season_names = {'DJF','MAM','JJA','SON'};
 big3 = [{'SEK'},{'HLG'},{'ZIM'}];
+zcutoff = 3; %elevation threshold below which to ignore iceberge (m)
 
 
 %% ONLY RUN ONCE: Estimate thicknesses using bed and surface elevations
@@ -491,8 +492,8 @@ site_abbrev = char(folderNames(1)); %look for buttressing file in 1st site direc
 
             
             %average the seasonal melange buttressing estimates across all years
-            Fb_Meng(p,1) = round(nanmean(MP(i).B.butt_Meng(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
-            Fb_Amundson(p,1) = round(nanmean(MP(i).B.butt_Amundson(4,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
+            Fb_Meng(p,1) = round(nanmean(MP(i).B.butt_Meng(zcutoff+1,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
+            Fb_Amundson(p,1) = round(nanmean(MP(i).B.butt_Amundson(zcutoff+1,p,:))/10^6,2); %4th row is for icebergs with freeboard > 3m
             if ~contains(string(sitenames(i,:)),'KBG')
                 Fbutt_obs(i,p,:) = [Fb_Meng(p,1), Fb_Amundson(p,1)];
             else
